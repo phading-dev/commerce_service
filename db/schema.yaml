@@ -1,0 +1,135 @@
+- enum:
+    name: ProductType
+    values:
+      - name: STORAGE
+        value: 1
+      - name: UPLAOD
+        value: 2
+      - name: NETWORK
+        value: 3
+      - name: SHOW
+        value: 4
+      - name: SHOW_PLATFORM_CUT
+        value: 5
+- enum:
+    name: PaymentProcessor
+    values:
+      - name: STRIPE
+        value: 1
+- message:
+    name: TransactionItem
+    fields:
+      - name: productType
+        type: ProductType
+        index: 1
+      - name: quantity # Positive means debit, i.e. charge the account. Negative means credit, i.e. owe the account.
+        type: number
+        index: 2
+- enum:
+    name: TransactionState
+    values:
+      - name: COLLECTING # Transits to either READY_DEBIT or READY_CREDIT depends on if the ending amount needs debit or credit.
+        value: 1
+      - name: READY_DEBIT # Transists to PROCESSING after sending to a payment processor
+        value: 2
+      - name: READY_CREDIT # Transists to PROCESSING after sending to a payment processor
+        value: 3
+      - name: PROCESSING # Waits for payment processor to send notifications once payment or payout has completed/failed.
+        value: 4
+      - name: DEBIT_FAILED_OTHER_REASON
+        value: 5
+      - name: DEBIT_FAILED_PAYMENT_METHOD_MISSING
+        value: 6
+      - name: DEBIT_FAILED_PAYMENT_METHOD_DECLINED
+        value: 7
+      - name: CREDIT_FAILED_OTHER_REASON
+        value: 8
+      - name: CREDIT_FAILED_INSUFFICIENT_FUND
+        value: 9
+      - name: DISUPTED
+        value: 10
+      - name: REFUNDED
+        value: 11
+- enum:
+    name: StripeCustomerState
+    values:
+      - name: HEALTHY
+        value: 1
+      - name: PAST_DUE
+        value: 2
+      - name: SUSPENDED_DELINQUENT
+        value: 3
+      - name: SUSPENDED_SCAM_DISPUTED
+        value: 4
+- spannerDatabase:
+    # Payment methods are managed in Stripe.
+    name: CommerceDatabase
+    tables:
+      - name: Price # ${unitAmount}/${divideBy}*quantity = due amount
+        columns:
+          - name: productType
+            type: ProductType
+          - name: currency
+            type: string
+          - name: unitAmount # Uses Stripe's approach. The amount is in cents in USD or the smallest currency unit.
+            type: int64
+          - name: divideBy
+            type: int64
+          - name: startTimestamp # UTC timestamp of the start of the month.
+            type: timestamp
+          - name: endTimestamp # UTC timestamp of the start of the month or infinite future. Exclusive.
+            type: timestamp
+        primaryKeys:
+          - productType
+          - startTimestamp
+      - name: Transaction # Combines payment (debit) and payout (credit).
+        columns:
+          - name: accountId
+            type: string
+          - name: transactionId
+            type: string
+          - name: processor
+            type: PaymentProcessor
+          - name: items
+            type: TransactionItem
+            isArray: true
+          - name: currency
+            type: string
+          - name: totalAmount # Uses Stripe's approach. The amount is in cents in USD or the smallest currency unit.
+            type: int64
+          - name: periodStartTimestamp # UTC timestamp of the start of a day.
+            type: timestamp
+          - name: periodEndTimestamp # UTC timestamp of the start of a day. Exclusive
+            type: timestamp
+          - name: state
+            type: TransactionState
+        primaryKeys:
+          - transactionId
+        indexes:
+          - name: ByTimestamp
+            unique: true
+            columns:
+              - accountId
+              - processor
+              - name: periodStartTimestamp
+                desc: true
+      - name: StripeCustomer # Used for payment.
+        columns:
+          - name: accountId
+            type: string
+          - name: stripeCustomerId
+            type: string
+          - name: state
+            type: StripeCustomerState
+        primaryKeys:
+          - accountId
+      - name: StripeConnectedAccount # Used for payout.
+        columns:
+          - name: accountId
+            type: string
+          - name: stripeAccountId
+            type: string
+        primaryKeys:
+          - accountId
+    outputDdl: ./db/ddl
+    outputSql: ./db/sql

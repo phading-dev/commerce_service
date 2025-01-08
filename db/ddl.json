@@ -1,0 +1,83 @@
+{
+  "tables": [{
+    "name": "Price",
+    "columns": [{
+      "name": "productType",
+      "addColumnDdl": "ALTER TABLE Price ADD COLUMN productType FLOAT64 NOT NULL"
+    }, {
+      "name": "currency",
+      "addColumnDdl": "ALTER TABLE Price ADD COLUMN currency STRING(MAX) NOT NULL"
+    }, {
+      "name": "unitAmount",
+      "addColumnDdl": "ALTER TABLE Price ADD COLUMN unitAmount INT64 NOT NULL"
+    }, {
+      "name": "divideBy",
+      "addColumnDdl": "ALTER TABLE Price ADD COLUMN divideBy INT64 NOT NULL"
+    }, {
+      "name": "startTimestamp",
+      "addColumnDdl": "ALTER TABLE Price ADD COLUMN startTimestamp TIMESTAMP NOT NULL"
+    }, {
+      "name": "endTimestamp",
+      "addColumnDdl": "ALTER TABLE Price ADD COLUMN endTimestamp TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE Price (productType FLOAT64 NOT NULL, currency STRING(MAX) NOT NULL, unitAmount INT64 NOT NULL, divideBy INT64 NOT NULL, startTimestamp TIMESTAMP NOT NULL, endTimestamp TIMESTAMP NOT NULL) PRIMARY KEY (productType ASC, startTimestamp ASC)",
+    "indexes": []
+  }, {
+    "name": "Transaction",
+    "columns": [{
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "transactionId",
+      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN transactionId STRING(MAX) NOT NULL"
+    }, {
+      "name": "processor",
+      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN processor FLOAT64 NOT NULL"
+    }, {
+      "name": "items",
+      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN items Array<BYTES(MAX)> NOT NULL"
+    }, {
+      "name": "concludedAmount",
+      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN concludedAmount INT64 NOT NULL"
+    }, {
+      "name": "periodStartTimestamp",
+      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN periodStartTimestamp TIMESTAMP NOT NULL"
+    }, {
+      "name": "periodEndTimestamp",
+      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN periodEndTimestamp TIMESTAMP NOT NULL"
+    }, {
+      "name": "state",
+      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN state FLOAT64 NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE Transaction (accountId STRING(MAX) NOT NULL, transactionId STRING(MAX) NOT NULL, processor FLOAT64 NOT NULL, items Array<BYTES(MAX)> NOT NULL, concludedAmount INT64 NOT NULL, periodStartTimestamp TIMESTAMP NOT NULL, periodEndTimestamp TIMESTAMP NOT NULL, state FLOAT64 NOT NULL) PRIMARY KEY (transactionId ASC)",
+    "indexes": [{
+      "name": "ByTimestamp",
+      "createIndexDdl": "CREATE INDEX UNIQUE ByTimestamp ON Transaction(accountId, processor, periodStartTimestamp DESC)"
+    }]
+  }, {
+    "name": "StripeCustomer",
+    "columns": [{
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE StripeCustomer ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "stripeCustomerId",
+      "addColumnDdl": "ALTER TABLE StripeCustomer ADD COLUMN stripeCustomerId STRING(MAX) NOT NULL"
+    }, {
+      "name": "state",
+      "addColumnDdl": "ALTER TABLE StripeCustomer ADD COLUMN state FLOAT64 NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE StripeCustomer (accountId STRING(MAX) NOT NULL, stripeCustomerId STRING(MAX) NOT NULL, state FLOAT64 NOT NULL) PRIMARY KEY (accountId ASC)",
+    "indexes": []
+  }, {
+    "name": "StripeConnectedAccount",
+    "columns": [{
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE StripeConnectedAccount ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "stripeAccountId",
+      "addColumnDdl": "ALTER TABLE StripeConnectedAccount ADD COLUMN stripeAccountId STRING(MAX) NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE StripeConnectedAccount (accountId STRING(MAX) NOT NULL, stripeAccountId STRING(MAX) NOT NULL) PRIMARY KEY (accountId ASC)",
+    "indexes": []
+  }]
+}
