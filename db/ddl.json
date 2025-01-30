@@ -1,83 +1,236 @@
 {
   "tables": [{
-    "name": "Price",
-    "columns": [{
-      "name": "productType",
-      "addColumnDdl": "ALTER TABLE Price ADD COLUMN productType FLOAT64 NOT NULL"
-    }, {
-      "name": "currency",
-      "addColumnDdl": "ALTER TABLE Price ADD COLUMN currency STRING(MAX) NOT NULL"
-    }, {
-      "name": "unitAmount",
-      "addColumnDdl": "ALTER TABLE Price ADD COLUMN unitAmount INT64 NOT NULL"
-    }, {
-      "name": "divideBy",
-      "addColumnDdl": "ALTER TABLE Price ADD COLUMN divideBy INT64 NOT NULL"
-    }, {
-      "name": "startTimestamp",
-      "addColumnDdl": "ALTER TABLE Price ADD COLUMN startTimestamp TIMESTAMP NOT NULL"
-    }, {
-      "name": "endTimestamp",
-      "addColumnDdl": "ALTER TABLE Price ADD COLUMN endTimestamp TIMESTAMP NOT NULL"
-    }],
-    "createTableDdl": "CREATE TABLE Price (productType FLOAT64 NOT NULL, currency STRING(MAX) NOT NULL, unitAmount INT64 NOT NULL, divideBy INT64 NOT NULL, startTimestamp TIMESTAMP NOT NULL, endTimestamp TIMESTAMP NOT NULL) PRIMARY KEY (productType ASC, startTimestamp ASC)",
-    "indexes": []
-  }, {
-    "name": "Transaction",
+    "name": "BillingAccount",
     "columns": [{
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE BillingAccount ADD COLUMN accountId STRING(MAX) NOT NULL"
     }, {
-      "name": "transactionId",
-      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN transactionId STRING(MAX) NOT NULL"
+      "name": "data",
+      "addColumnDdl": "ALTER TABLE BillingAccount ADD COLUMN data BYTES(MAX) NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE BillingAccount (accountId STRING(MAX) NOT NULL, data BYTES(MAX) NOT NULL) PRIMARY KEY (accountId ASC)",
+    "indexes": []
+  }, {
+    "name": "Billing",
+    "columns": [{
+      "name": "billingId",
+      "addColumnDdl": "ALTER TABLE Billing ADD COLUMN billingId STRING(MAX) NOT NULL"
     }, {
-      "name": "processor",
-      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN processor FLOAT64 NOT NULL"
-    }, {
-      "name": "items",
-      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN items Array<BYTES(MAX)> NOT NULL"
-    }, {
-      "name": "concludedAmount",
-      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN concludedAmount INT64 NOT NULL"
-    }, {
-      "name": "periodStartTimestamp",
-      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN periodStartTimestamp TIMESTAMP NOT NULL"
-    }, {
-      "name": "periodEndTimestamp",
-      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN periodEndTimestamp TIMESTAMP NOT NULL"
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE Billing ADD COLUMN accountId STRING(MAX) NOT NULL"
     }, {
       "name": "state",
-      "addColumnDdl": "ALTER TABLE Transaction ADD COLUMN state FLOAT64 NOT NULL"
+      "addColumnDdl": "ALTER TABLE Billing ADD COLUMN state FLOAT64 NOT NULL"
+    }, {
+      "name": "month",
+      "addColumnDdl": "ALTER TABLE Billing ADD COLUMN month STRING(MAX) NOT NULL"
+    }, {
+      "name": "data",
+      "addColumnDdl": "ALTER TABLE Billing ADD COLUMN data BYTES(MAX) NOT NULL"
     }],
-    "createTableDdl": "CREATE TABLE Transaction (accountId STRING(MAX) NOT NULL, transactionId STRING(MAX) NOT NULL, processor FLOAT64 NOT NULL, items Array<BYTES(MAX)> NOT NULL, concludedAmount INT64 NOT NULL, periodStartTimestamp TIMESTAMP NOT NULL, periodEndTimestamp TIMESTAMP NOT NULL, state FLOAT64 NOT NULL) PRIMARY KEY (transactionId ASC)",
+    "createTableDdl": "CREATE TABLE Billing (billingId STRING(MAX) NOT NULL, accountId STRING(MAX) NOT NULL, state FLOAT64 NOT NULL, month STRING(MAX) NOT NULL, data BYTES(MAX) NOT NULL) PRIMARY KEY (billingId ASC)",
     "indexes": [{
-      "name": "ByTimestamp",
-      "createIndexDdl": "CREATE INDEX UNIQUE ByTimestamp ON Transaction(accountId, processor, periodStartTimestamp DESC)"
+      "name": "BillingByMonth",
+      "createIndexDdl": "CREATE INDEX BillingByMonth ON Billing(accountId, month DESC)"
+    }, {
+      "name": "BillingByState",
+      "createIndexDdl": "CREATE INDEX BillingByState ON Billing(accountId, state)"
     }]
   }, {
-    "name": "StripeCustomer",
+    "name": "EarningsAccount",
     "columns": [{
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE StripeCustomer ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE EarningsAccount ADD COLUMN accountId STRING(MAX) NOT NULL"
     }, {
-      "name": "stripeCustomerId",
-      "addColumnDdl": "ALTER TABLE StripeCustomer ADD COLUMN stripeCustomerId STRING(MAX) NOT NULL"
-    }, {
-      "name": "state",
-      "addColumnDdl": "ALTER TABLE StripeCustomer ADD COLUMN state FLOAT64 NOT NULL"
+      "name": "data",
+      "addColumnDdl": "ALTER TABLE EarningsAccount ADD COLUMN data BYTES(MAX) NOT NULL"
     }],
-    "createTableDdl": "CREATE TABLE StripeCustomer (accountId STRING(MAX) NOT NULL, stripeCustomerId STRING(MAX) NOT NULL, state FLOAT64 NOT NULL) PRIMARY KEY (accountId ASC)",
+    "createTableDdl": "CREATE TABLE EarningsAccount (accountId STRING(MAX) NOT NULL, data BYTES(MAX) NOT NULL) PRIMARY KEY (accountId ASC)",
     "indexes": []
   }, {
-    "name": "StripeConnectedAccount",
+    "name": "Earnings",
+    "columns": [{
+      "name": "earningsId",
+      "addColumnDdl": "ALTER TABLE Earnings ADD COLUMN earningsId STRING(MAX) NOT NULL"
+    }, {
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE Earnings ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "state",
+      "addColumnDdl": "ALTER TABLE Earnings ADD COLUMN state FLOAT64 NOT NULL"
+    }, {
+      "name": "month",
+      "addColumnDdl": "ALTER TABLE Earnings ADD COLUMN month STRING(MAX) NOT NULL"
+    }, {
+      "name": "data",
+      "addColumnDdl": "ALTER TABLE Earnings ADD COLUMN data BYTES(MAX) NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE Earnings (earningsId STRING(MAX) NOT NULL, accountId STRING(MAX) NOT NULL, state FLOAT64 NOT NULL, month STRING(MAX) NOT NULL, data BYTES(MAX) NOT NULL) PRIMARY KEY (earningsId ASC)",
+    "indexes": [{
+      "name": "EarningsByMonth",
+      "createIndexDdl": "CREATE INDEX EarningsByMonth ON Earnings(accountId, month DESC)"
+    }, {
+      "name": "EarningsByState",
+      "createIndexDdl": "CREATE INDEX EarningsByState ON Earnings(accountId, state)"
+    }]
+  }, {
+    "name": "StripeCustomerCreatingTask",
     "columns": [{
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE StripeConnectedAccount ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE StripeCustomerCreatingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
     }, {
-      "name": "stripeAccountId",
-      "addColumnDdl": "ALTER TABLE StripeConnectedAccount ADD COLUMN stripeAccountId STRING(MAX) NOT NULL"
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE StripeCustomerCreatingTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE StripeCustomerCreatingTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
     }],
-    "createTableDdl": "CREATE TABLE StripeConnectedAccount (accountId STRING(MAX) NOT NULL, stripeAccountId STRING(MAX) NOT NULL) PRIMARY KEY (accountId ASC)",
-    "indexes": []
+    "createTableDdl": "CREATE TABLE StripeCustomerCreatingTask (accountId STRING(MAX) NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (accountId ASC)",
+    "indexes": [{
+      "name": "StripeCustomerCreatingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX StripeCustomerCreatingTaskByExecutionTime ON StripeCustomerCreatingTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "PaymentTask",
+    "columns": [{
+      "name": "billingId",
+      "addColumnDdl": "ALTER TABLE PaymentTask ADD COLUMN billingId STRING(MAX) NOT NULL"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE PaymentTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE PaymentTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE PaymentTask (billingId STRING(MAX) NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (billingId ASC)",
+    "indexes": [{
+      "name": "PaymentTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX PaymentTaskByExecutionTime ON PaymentTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "UpdatePaymentMethodNotifyingTask",
+    "columns": [{
+      "name": "billingId",
+      "addColumnDdl": "ALTER TABLE UpdatePaymentMethodNotifyingTask ADD COLUMN billingId STRING(MAX) NOT NULL"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE UpdatePaymentMethodNotifyingTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE UpdatePaymentMethodNotifyingTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE UpdatePaymentMethodNotifyingTask (billingId STRING(MAX) NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (billingId ASC)",
+    "indexes": [{
+      "name": "UpdatePaymentMethodNotifyingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX UpdatePaymentMethodNotifyingTaskByExecutionTime ON UpdatePaymentMethodNotifyingTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "BillingAccountSuspendingDueToPastDueTask",
+    "columns": [{
+      "name": "billingId",
+      "addColumnDdl": "ALTER TABLE BillingAccountSuspendingDueToPastDueTask ADD COLUMN billingId STRING(MAX) NOT NULL"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE BillingAccountSuspendingDueToPastDueTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE BillingAccountSuspendingDueToPastDueTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE BillingAccountSuspendingDueToPastDueTask (billingId STRING(MAX) NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (billingId ASC)",
+    "indexes": [{
+      "name": "BillingAccountSuspendingDueToPastDueTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX BillingAccountSuspendingDueToPastDueTaskByExecutionTime ON BillingAccountSuspendingDueToPastDueTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "BillingAccountSuspensionNotifyingTask",
+    "columns": [{
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE BillingAccountSuspensionNotifyingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "version",
+      "addColumnDdl": "ALTER TABLE BillingAccountSuspensionNotifyingTask ADD COLUMN version FLOAT64 NOT NULL"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE BillingAccountSuspensionNotifyingTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE BillingAccountSuspensionNotifyingTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE BillingAccountSuspensionNotifyingTask (accountId STRING(MAX) NOT NULL, version FLOAT64 NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (accountId ASC, version ASC)",
+    "indexes": [{
+      "name": "BillingAccountSuspensionNotifyingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX BillingAccountSuspensionNotifyingTaskByExecutionTime ON BillingAccountSuspensionNotifyingTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "BillingAccountStateSyncingTask",
+    "columns": [{
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE BillingAccountStateSyncingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "version",
+      "addColumnDdl": "ALTER TABLE BillingAccountStateSyncingTask ADD COLUMN version FLOAT64 NOT NULL"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE BillingAccountStateSyncingTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE BillingAccountStateSyncingTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE BillingAccountStateSyncingTask (accountId STRING(MAX) NOT NULL, version FLOAT64 NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (accountId ASC, version ASC)",
+    "indexes": [{
+      "name": "BillingAccountStateSyncingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX BillingAccountStateSyncingTaskByExecutionTime ON BillingAccountStateSyncingTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "StripeConnectedAccountCreatingTask",
+    "columns": [{
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE StripeConnectedAccountCreatingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE StripeConnectedAccountCreatingTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE StripeConnectedAccountCreatingTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE StripeConnectedAccountCreatingTask (accountId STRING(MAX) NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (accountId ASC)",
+    "indexes": [{
+      "name": "StripeConnectedAccountCreatingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX StripeConnectedAccountCreatingTaskByExecutionTime ON StripeConnectedAccountCreatingTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "SetupStripeConnectedAccountNotifyingTask",
+    "columns": [{
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE SetupStripeConnectedAccountNotifyingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE SetupStripeConnectedAccountNotifyingTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE SetupStripeConnectedAccountNotifyingTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE SetupStripeConnectedAccountNotifyingTask (accountId STRING(MAX) NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (accountId ASC)",
+    "indexes": [{
+      "name": "SetupStripeConnectedAccountNotifyingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX SetupStripeConnectedAccountNotifyingTaskByExecutionTime ON SetupStripeConnectedAccountNotifyingTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "PayoutTask",
+    "columns": [{
+      "name": "earningsId",
+      "addColumnDdl": "ALTER TABLE PayoutTask ADD COLUMN earningsId STRING(MAX) NOT NULL"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE PayoutTask ADD COLUMN executionTimeMs TIMESTAMP NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE PayoutTask ADD COLUMN createdTimeMs TIMESTAMP NOT NULL"
+    }],
+    "createTableDdl": "CREATE TABLE PayoutTask (earningsId STRING(MAX) NOT NULL, executionTimeMs TIMESTAMP NOT NULL, createdTimeMs TIMESTAMP NOT NULL) PRIMARY KEY (earningsId ASC)",
+    "indexes": [{
+      "name": "PayoutTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX PayoutTaskByExecutionTime ON PayoutTask(executionTimeMs)"
+    }]
   }]
 }

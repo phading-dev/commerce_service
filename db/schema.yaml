@@ -1,135 +1,747 @@
-- enum:
-    name: ProductType
-    values:
-      - name: STORAGE
-        value: 1
-      - name: UPLAOD
-        value: 2
-      - name: NETWORK
-        value: 3
-      - name: SHOW
-        value: 4
-      - name: SHOW_PLATFORM_CUT
-        value: 5
-- enum:
-    name: PaymentProcessor
-    values:
-      - name: STRIPE
-        value: 1
-- message:
-    name: TransactionItem
-    fields:
-      - name: productType
-        type: ProductType
-        index: 1
-      - name: quantity # Positive means debit, i.e. charge the account. Negative means credit, i.e. owe the account.
-        type: number
-        index: 2
-- enum:
-    name: TransactionState
-    values:
-      - name: COLLECTING # Transits to either READY_DEBIT or READY_CREDIT depends on if the ending amount needs debit or credit.
-        value: 1
-      - name: READY_DEBIT # Transists to PROCESSING after sending to a payment processor
-        value: 2
-      - name: READY_CREDIT # Transists to PROCESSING after sending to a payment processor
-        value: 3
-      - name: PROCESSING # Waits for payment processor to send notifications once payment or payout has completed/failed.
-        value: 4
-      - name: DEBIT_FAILED_OTHER_REASON
-        value: 5
-      - name: DEBIT_FAILED_PAYMENT_METHOD_MISSING
-        value: 6
-      - name: DEBIT_FAILED_PAYMENT_METHOD_DECLINED
-        value: 7
-      - name: CREDIT_FAILED_OTHER_REASON
-        value: 8
-      - name: CREDIT_FAILED_INSUFFICIENT_FUND
-        value: 9
-      - name: DISUPTED
-        value: 10
-      - name: REFUNDED
-        value: 11
-- enum:
-    name: StripeCustomerState
-    values:
-      - name: HEALTHY
-        value: 1
-      - name: PAST_DUE
-        value: 2
-      - name: SUSPENDED_DELINQUENT
-        value: 3
-      - name: SUSPENDED_SCAM_DISPUTED
-        value: 4
-- spannerDatabase:
-    # Payment methods are managed in Stripe.
-    name: CommerceDatabase
-    tables:
-      - name: Price # ${unitAmount}/${divideBy}*quantity = due amount
-        columns:
-          - name: productType
-            type: ProductType
-          - name: currency
-            type: string
-          - name: unitAmount # Uses Stripe's approach. The amount is in cents in USD or the smallest currency unit.
-            type: int64
-          - name: divideBy
-            type: int64
-          - name: startTimestamp # UTC timestamp of the start of the month.
-            type: timestamp
-          - name: endTimestamp # UTC timestamp of the start of the month or infinite future. Exclusive.
-            type: timestamp
-        primaryKeys:
-          - productType
-          - startTimestamp
-      - name: Transaction # Combines payment (debit) and payout (credit).
-        columns:
-          - name: accountId
-            type: string
-          - name: transactionId
-            type: string
-          - name: processor
-            type: PaymentProcessor
-          - name: items
-            type: TransactionItem
-            isArray: true
-          - name: currency
-            type: string
-          - name: totalAmount # Uses Stripe's approach. The amount is in cents in USD or the smallest currency unit.
-            type: int64
-          - name: periodStartTimestamp # UTC timestamp of the start of a day.
-            type: timestamp
-          - name: periodEndTimestamp # UTC timestamp of the start of a day. Exclusive
-            type: timestamp
-          - name: state
-            type: TransactionState
-        primaryKeys:
-          - transactionId
-        indexes:
-          - name: ByTimestamp
-            unique: true
-            columns:
-              - accountId
-              - processor
-              - name: periodStartTimestamp
-                desc: true
-      - name: StripeCustomer # Used for payment.
-        columns:
-          - name: accountId
-            type: string
-          - name: stripeCustomerId
-            type: string
-          - name: state
-            type: StripeCustomerState
-        primaryKeys:
-          - accountId
-      - name: StripeConnectedAccount # Used for payout.
-        columns:
-          - name: accountId
-            type: string
-          - name: stripeAccountId
-            type: string
-        primaryKeys:
-          - accountId
-    outputDdl: ./db/ddl
-    outputSql: ./db/sql
+- kind: Enum
+  name: BillingAccountState
+  values:
+    - name: HEALTHY
+      value: 1
+    - name: SUSPENDED
+      value: 2
+- kind: Message
+  name: BillingAccountStateInfo
+  fields:
+    - name: version
+      type: number
+      index: 1
+    - name: state
+      type: BillingAccountState
+      index: 2
+    - name: updatedTimeMs
+      type: number
+      index: 3
+- kind: Message
+  name: BillingAccount
+  fields:
+    - name: accountId
+      type: string
+      index: 1
+    - name: stripeCustomerId
+      type: string
+      index: 2
+    - name: stateInfo
+      type: BillingAccountStateInfo
+      index: 3
+    - name: paymentAfterMs
+      type: number
+      index: 4
+- kind: Enum
+  name: PaymentState
+  values:
+    - name: PROCESSING
+      value: 1
+    - name: CHARGING
+      value: 2
+    - name: PAID
+      value: 3
+    - name: FAILED
+      value: 4
+- kind: Message
+  name: LineItem
+  fields:
+    - name: productType
+      type: ProductType
+      import: "@phading/price/price"
+      index: 1
+    - name: quantity # The number of units per price config.
+      type: number
+      index: 2
+    - name: amount # Amount under the smallest unit of the currency. E.g. cents for USD.
+      type: number
+      index: 3
+- kind: Message
+  name: Billing
+  fields:
+    - name: accountId
+      type: string
+      index: 1
+    - name: billingId
+      type: string
+      index: 2
+    - name: createdTimeMs
+      type: number
+      index: 3
+    - name: state
+      type: PaymentState
+      index: 4
+    - name: month # ISO string
+      type: string
+      index: 5
+    - name: currency
+      type: string
+      index: 6
+    - name: totalAmount # Amount under the smallest unit of the currency. E.g. cents for USD.
+      type: number
+      index: 7
+    - name: items
+      type: LineItem
+      isArray: true
+      index: 8
+    - name: stripeInvoiceId
+      type: string
+      index: 9
+    - name: stripeInvoiceUrl
+      type: string
+      index: 10
+- kind: Enum
+  name: StripeConnectedAccountState
+  values:
+    - name: ONBOARDING
+      value: 1
+    - name: ONBOARDED
+      value: 2
+- kind: Message
+  name: EarningsAccount
+  fields:
+    - name: accountId
+      type: string
+      index: 1
+    - name: stripeConnectedAccountId
+      type: string
+      index: 2
+    - name: stripeConnectedAccountState
+      type: StripeConnectedAccountState
+      index: 3
+- kind: Enum
+  name: PayoutState
+  values:
+    - name: PROCESSING
+      value: 1
+    - name: PAID
+      value: 2
+    - name: FAILED
+      value: 3
+- kind: Message
+  name: Earnings
+  fields:
+    - name: accountId
+      type: string
+      index: 1
+    - name: earningsId
+      type: string
+      index: 2
+    - name: createdTimeMs
+      type: number
+      index: 3
+    - name: state
+      type: PayoutState
+      index: 4
+    - name: month # ISO string
+      type: string
+      index: 5
+    - name: currency
+      type: string
+      index: 6
+    - name: totalAmount # Amount under the smallest unit of the currency. E.g. cents for USD.
+      type: number
+      index: 7
+    - name: items
+      type: LineItem
+      isArray: true
+      index: 8
+    - name: stripeTransferId
+      type: string
+      index: 9
+- kind: SpannerDatabase
+  name: CommerceDatabase
+  tables:
+    - kind: MessageTable
+      name: BillingAccount
+      storedInColumn: data
+      columns:
+        - accountId
+      primaryKeys:
+        - accountId
+      insertStatementName: InsertBillingAccount
+      deleteStatementName: DeleteBillingAccount
+      getStatementName: GetBillingAccount
+      updateStatementName: UpdateBillingAccount
+    - kind: MessageTable
+      name: Billing
+      storedInColumn: data
+      columns:
+        - billingId
+        - accountId
+        - state
+        - month
+      primaryKeys:
+        - billingId
+      indexes:
+        - name: BillingByMonth
+          columns:
+            - accountId
+            - name: month
+              desc: true
+        - name: BillingByState
+          columns:
+            - accountId
+            - state
+      insertStatementName: InsertBilling
+      deleteStatementName: DeleteBilling
+      getStatementName: GetBilling
+      updateStatementName: UpdateBilling
+    - kind: MessageTable
+      name: EarningsAccount
+      storedInColumn: data
+      columns:
+        - accountId
+      primaryKeys:
+        - accountId
+      insertStatementName: InsertEarningsAccount
+      deleteStatementName: DeleteEarningsAccount
+      getStatementName: GetEarningsAccount
+      updateStatementName: UpdateEarningsAccount
+    - kind: MessageTable
+      name: Earnings
+      storedInColumn: data
+      columns:
+        - earningsId
+        - accountId
+        - state
+        - month
+      primaryKeys:
+        - earningsId
+      indexes:
+        - name: EarningsByMonth
+          columns:
+            - accountId
+            - name: month
+              desc: true
+        - name: EarningsByState
+          columns:
+            - accountId
+            - state
+      insertStatementName: InsertEarnings
+      deleteStatementName: DeleteEarnings
+      getStatementName: GetEarnings
+      updateStatementName: UpdateEarnings
+    - kind: Table
+      name: StripeCustomerCreatingTask
+      columns:
+        - name: accountId
+          type: string
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - accountId
+      indexes:
+        - name: StripeCustomerCreatingTaskByExecutionTime
+          columns:
+            - executionTimeMs
+    - kind: Table
+      name: PaymentTask
+      columns:
+        - name: billingId
+          type: string
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - billingId
+      indexes:
+        - name: PaymentTaskByExecutionTime
+          columns:
+            - executionTimeMs
+    - kind: Table
+      name: UpdatePaymentMethodNotifyingTask
+      columns:
+        - name: billingId
+          type: string
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - billingId
+      indexes:
+        - name: UpdatePaymentMethodNotifyingTaskByExecutionTime
+          columns:
+            - executionTimeMs
+    - kind: Table
+      name: BillingAccountSuspendingDueToPastDueTask
+      columns:
+        - name: billingId
+          type: string
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - billingId
+      indexes:
+        - name: BillingAccountSuspendingDueToPastDueTaskByExecutionTime
+          columns:
+            - executionTimeMs
+    - kind: Table
+      name: BillingAccountSuspensionNotifyingTask
+      columns:
+        - name: accountId
+          type: string
+        - name: version
+          type: float64
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - accountId
+        - version
+      indexes:
+        - name: BillingAccountSuspensionNotifyingTaskByExecutionTime
+          columns:
+            - executionTimeMs
+    - kind: Table
+      name: BillingAccountStateSyncingTask
+      columns:
+        - name: accountId
+          type: string
+        - name: version
+          type: float64
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - accountId
+        - version
+      indexes:
+        - name: BillingAccountStateSyncingTaskByExecutionTime
+          columns:
+            - executionTimeMs
+    - kind: Table
+      name: StripeConnectedAccountCreatingTask
+      columns:
+        - name: accountId
+          type: string
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - accountId
+      indexes:
+        - name: StripeConnectedAccountCreatingTaskByExecutionTime
+          columns:
+            - executionTimeMs
+    - kind: Table
+      name: SetupStripeConnectedAccountNotifyingTask
+      columns:
+        - name: accountId
+          type: string
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - accountId
+      indexes:
+        - name: SetupStripeConnectedAccountNotifyingTaskByExecutionTime
+          columns:
+            - executionTimeMs
+    - kind: Table
+      name: PayoutTask
+      columns:
+        - name: earningsId
+          type: string
+        - name: executionTimeMs
+          type: timestamp
+        - name: createdTimeMs
+          type: timestamp
+      primaryKeys:
+        - earningsId
+      indexes:
+        - name: PayoutTaskByExecutionTime
+          columns:
+            - executionTimeMs
+  inserts:
+    - name: InsertStripeCustomerCreatingTask
+      table: StripeCustomerCreatingTask
+      setColumns:
+        - accountId
+        - executionTimeMs
+        - createdTimeMs
+    - name: InsertPaymentTask
+      table: PaymentTask
+      setColumns:
+        - billingId
+        - executionTimeMs
+        - createdTimeMs
+    - name: InsertUpdatePaymentMethodNotifyingTask
+      table: UpdatePaymentMethodNotifyingTask
+      setColumns:
+        - billingId
+        - executionTimeMs
+        - createdTimeMs
+    - name: InsertBillingAccountSuspendingDueToPastDueTask
+      table: BillingAccountSuspendingDueToPastDueTask
+      setColumns:
+        - billingId
+        - executionTimeMs
+        - createdTimeMs
+    - name: InsertBillingAccountSuspensionNotifyingTask
+      table: BillingAccountSuspensionNotifyingTask
+      setColumns:
+        - accountId
+        - version
+        - executionTimeMs
+        - createdTimeMs
+    - name: InsertBillingAccountStateSyncingTask
+      table: BillingAccountStateSyncingTask
+      setColumns:
+        - accountId
+        - version
+        - executionTimeMs
+        - createdTimeMs
+    - name: InsertStripeConnectedAccountCreatingTask
+      table: StripeConnectedAccountCreatingTask
+      setColumns:
+        - accountId
+        - executionTimeMs
+        - createdTimeMs
+    - name: InsertSetupStripeConnectedAccountNotifyingTask
+      table: SetupStripeConnectedAccountNotifyingTask
+      setColumns:
+        - accountId
+        - executionTimeMs
+        - createdTimeMs
+    - name: InsertPayoutTask
+      table: PayoutTask
+      setColumns:
+        - earningsId
+        - executionTimeMs
+        - createdTimeMs
+  updates:
+    - name: UpdateStripeCustomerCreatingTask
+      table: StripeCustomerCreatingTask
+      where:
+        op: =
+        leftColumn: accountId
+      setColumns:
+        - executionTimeMs
+    - name: UpdatePaymentTask
+      table: PaymentTask
+      where:
+        op: =
+        leftColumn: billingId
+      setColumns:
+        - executionTimeMs
+    - name: UpdateUpdatePaymentMethodNotifyingTask
+      table: UpdatePaymentMethodNotifyingTask
+      where:
+        op: =
+        leftColumn: billingId
+      setColumns:
+        - executionTimeMs
+    - name: UpdateBillingAccountSuspendingDueToPastDueTask
+      table: BillingAccountSuspendingDueToPastDueTask
+      where:
+        op: =
+        leftColumn: billingId
+      setColumns:
+        - executionTimeMs
+    - name: UpdateBillingAccountSuspensionNotifyingTask
+      table: BillingAccountSuspensionNotifyingTask
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: =
+            leftColumn: version
+      setColumns:
+        - executionTimeMs
+    - name: UpdateBillingAccountStateSyncingTask
+      table: BillingAccountStateSyncingTask
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: =
+            leftColumn: version
+      setColumns:
+        - executionTimeMs
+    - name: UpdateStripeConnectedAccountCreatingTask
+      table: StripeConnectedAccountCreatingTask
+      where:
+        op: =
+        leftColumn: accountId
+      setColumns:
+        - executionTimeMs
+    - name: UpdateSetupStripeConnectedAccountNotifyingTask
+      table: SetupStripeConnectedAccountNotifyingTask
+      where:
+        op: =
+        leftColumn: accountId
+      setColumns:
+        - executionTimeMs
+    - name: UpdatePayoutTask
+      table: PayoutTask
+      where:
+        op: =
+        leftColumn: earningsId
+      setColumns:
+        - executionTimeMs
+  deletes:
+    - name: DeleteStripeCustomerCreatingTask
+      table: StripeCustomerCreatingTask
+      where:
+        op: =
+        leftColumn: accountId
+    - name: DeletePaymentTask
+      table: PaymentTask
+      where:
+        op: =
+        leftColumn: billingId
+    - name: DeleteUpdatePaymentMethodNotifyingTask
+      table: UpdatePaymentMethodNotifyingTask
+      where:
+        op: =
+        leftColumn: billingId
+    - name: DeleteBillingAccountSuspendingDueToPastDueTask
+      table: BillingAccountSuspendingDueToPastDueTask
+      where:
+        op: =
+        leftColumn: billingId
+    - name: DeleteBillingAccountSuspensionNotifyingTask
+      table: BillingAccountSuspensionNotifyingTask
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: =
+            leftColumn: version
+    - name: DeleteBillingAccountStateSyncingTask
+      table: BillingAccountStateSyncingTask
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: =
+            leftColumn: version
+    - name: DeleteStripeConnectedAccountCreatingTask
+      table: StripeConnectedAccountCreatingTask
+      where:
+        op: =
+        leftColumn: accountId
+    - name: DeleteSetupStripeConnectedAccountNotifyingTask
+      table: SetupStripeConnectedAccountNotifyingTask
+      where:
+        op: =
+        leftColumn: accountId
+    - name: DeletePayoutTask
+      table: PayoutTask
+      where:
+        op: =
+        leftColumn: earningsId
+  selects:
+    - name: GetBillingAccountFromBilling
+      table:
+        name: Billing
+        as: b
+      join:
+        - type: INNER
+          table:
+            name: BillingAccount
+            as: a
+          on:
+            op: =
+            leftColumn:
+              name: accountId
+              table: b
+            rightColumn: accountId
+      where:
+        op: =
+        leftColumn: billingId
+      getColumns:
+        - name: data
+          table: a
+    - name: GetBillingByMonth
+      table: Billing
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: =
+            leftColumn: month
+      getColumns:
+        - data
+    - name: ListBillings
+      table: Billing
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: ">="
+            leftColumn: month
+          - op: "<="
+            leftColumn: month
+      orderBy:
+        - column: month
+          desc: true
+      getColumns:
+        - data
+    - name: ListBillingsByState
+      table: Billing
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: =
+            leftColumn: state
+      getColumns:
+        - data
+    - name: GetEarningsByMonth
+      table: Earnings
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: =
+            leftColumn: month
+      getColumns:
+        - data
+    - name: ListEarnings
+      table: Earnings
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: ">="
+            leftColumn: month
+          - op: "<="
+            leftColumn: month
+      orderBy:
+        - column: month
+          desc: true
+      getColumns:
+        - data
+    - name: ListEarningsByState
+      table: Earnings
+      where:
+        op: AND
+        exps:
+          - op: =
+            leftColumn: accountId
+          - op: =
+            leftColumn: state
+      getColumns:
+        - data
+    - name: ListStripeCustomerCreatingTasks
+      table: StripeCustomerCreatingTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - accountId
+        - executionTimeMs
+    - name: ListPaymentTasks
+      table: PaymentTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - billingId
+        - executionTimeMs
+    - name: ListUpdatePaymentMethodNotifyingTasks
+      table: UpdatePaymentMethodNotifyingTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - billingId
+        - executionTimeMs
+    - name: CheckUpdatePaymentMethodNotifyingTask
+      table: UpdatePaymentMethodNotifyingTask
+      where:
+        op: =
+        leftColumn: billingId
+      getColumns:
+        - executionTimeMs
+    - name: ListBillingAccountSuspendingDueToPastDueTasks
+      table: BillingAccountSuspendingDueToPastDueTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - billingId
+        - executionTimeMs
+    - name: ListBillingAccountSuspensionNotifyingTasks
+      table: BillingAccountSuspensionNotifyingTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - accountId
+        - version
+        - executionTimeMs
+    - name: ListBillingAccountStateSyncingTasks
+      table: BillingAccountStateSyncingTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - accountId
+        - version
+        - executionTimeMs
+    - name: ListStripeConnectedAccountCreatingTasks
+      table: StripeConnectedAccountCreatingTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - accountId
+        - executionTimeMs
+    - name: ListSetupStripeConnectedAccountNotifyingTasks
+      table: SetupStripeConnectedAccountNotifyingTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - accountId
+        - executionTimeMs
+    - name: ListPayoutTasks
+      table: PayoutTask
+      where:
+        op: <=
+        leftColumn: executionTimeMs
+      orderBy:
+        - executionTimeMs
+      getColumns:
+        - earningsId
+        - executionTimeMs
+  outputDdl: ./db/ddl
+  outputSql: ./db/sql
