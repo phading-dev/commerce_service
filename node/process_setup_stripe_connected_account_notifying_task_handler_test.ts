@@ -1,29 +1,37 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
-  LIST_SETUP_STRIPE_CONNECTED_ACCOUNT_NOTIFYING_TASKS_ROW,
+  GET_SETUP_STRIPE_CONNECTED_ACCOUNT_NOTIFYING_TASK_METADATA_ROW,
   deleteSetupStripeConnectedAccountNotifyingTaskStatement,
+  getSetupStripeConnectedAccountNotifyingTaskMetadata,
   insertSetupStripeConnectedAccountNotifyingTaskStatement,
-  listSetupStripeConnectedAccountNotifyingTasks,
+  listPendingSetupStripeConnectedAccountNotifyingTasks,
 } from "../db/sql";
-import { ProcessSetupStripeConnectedAccountNotifyingTaskHandler } from "./process_setup_stripe_connected_account_task_handler";
+import { ProcessSetupStripeConnectedAccountNotifyingTaskHandler } from "./process_setup_stripe_connected_account_notifying_task_handler";
 import { GetAccountContactResponse } from "@phading/user_service_interface/node/interface";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
-import { assertThat, eq, isArray } from "@selfage/test_matcher";
+import {
+  assertReject,
+  assertThat,
+  eq,
+  eqError,
+  isArray,
+} from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "ProcessStripeConnectedAccountCreatingTaskHandlerTest",
+  name: "ProcessSetupStripeConnectedAccountNotifyingTaskHandlerTest",
   cases: [
     {
-      name: "Success",
+      name: "ProcessTask",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
             insertSetupStripeConnectedAccountNotifyingTaskStatement(
               "account1",
+              0,
               100,
               100,
             ),
@@ -52,12 +60,9 @@ TEST_RUNNER.run({
           );
 
         // Execute
-        handler.handle("", {
+        await handler.processTask("", {
           accountId: "account1",
         });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
-        );
 
         // Verify
         assertThat(
@@ -73,17 +78,17 @@ TEST_RUNNER.run({
         assertThat(
           sendParamsCapture.dynamicTemplateData.completeSetupUrl,
           eq(
-            "http://test.com/?e=%7B%22accountId%22%3A%22account1%22%2C%22account%22%3A%7B%22earnings%22%3A%7B%7D%7D%7D",
+            "http://test.com/?e=%7B%221%22%3A%7B%221%22%3A%22account1%22%2C%222%22%3A%7B%223%22%3A%7B%7D%7D%7D%7D",
           ),
           "sendParams.dynamicTemplateData.completeSetupUrl",
         );
         assertThat(
-          await listSetupStripeConnectedAccountNotifyingTasks(
+          await listPendingSetupStripeConnectedAccountNotifyingTasks(
             SPANNER_DATABASE,
             1000000,
           ),
           isArray([]),
-          "listSetupStripeConnectedAccountNotifyingTasks",
+          "SetupStripeConnectedAccountNotifyingTasks",
         );
       },
       tearDown: async () => {
@@ -96,13 +101,14 @@ TEST_RUNNER.run({
       },
     },
     {
-      name: "FailedToSendEmailAndRetried",
+      name: "FailedToSendEmail",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
             insertSetupStripeConnectedAccountNotifyingTaskStatement(
               "account1",
+              0,
               100,
               100,
             ),
@@ -130,29 +136,69 @@ TEST_RUNNER.run({
           );
 
         // Execute
-        handler.handle("", {
-          accountId: "account1",
-        });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
+        let error = await assertReject(
+          handler.processTask("", {
+            accountId: "account1",
+          }),
         );
 
         // Verify
-        assertThat(
-          await listSetupStripeConnectedAccountNotifyingTasks(
+        assertThat(error, eqError(new Error("Fake error")), "error");
+      },
+      tearDown: async () => {
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            deleteSetupStripeConnectedAccountNotifyingTaskStatement("account1"),
+          ]);
+          await transaction.commit();
+        });
+      },
+    },
+    {
+      name: "ClaimTask",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertSetupStripeConnectedAccountNotifyingTaskStatement(
+              "account1",
+              0,
+              100,
+              100,
+            ),
+          ]);
+          await transaction.commit();
+        });
+        let handler =
+          new ProcessSetupStripeConnectedAccountNotifyingTaskHandler(
             SPANNER_DATABASE,
-            1000000,
+            undefined,
+            undefined,
+            undefined,
+            () => 1000,
+          );
+
+        // Execute
+        await handler.claimTask("", {
+          accountId: "account1",
+        });
+
+        // Verify
+        assertThat(
+          await getSetupStripeConnectedAccountNotifyingTaskMetadata(
+            SPANNER_DATABASE,
+            "account1",
           ),
           isArray([
             eqMessage(
               {
-                setupStripeConnectedAccountNotifyingTaskAccountId: "account1",
+                setupStripeConnectedAccountNotifyingTaskRetryCount: 1,
                 setupStripeConnectedAccountNotifyingTaskExecutionTimeMs: 301000,
               },
-              LIST_SETUP_STRIPE_CONNECTED_ACCOUNT_NOTIFYING_TASKS_ROW,
+              GET_SETUP_STRIPE_CONNECTED_ACCOUNT_NOTIFYING_TASK_METADATA_ROW,
             ),
           ]),
-          "listSetupStripeConnectedAccountNotifyingTasks",
+          "SetupStripeConnectedAccountNotifyingTasks",
         );
       },
       tearDown: async () => {

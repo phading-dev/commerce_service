@@ -1,5 +1,5 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { listStripeCustomerCreatingTasks } from "../db/sql";
+import { listPendingStripeCustomerCreatingTasks } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { ListStripeCustomerCreatingTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
@@ -26,7 +26,7 @@ export class ListStripeCustomerCreatingTasksHandler extends ListStripeCustomerCr
     loggingPrefix: string,
     body: ListStripeCustomerCreatingTasksRequestBody,
   ): Promise<ListStripeCustomerCreatingTasksResponse> {
-    let rows = await listStripeCustomerCreatingTasks(
+    let rows = await listPendingStripeCustomerCreatingTasks(
       this.database,
       this.getNow(),
     );

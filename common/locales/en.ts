@@ -1,8 +1,4 @@
-import {
-  ACCOUNT_SUSPENSION_EN_EMAIL_TEMPLATE_ID,
-  SETUP_STRIPE_CONNECTED_ACCOUNT_EN_EMAIL_TEMPLATE_ID,
-  UPDATE_PAYMENT_METHOD_EN_EMAIL_TEMPLATE_ID,
-} from "../env_vars";
+import { ENV_VARS } from "../../env";
 
 export default class EN {
   get locale() {
@@ -12,12 +8,12 @@ export default class EN {
     return "Total usage";
   }
   get updatePaymentMethodEmailTemplateId() {
-    return UPDATE_PAYMENT_METHOD_EN_EMAIL_TEMPLATE_ID;
+    return ENV_VARS.updatePaymentMethodEnEmailTemplateId;
   }
   get accountSuspensionEmailTemplateId() {
-    return ACCOUNT_SUSPENSION_EN_EMAIL_TEMPLATE_ID;
+    return ENV_VARS.accountSuspensionEnEmailTemplateId;
   }
   get setupStripeConnectedAccountEmailTemplateId() {
-    return SETUP_STRIPE_CONNECTED_ACCOUNT_EN_EMAIL_TEMPLATE_ID;
+    return ENV_VARS.setupStripeConnectedAccountEnEmailTemplateId;
   }
 }

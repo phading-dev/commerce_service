@@ -15,7 +15,7 @@ import {
   SetConnectedAccountOnboardedRequestBody,
   SetConnectedAccountOnboardedResponse,
 } from "@phading/commerce_service_interface/web/earnings/interface";
-import { exchangeSessionAndCheckCapability } from "@phading/user_session_service_interface/node/client";
+import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import {
   newInternalServerErrorError,
   newUnauthorizedError,
@@ -44,14 +44,13 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
     body: SetConnectedAccountOnboardedRequestBody,
     sessionStr: string,
   ): Promise<SetConnectedAccountOnboardedResponse> {
-    let { accountId, capabilities } = await exchangeSessionAndCheckCapability(
-      this.serviceClient,
-      {
+    let { accountId, capabilities } = await this.serviceClient.send(
+      newExchangeSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanEarn: true,
         },
-      },
+      }),
     );
     if (accountId !== body.accountId) {
       throw newUnauthorizedError(
@@ -85,7 +84,7 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
         earnings.state = PayoutState.PROCESSING;
         statements.push(
           updateEarningsStatement(earnings),
-          insertPayoutTaskStatement(earnings.earningsId, now, now),
+          insertPayoutTaskStatement(earnings.earningsId, 0, now, now),
         );
       });
       await transaction.batchUpdate(statements);

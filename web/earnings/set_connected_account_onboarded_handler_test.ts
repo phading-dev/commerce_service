@@ -2,10 +2,13 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PayoutState, StripeConnectedAccountState } from "../../db/schema";
 import {
   GET_EARNINGS_ACCOUNT_ROW,
+  GET_PAYOUT_TASK_ROW,
   LIST_EARNINGS_ROW,
   deleteEarningsAccountStatement,
   deleteEarningsStatement,
+  deletePayoutTaskStatement,
   getEarningsAccount,
+  getPayoutTask,
   insertEarningsAccountStatement,
   insertEarningsStatement,
   listEarnings,
@@ -18,6 +21,23 @@ import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
 import { assertReject, assertThat, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
+
+async function cleanupAll() {
+  await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+    await transaction.batchUpdate([
+      deleteEarningsAccountStatement("account1"),
+      deleteEarningsStatement("earnings1"),
+      deleteEarningsStatement("earnings2"),
+      deleteEarningsStatement("earnings3"),
+      deleteEarningsStatement("earnings4"),
+      deletePayoutTaskStatement("earnings1"),
+      deletePayoutTaskStatement("earnings2"),
+      deletePayoutTaskStatement("earnings3"),
+      deletePayoutTaskStatement("earnings4"),
+    ]);
+    await transaction.commit();
+  });
+}
 
 TEST_RUNNER.run({
   name: "SetConnectedAccountOnboardedHandlerTest",
@@ -77,12 +97,7 @@ TEST_RUNNER.run({
         );
       },
       tearDown: async () => {
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
-          ]);
-          await transaction.commit();
-        });
+        await cleanupAll();
       },
     },
     {
@@ -217,18 +232,39 @@ TEST_RUNNER.run({
           ]),
           "Earnings",
         );
+        assertThat(
+          await getPayoutTask(SPANNER_DATABASE, "earnings1"),
+          isArray([
+            eqMessage(
+              {
+                payoutTaskEarningsId: "earnings1",
+                payoutTaskRetryCount: 0,
+                payoutTaskExecutionTimeMs: 1000,
+                payoutTaskCreatedTimeMs: 1000,
+              },
+              GET_PAYOUT_TASK_ROW,
+            ),
+          ]),
+          "PayoutTask for earnings1",
+        );
+        assertThat(
+          await getPayoutTask(SPANNER_DATABASE, "earnings4"),
+          isArray([
+            eqMessage(
+              {
+                payoutTaskEarningsId: "earnings4",
+                payoutTaskRetryCount: 0,
+                payoutTaskExecutionTimeMs: 1000,
+                payoutTaskCreatedTimeMs: 1000,
+              },
+              GET_PAYOUT_TASK_ROW,
+            ),
+          ]),
+          "PayoutTask for earnings4",
+        );
       },
       tearDown: async () => {
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
-            deleteEarningsStatement("earnings1"),
-            deleteEarningsStatement("earnings2"),
-            deleteEarningsStatement("earnings3"),
-            deleteEarningsStatement("earnings4"),
-          ]);
-          await transaction.commit();
-        });
+        await cleanupAll();
       },
     },
     {

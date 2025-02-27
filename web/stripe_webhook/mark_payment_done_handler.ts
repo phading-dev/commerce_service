@@ -1,6 +1,5 @@
 import getStream from "get-stream";
 import Stripe from "stripe";
-import { STRIPE_PAYMENT_INTENT_SUCCESS_SECRET_KEY } from "../../common/env_vars";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
@@ -16,20 +15,23 @@ import {
   newBadRequestError,
   newInternalServerErrorError,
 } from "@selfage/http_error";
+import { Ref } from "@selfage/ref";
 import { Readable } from "stream";
 
 export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
-  public static create(): MarkPaymentDoneHandler {
+  public static create(
+    stripePaymentIntentSuccessSecretKey: string,
+  ): MarkPaymentDoneHandler {
     return new MarkPaymentDoneHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
-      STRIPE_PAYMENT_INTENT_SUCCESS_SECRET_KEY,
+      stripePaymentIntentSuccessSecretKey,
     );
   }
 
   public constructor(
     private database: Database,
-    private stripeClient: Stripe,
+    private stripeClient: Ref<Stripe>,
     private stripeSecretKey: string,
   ) {
     super();
@@ -40,7 +42,7 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
     body: Readable,
     sessionStr: string,
   ): Promise<EventReceivedResponse> {
-    let event = this.stripeClient.webhooks.constructEvent(
+    let event = this.stripeClient.val.webhooks.constructEvent(
       await getStream(body),
       sessionStr,
       this.stripeSecretKey,
@@ -51,7 +53,7 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
       );
     }
     let invoiceId = event.data.object.invoice as string;
-    let invoice = await this.stripeClient.invoices.retrieve(invoiceId);
+    let invoice = await this.stripeClient.val.invoices.retrieve(invoiceId);
     await this.database.runTransactionAsync(async (transaction) => {
       let billingRows = await getBilling(
         transaction,

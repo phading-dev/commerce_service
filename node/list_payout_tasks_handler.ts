@@ -1,5 +1,5 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { listPayoutTasks } from "../db/sql";
+import { listPendingPayoutTasks } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { ListPayoutTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
@@ -24,7 +24,7 @@ export class ListPayoutTasksHandler extends ListPayoutTasksHandlerInterface {
     loggingPrefix: string,
     body: ListPayoutTasksRequestBody,
   ): Promise<ListPayoutTasksResponse> {
-    let rows = await listPayoutTasks(this.database, this.getNow());
+    let rows = await listPendingPayoutTasks(this.database, this.getNow());
     return {
       tasks: rows.map(
         (row): ProcessPayoutTaskRequestBody => ({

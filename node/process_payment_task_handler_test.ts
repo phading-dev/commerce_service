@@ -1,28 +1,36 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PaymentState } from "../db/schema";
 import {
+  GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
   GET_BILLING_ROW,
-  LIST_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASKS_ROW,
-  LIST_PAYMENT_TASKS_ROW,
-  LIST_UPDATE_PAYMENT_METHOD_NOTIFYING_TASKS_ROW,
+  GET_PAYMENT_TASK_METADATA_ROW,
+  GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
   deleteBillingAccountStatement,
   deleteBillingAccountSuspendingDueToPastDueTaskStatement,
   deleteBillingStatement,
   deletePaymentTaskStatement,
   deleteUpdatePaymentMethodNotifyingTaskStatement,
   getBilling,
+  getBillingAccountSuspendingDueToPastDueTask,
+  getPaymentTaskMetadata,
+  getUpdatePaymentMethodNotifyingTask,
   insertBillingAccountStatement,
   insertBillingStatement,
   insertPaymentTaskStatement,
-  listBillingAccountSuspendingDueToPastDueTasks,
-  listPaymentTasks,
-  listUpdatePaymentMethodNotifyingTasks,
+  listPendingPaymentTasks,
 } from "../db/sql";
 import { ProcessPaymentTaskHandler } from "./process_payment_task_handler";
 import { newBadRequestError } from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
-import { assertReject, assertThat, eq, isArray } from "@selfage/test_matcher";
+import { Ref } from "@selfage/ref";
+import {
+  assertReject,
+  assertThat,
+  eq,
+  eqError,
+  isArray,
+} from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 let ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -61,7 +69,7 @@ TEST_RUNNER.run({
               totalAmount: 1200,
               currency: "USD",
             }),
-            insertPaymentTaskStatement("billing1", 100, 100),
+            insertPaymentTaskStatement("billing1", 0, 100, 100),
           ]);
           await transaction.commit();
         });
@@ -122,15 +130,12 @@ TEST_RUNNER.run({
         };
         let handler = new ProcessPaymentTaskHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        handler.handle("", { billingId: "billing1" });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
-        );
+        await handler.processTask("", { billingId: "billing1" });
 
         // Verify
         assertThat(
@@ -220,7 +225,7 @@ TEST_RUNNER.run({
           "billing",
         );
         assertThat(
-          await listPaymentTasks(SPANNER_DATABASE, ONE_YEAR_MS),
+          await listPendingPaymentTasks(SPANNER_DATABASE, ONE_YEAR_MS),
           isArray([]),
           "tasks",
         );
@@ -230,7 +235,7 @@ TEST_RUNNER.run({
       },
     },
     {
-      name: "CreateInvoiceFailedAndRetry",
+      name: "CreateInvoiceFailed",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -247,7 +252,7 @@ TEST_RUNNER.run({
               totalAmount: 1200,
               currency: "USD",
             }),
-            insertPaymentTaskStatement("billing1", 100, 100),
+            insertPaymentTaskStatement("billing1", 0, 100, 100),
           ]);
           await transaction.commit();
         });
@@ -269,17 +274,17 @@ TEST_RUNNER.run({
         };
         let handler = new ProcessPaymentTaskHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        handler.handle("", { billingId: "billing1" });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
+        let error = await assertReject(
+          handler.processTask("", { billingId: "billing1" }),
         );
 
         // Verify
+        assertThat(error, eqError(new Error("Fake error")), "error");
         assertThat(
           await getBilling(SPANNER_DATABASE, "billing1"),
           isArray([
@@ -298,19 +303,6 @@ TEST_RUNNER.run({
             ),
           ]),
           "billing",
-        );
-        assertThat(
-          await listPaymentTasks(SPANNER_DATABASE, ONE_YEAR_MS),
-          isArray([
-            eqMessage(
-              {
-                paymentTaskBillingId: "billing1",
-                paymentTaskExecutionTimeMs: 301000,
-              },
-              LIST_PAYMENT_TASKS_ROW,
-            ),
-          ]),
-          "tasks",
         );
       },
       tearDown: async () => {
@@ -335,7 +327,7 @@ TEST_RUNNER.run({
               totalAmount: 1200,
               currency: "USD",
             }),
-            insertPaymentTaskStatement("billing1", 100, 100),
+            insertPaymentTaskStatement("billing1", 0, 100, 100),
           ]);
           await transaction.commit();
         });
@@ -352,15 +344,12 @@ TEST_RUNNER.run({
         };
         let handler = new ProcessPaymentTaskHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        handler.handle("", { billingId: "billing1" });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
-        );
+        await handler.processTask("", { billingId: "billing1" });
 
         // Verify
         assertThat(
@@ -383,38 +372,42 @@ TEST_RUNNER.run({
           "billing",
         );
         assertThat(
-          await listPaymentTasks(SPANNER_DATABASE, ONE_YEAR_MS),
+          await listPendingPaymentTasks(SPANNER_DATABASE, ONE_YEAR_MS),
           isArray([]),
           "tasks",
         );
         assertThat(
-          await listUpdatePaymentMethodNotifyingTasks(
+          await getUpdatePaymentMethodNotifyingTask(
             SPANNER_DATABASE,
-            ONE_YEAR_MS,
+            "billing1",
           ),
           isArray([
             eqMessage(
               {
                 updatePaymentMethodNotifyingTaskBillingId: "billing1",
+                updatePaymentMethodNotifyingTaskRetryCount: 0,
                 updatePaymentMethodNotifyingTaskExecutionTimeMs: 1000,
+                updatePaymentMethodNotifyingTaskCreatedTimeMs: 1000,
               },
-              LIST_UPDATE_PAYMENT_METHOD_NOTIFYING_TASKS_ROW,
+              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
             ),
           ]),
           "updatePaymentMethodNotifyingTasks",
         );
         assertThat(
-          await listBillingAccountSuspendingDueToPastDueTasks(
+          await getBillingAccountSuspendingDueToPastDueTask(
             SPANNER_DATABASE,
-            ONE_YEAR_MS,
+            "billing1",
           ),
           isArray([
             eqMessage(
               {
                 billingAccountSuspendingDueToPastDueTaskBillingId: "billing1",
+                billingAccountSuspendingDueToPastDueTaskRetryCount: 0,
                 billingAccountSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
+                billingAccountSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
               },
-              LIST_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASKS_ROW,
+              GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
             ),
           ]),
           "billingAccountSuspendingDueToPastDueTasks",
@@ -448,13 +441,13 @@ TEST_RUNNER.run({
         let stripeClientMock: any = {};
         let handler = new ProcessPaymentTaskHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
         let error = await assertReject(
-          handler.handle("", { billingId: "billing1" }),
+          handler.processTask("", { billingId: "billing1" }),
         );
 
         // Verify
@@ -464,6 +457,44 @@ TEST_RUNNER.run({
             newBadRequestError("Billing billing1 is not in PROCESSING state"),
           ),
           "error",
+        );
+      },
+      tearDown: async () => {
+        await cleanupAll();
+      },
+    },
+    {
+      name: "ClaimTask",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertPaymentTaskStatement("billing1", 0, 100, 100),
+          ]);
+          await transaction.commit();
+        });
+        let handler = new ProcessPaymentTaskHandler(
+          SPANNER_DATABASE,
+          undefined,
+          () => 1000,
+        );
+
+        // Execute
+        await handler.claimTask("", { billingId: "billing1" });
+
+        // Verify
+        assertThat(
+          await getPaymentTaskMetadata(SPANNER_DATABASE, "billing1"),
+          isArray([
+            eqMessage(
+              {
+                paymentTaskRetryCount: 1,
+                paymentTaskExecutionTimeMs: 301000,
+              },
+              GET_PAYMENT_TASK_METADATA_ROW,
+            ),
+          ]),
+          "tasks",
         );
       },
       tearDown: async () => {

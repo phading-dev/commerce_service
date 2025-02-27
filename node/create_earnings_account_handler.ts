@@ -39,6 +39,7 @@ export class CreateEarningsAccountHandler extends CreateEarningsAccountHandlerIn
         }),
         insertStripeConnectedAccountCreatingTaskStatement(
           body.accountId,
+          0,
           now,
           now,
         ),

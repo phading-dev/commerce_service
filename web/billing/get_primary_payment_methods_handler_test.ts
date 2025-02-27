@@ -9,6 +9,7 @@ import { CardBrand } from "@phading/commerce_service_interface/web/billing/payme
 import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
+import { Ref } from "@selfage/ref";
 import { assertThat, eq } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
@@ -69,7 +70,7 @@ TEST_RUNNER.run({
         } as ExchangeSessionAndCheckCapabilityResponse;
         let handler = new GetPrimaryPaymentMethodHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           clientMock,
         );
 

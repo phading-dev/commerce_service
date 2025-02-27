@@ -1,5 +1,3 @@
-// Get ONBOARDING link.
-// Get LOGIN link.
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { StripeConnectedAccountState } from "../../db/schema";
 import {
@@ -15,6 +13,7 @@ import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
+import { Ref } from "@selfage/ref";
 import { assertThat, eq } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
@@ -57,7 +56,7 @@ TEST_RUNNER.run({
         let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new GetConnectedAccountLinkHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           clientMock,
           urlBuilder,
         );
@@ -85,13 +84,15 @@ TEST_RUNNER.run({
         assertThat(
           paramsCaptured.return_url,
           eq(
-            "https://test.com/set_connected_account_onboarded?e=%7B%22accountId%22%3A%22account1%22%7D",
+            "https://test.com/?e=%7B%223%22%3A%7B%221%22%3A%22account1%22%7D%7D",
           ),
           "paramsCaptured.return_url",
         );
         assertThat(
           paramsCaptured.refresh_url,
-          eq("https://test.com/?e=%7B%22accountId%22%3A%22account1%22%2C%22account%22%3A%7B%22earnings%22%3A%7B%7D%7D%7D"),
+          eq(
+            "https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%22account1%22%2C%222%22%3A%7B%223%22%3A%7B%7D%7D%7D%7D",
+          ),
           "paramsCaptured.refresh_url",
         );
       },
@@ -140,7 +141,7 @@ TEST_RUNNER.run({
         let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new GetConnectedAccountLinkHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           clientMock,
           urlBuilder,
         );

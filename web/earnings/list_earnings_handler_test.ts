@@ -97,7 +97,6 @@ TEST_RUNNER.run({
               earnings: [
                 {
                   earningsId: "earnings3",
-                  accountId: "account1",
                   month: "2020-03",
                   currency: "USD",
                   totalAmount: 1400,
@@ -112,7 +111,6 @@ TEST_RUNNER.run({
                 },
                 {
                   earningsId: "earnings2",
-                  accountId: "account1",
                   month: "2020-02",
                   currency: "USD",
                   totalAmount: 1300,
@@ -127,7 +125,6 @@ TEST_RUNNER.run({
                 },
                 {
                   earningsId: "earnings1",
-                  accountId: "account1",
                   month: "2020-01",
                   currency: "USD",
                   totalAmount: 1200,

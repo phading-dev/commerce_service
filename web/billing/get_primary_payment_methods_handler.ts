@@ -10,10 +10,11 @@ import {
   GetPrimaryPaymentMethodResponse,
 } from "@phading/commerce_service_interface/web/billing/interface";
 import { CARD_BRAND } from "@phading/commerce_service_interface/web/billing/payment_method_masked";
-import { exchangeSessionAndCheckCapability } from "@phading/user_session_service_interface/node/client";
+import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newInternalServerErrorError } from "@selfage/http_error";
 import { parseEnum } from "@selfage/message/parser";
 import { NodeServiceClient } from "@selfage/node_service_client";
+import { Ref } from "@selfage/ref";
 
 export class GetPrimaryPaymentMethodHandler extends GetPrimaryPaymentMethodHandlerInterface {
   public static create(): GetPrimaryPaymentMethodHandler {
@@ -26,7 +27,7 @@ export class GetPrimaryPaymentMethodHandler extends GetPrimaryPaymentMethodHandl
 
   public constructor(
     private database: Database,
-    private stripeClient: Stripe,
+    private stripeClient: Ref<Stripe>,
     private serviceClient: NodeServiceClient,
   ) {
     super();
@@ -37,14 +38,13 @@ export class GetPrimaryPaymentMethodHandler extends GetPrimaryPaymentMethodHandl
     body: GetPrimaryPaymentMethodRequestBody,
     sessionStr: string,
   ): Promise<GetPrimaryPaymentMethodResponse> {
-    let { accountId, capabilities } = await exchangeSessionAndCheckCapability(
-      this.serviceClient,
-      {
+    let { accountId, capabilities } = await this.serviceClient.send(
+      newExchangeSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanBeBilled: true,
         },
-      },
+      }),
     );
     if (!capabilities.canBeBilled) {
       throw newInternalServerErrorError(
@@ -59,16 +59,17 @@ export class GetPrimaryPaymentMethodHandler extends GetPrimaryPaymentMethodHandl
     }
     let account = rows[0].billingAccountData;
 
-    let stripeCustomer = await this.stripeClient.customers.retrieve(
+    let stripeCustomer = await this.stripeClient.val.customers.retrieve(
       account.stripeCustomerId,
     );
     let primaryPaymentMethodId = (stripeCustomer as Stripe.Customer)
       .invoice_settings.default_payment_method as string;
     // If not found, an error is thrown.
-    let paymentMethod = await this.stripeClient.customers.retrievePaymentMethod(
-      account.stripeCustomerId,
-      primaryPaymentMethodId,
-    );
+    let paymentMethod =
+      await this.stripeClient.val.customers.retrievePaymentMethod(
+        account.stripeCustomerId,
+        primaryPaymentMethodId,
+      );
     return {
       paymentMethod: {
         paymentMethodId: paymentMethod.id,

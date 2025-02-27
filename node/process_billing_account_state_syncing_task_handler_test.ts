@@ -1,12 +1,13 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { BillingAccountState } from "../db/schema";
 import {
-  LIST_BILLING_ACCOUNT_STATE_SYNCING_TASKS_ROW,
+  GET_BILLING_ACCOUNT_STATE_SYNCING_TASK_METADATA_ROW,
   deleteBillingAccountStateSyncingTaskStatement,
   deleteBillingAccountStatement,
+  getBillingAccountStateSyncingTaskMetadata,
   insertBillingAccountStateSyncingTaskStatement,
   insertBillingAccountStatement,
-  listBillingAccountStateSyncingTasks,
+  listPendingBillingAccountStateSyncingTasks,
 } from "../db/sql";
 import { ProcessBillingAccountStateSyncingTaskHandler } from "./process_billing_account_state_syncing_task_handler";
 import { BillingAccountState as UserServiceBillingAccountState } from "@phading/user_service_interface/node/billing_account_state";
@@ -14,9 +15,17 @@ import {
   SYNC_BILLING_ACCOUNT_STATE,
   SYNC_BILLING_ACCOUNT_STATE_REQUEST_BODY,
 } from "@phading/user_service_interface/node/interface";
+import { newBadRequestError } from "@selfage/http_error";
+import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
-import { assertThat, eq, isArray } from "@selfage/test_matcher";
+import {
+  assertReject,
+  assertThat,
+  eq,
+  eqError,
+  isArray,
+} from "@selfage/test_matcher";
 import { TEST_RUNNER, TestCase } from "@selfage/test_runner";
 
 class SyncStateCase implements TestCase {
@@ -30,13 +39,19 @@ class SyncStateCase implements TestCase {
     await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
       await transaction.batchUpdate([
         insertBillingAccountStatement({
-          accountId: "accountId",
+          accountId: "account1",
           stateInfo: {
             state: this.state,
             version: 1,
           },
         }),
-        insertBillingAccountStateSyncingTaskStatement("accountId", 1, 100, 100),
+        insertBillingAccountStateSyncingTaskStatement(
+          "account1",
+          1,
+          0,
+          100,
+          100,
+        ),
       ]);
       await transaction.commit();
     });
@@ -48,11 +63,10 @@ class SyncStateCase implements TestCase {
     );
 
     // Execute
-    handler.handle("", {
-      accountId: "accountId",
+    await handler.processTask("", {
+      accountId: "account1",
       version: 1,
     });
-    await new Promise<void>((resolve) => (handler.doneCallbackFn = resolve));
 
     // Verify
     assertThat(
@@ -64,7 +78,7 @@ class SyncStateCase implements TestCase {
       clientMock.request.body,
       eqMessage(
         {
-          accountId: "accountId",
+          accountId: "account1",
           billingAccountStateVersion: 1,
           billingAccountState: this.syncState,
         },
@@ -73,7 +87,10 @@ class SyncStateCase implements TestCase {
       "RC body",
     );
     assertThat(
-      await listBillingAccountStateSyncingTasks(SPANNER_DATABASE, 1000000),
+      await listPendingBillingAccountStateSyncingTasks(
+        SPANNER_DATABASE,
+        1000000,
+      ),
       isArray([]),
       "listBillingAccountStateSyncingTasks",
     );
@@ -81,8 +98,8 @@ class SyncStateCase implements TestCase {
   public async tearDown() {
     await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
       await transaction.batchUpdate([
-        deleteBillingAccountStatement("accountId"),
-        deleteBillingAccountStateSyncingTaskStatement("accountId", 1),
+        deleteBillingAccountStatement("account1"),
+        deleteBillingAccountStateSyncingTaskStatement("account1", 1),
       ]);
       await transaction.commit();
     });
@@ -103,21 +120,22 @@ TEST_RUNNER.run({
       UserServiceBillingAccountState.SUSPENDED,
     ),
     {
-      name: "SyncFailedAndRetried",
+      name: "SyncFailed",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
             insertBillingAccountStatement({
-              accountId: "accountId",
+              accountId: "account1",
               stateInfo: {
                 state: BillingAccountState.HEALTHY,
                 version: 1,
               },
             }),
             insertBillingAccountStateSyncingTaskStatement(
-              "accountId",
+              "account1",
               1,
+              0,
               100,
               100,
             ),
@@ -133,40 +151,139 @@ TEST_RUNNER.run({
         );
 
         // Execute
-        handler.handle("", {
-          accountId: "accountId",
-          version: 1,
-        });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
+        let error = await assertReject(
+          handler.processTask("", {
+            accountId: "account1",
+            version: 1,
+          }),
         );
 
         // Verify
-        assertThat(
-          await listBillingAccountStateSyncingTasks(SPANNER_DATABASE, 1000000),
-          isArray([
-            eqMessage(
-              {
-                billingAccountStateSyncingTaskAccountId: "accountId",
-                billingAccountStateSyncingTaskVersion: 1,
-                billingAccountStateSyncingTaskExecutionTimeMs: 301000,
-              },
-              LIST_BILLING_ACCOUNT_STATE_SYNCING_TASKS_ROW,
-            ),
-          ]),
-          "listBillingAccountStateSyncingTasks",
-        );
+        assertThat(error, eqError(new Error("Fake error")), "error");
       },
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountStatement("accountId"),
-            deleteBillingAccountStateSyncingTaskStatement("accountId", 1),
+            deleteBillingAccountStatement("account1"),
+            deleteBillingAccountStateSyncingTaskStatement("account1", 1),
           ]);
           await transaction.commit();
         });
       },
     },
-    // Add a test for when version does not match.
+    {
+      name: "VersionMismatch",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertBillingAccountStatement({
+              accountId: "account1",
+              stateInfo: {
+                state: BillingAccountState.HEALTHY,
+                version: 2,
+              },
+            }),
+            insertBillingAccountStateSyncingTaskStatement(
+              "account1",
+              1,
+              0,
+              100,
+              100,
+            ),
+          ]);
+          await transaction.commit();
+        });
+        let handler = new ProcessBillingAccountStateSyncingTaskHandler(
+          SPANNER_DATABASE,
+          new NodeServiceClientMock(),
+          () => 1000,
+        );
+
+        // Execute
+        let error = await assertReject(
+          handler.processTask("", {
+            accountId: "account1",
+            version: 1,
+          }),
+        );
+
+        // Verify
+        assertThat(
+          error,
+          eqHttpError(
+            newBadRequestError(
+              "Billing account account1 version is 2 which doesn't match task version 1.",
+            ),
+          ),
+          "error",
+        );
+      },
+      tearDown: async () => {
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            deleteBillingAccountStatement("account1"),
+            deleteBillingAccountStateSyncingTaskStatement("account1", 1),
+          ]);
+          await transaction.commit();
+        });
+      },
+    },
+    {
+      name: "ClaimTask",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertBillingAccountStateSyncingTaskStatement(
+              "account1",
+              1,
+              0,
+              100,
+              100,
+            ),
+          ]);
+          await transaction.commit();
+        });
+        let handler = new ProcessBillingAccountStateSyncingTaskHandler(
+          SPANNER_DATABASE,
+          undefined,
+          () => 1000,
+        );
+
+        // Execute
+        await handler.claimTask("", {
+          accountId: "account1",
+          version: 1,
+        });
+
+        // Verify
+        assertThat(
+          await getBillingAccountStateSyncingTaskMetadata(
+            SPANNER_DATABASE,
+            "account1",
+            1,
+          ),
+          isArray([
+            eqMessage(
+              {
+                billingAccountStateSyncingTaskRetryCount: 1,
+                billingAccountStateSyncingTaskExecutionTimeMs: 301000,
+              },
+              GET_BILLING_ACCOUNT_STATE_SYNCING_TASK_METADATA_ROW,
+            ),
+          ]),
+          "task",
+        );
+      },
+      tearDown: async () => {
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            deleteBillingAccountStateSyncingTaskStatement("account1", 1),
+          ]);
+          await transaction.commit();
+        });
+      },
+    },
   ],
 });

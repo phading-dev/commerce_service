@@ -46,7 +46,7 @@ export class CreateBillingAccountHandler extends CreateBillingAccountHandlerInte
           },
           paymentAfterMs: now + CreateBillingAccountHandler.DELAYED_PAYMENT_MS,
         }),
-        insertStripeCustomerCreatingTaskStatement(body.accountId, now, now),
+        insertStripeCustomerCreatingTaskStatement(body.accountId, 0, now, now),
       ]);
       await transaction.commit();
     });

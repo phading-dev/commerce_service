@@ -14,7 +14,7 @@ import {
   PayoutState as PayoutStateResponse,
 } from "@phading/commerce_service_interface/web/earnings/statement";
 import { MAX_MONTH_RANGE } from "@phading/constants/commerce";
-import { exchangeSessionAndCheckCapability } from "@phading/user_session_service_interface/node/client";
+import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import {
   newBadRequestError,
   newInternalServerErrorError,
@@ -60,14 +60,13 @@ export class ListEarningsHandler extends ListEarningsHandlerInterface {
         `The range between "startMonth" and "endMonth" is too long.`,
       );
     }
-    let { accountId, capabilities } = await exchangeSessionAndCheckCapability(
-      this.serviceClient,
-      {
+    let { accountId, capabilities } = await this.serviceClient.send(
+      newExchangeSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanEarn: true,
         },
-      },
+      }),
     );
     if (!capabilities.canEarn) {
       throw newInternalServerErrorError(

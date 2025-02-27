@@ -1,26 +1,36 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
   GET_BILLING_ACCOUNT_ROW,
-  LIST_STRIPE_CUSTOMER_CREATING_TASKS_ROW,
+  GET_STRIPE_CUSTOMER_CREATING_TASK_METADATA_ROW,
   deleteBillingAccountStatement,
   deleteStripeCustomerCreatingTaskStatement,
   getBillingAccount,
+  getStripeCustomerCreatingTaskMetadata,
   insertBillingAccountStatement,
   insertStripeCustomerCreatingTaskStatement,
-  listStripeCustomerCreatingTasks,
+  listPendingStripeCustomerCreatingTasks,
 } from "../db/sql";
 import { ProcessStripeCustomerCreatingTaskHandler } from "./process_stripe_customer_creating_task_handler";
 import { GetAccountContactResponse } from "@phading/user_service_interface/node/interface";
+import { newInternalServerErrorError } from "@selfage/http_error";
+import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
-import { assertThat, eq, isArray } from "@selfage/test_matcher";
+import { Ref } from "@selfage/ref";
+import {
+  assertReject,
+  assertThat,
+  eq,
+  eqError,
+  isArray,
+} from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
   name: "ProcessStripeCustomerCreatingTaskHandlerTest",
   cases: [
     {
-      name: "Success",
+      name: "ProcessTask",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -28,7 +38,7 @@ TEST_RUNNER.run({
             insertBillingAccountStatement({
               accountId: "account1",
             }),
-            insertStripeCustomerCreatingTaskStatement("account1", 100, 100),
+            insertStripeCustomerCreatingTaskStatement("account1", 0, 100, 100),
           ]);
           await transaction.commit();
         });
@@ -53,17 +63,14 @@ TEST_RUNNER.run({
         let handler = new ProcessStripeCustomerCreatingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        handler.handle("", {
+        await handler.processTask("", {
           accountId: "account1",
         });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
-        );
 
         // Verify
         assertThat(
@@ -97,7 +104,10 @@ TEST_RUNNER.run({
           "billingAccount",
         );
         assertThat(
-          await listStripeCustomerCreatingTasks(SPANNER_DATABASE, 1000000),
+          await listPendingStripeCustomerCreatingTasks(
+            SPANNER_DATABASE,
+            1000000,
+          ),
           isArray([]),
           "stripeCustomerCreatingTasks",
         );
@@ -113,7 +123,130 @@ TEST_RUNNER.run({
       },
     },
     {
-      name: "CustomerCreateionFailedAndRetried",
+      name: "CustomerAlreadyCreated",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertBillingAccountStatement({
+              accountId: "account1",
+              stripeCustomerId: "stripeCustomer1",
+            }),
+            insertStripeCustomerCreatingTaskStatement("account1", 0, 100, 100),
+          ]);
+          await transaction.commit();
+        });
+        let clientMock = new NodeServiceClientMock();
+        clientMock.response = {
+          contactEmail: "contact@email.com",
+          naturalName: "First Second",
+        } as GetAccountContactResponse;
+        let stripeClientMock: any = {
+          customers: {
+            create: async (createCustomerParams: any, options: any) => {
+              return {
+                id: "stripeCustomer1",
+              };
+            },
+          },
+        };
+        let handler = new ProcessStripeCustomerCreatingTaskHandler(
+          SPANNER_DATABASE,
+          clientMock,
+          new Ref(stripeClientMock),
+          () => 1000,
+        );
+
+        // Execute
+        await handler.processTask("", {
+          accountId: "account1",
+        });
+
+        // Verify
+        assertThat(
+          await listPendingStripeCustomerCreatingTasks(
+            SPANNER_DATABASE,
+            1000000,
+          ),
+          isArray([]),
+          "stripeCustomerCreatingTasks",
+        );
+      },
+      tearDown: async () => {
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            deleteBillingAccountStatement("account1"),
+            deleteStripeCustomerCreatingTaskStatement("account1"),
+          ]);
+          await transaction.commit();
+        });
+      },
+    },
+    {
+      name: "CustomerCreatedWithDifferentId",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertBillingAccountStatement({
+              accountId: "account1",
+              stripeCustomerId: "stripeCustomer1",
+            }),
+            insertStripeCustomerCreatingTaskStatement("account1", 0, 100, 100),
+          ]);
+          await transaction.commit();
+        });
+        let clientMock = new NodeServiceClientMock();
+        clientMock.response = {
+          contactEmail: "contact@email.com",
+          naturalName: "First Second",
+        } as GetAccountContactResponse;
+        let stripeClientMock: any = {
+          customers: {
+            create: async (createCustomerParams: any, options: any) => {
+              return {
+                id: "stripeCustomer2",
+              };
+            },
+          },
+        };
+        let handler = new ProcessStripeCustomerCreatingTaskHandler(
+          SPANNER_DATABASE,
+          clientMock,
+          new Ref(stripeClientMock),
+          () => 1000,
+        );
+
+        // Execute
+        let error = await assertReject(
+          handler.processTask("", {
+            accountId: "account1",
+          }),
+        );
+
+        // Verify
+        assertThat(
+          error,
+          eqHttpError(
+            newInternalServerErrorError(
+              "Billing account account1 already has a stripe customer id stripeCustomer1 which is different from the new one stripeCustomer2.",
+            ),
+          ),
+          "error",
+        );
+      },
+      tearDown: async () => {
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            deleteBillingAccountStatement("account1"),
+            deleteStripeCustomerCreatingTaskStatement("account1"),
+          ]);
+          await transaction.commit();
+        });
+      },
+    },
+    {
+      name: "CustomerCreationFailed",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -121,7 +254,7 @@ TEST_RUNNER.run({
             insertBillingAccountStatement({
               accountId: "account1",
             }),
-            insertStripeCustomerCreatingTaskStatement("account1", 100, 100),
+            insertStripeCustomerCreatingTaskStatement("account1", 0, 100, 100),
           ]);
           await transaction.commit();
         });
@@ -140,32 +273,19 @@ TEST_RUNNER.run({
         let handler = new ProcessStripeCustomerCreatingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        handler.handle("", {
-          accountId: "account1",
-        });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
+        let error = await assertReject(
+          handler.processTask("", {
+            accountId: "account1",
+          }),
         );
 
         // Verify
-        assertThat(
-          await listStripeCustomerCreatingTasks(SPANNER_DATABASE, 1000000),
-          isArray([
-            eqMessage(
-              {
-                stripeCustomerCreatingTaskAccountId: "account1",
-                stripeCustomerCreatingTaskExecutionTimeMs: 301000,
-              },
-              LIST_STRIPE_CUSTOMER_CREATING_TASKS_ROW,
-            ),
-          ]),
-          "stripeCustomerCreatingTasks",
-        );
+        assertThat(error, eqError(new Error("Fake error.")), "error");
       },
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -177,6 +297,54 @@ TEST_RUNNER.run({
         });
       },
     },
-    // TODO: Add a test case for when created customer id mismatches.
+    {
+      name: "ClaimTask",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertStripeCustomerCreatingTaskStatement("account1", 0, 100, 100),
+          ]);
+          await transaction.commit();
+        });
+        let handler = new ProcessStripeCustomerCreatingTaskHandler(
+          SPANNER_DATABASE,
+          undefined,
+          undefined,
+          () => 1000,
+        );
+
+        // Execute
+        await handler.claimTask("", {
+          accountId: "account1",
+        });
+
+        // Verify
+        assertThat(
+          await getStripeCustomerCreatingTaskMetadata(
+            SPANNER_DATABASE,
+            "account1",
+          ),
+          isArray([
+            eqMessage(
+              {
+                stripeCustomerCreatingTaskRetryCount: 1,
+                stripeCustomerCreatingTaskExecutionTimeMs: 301000,
+              },
+              GET_STRIPE_CUSTOMER_CREATING_TASK_METADATA_ROW,
+            ),
+          ]),
+          "stripeCustomerCreatingTasks",
+        );
+      },
+      tearDown: async () => {
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            deleteStripeCustomerCreatingTaskStatement("account1"),
+          ]);
+          await transaction.commit();
+        });
+      },
+    },
   ],
 });

@@ -5,8 +5,9 @@ import { STRIPE_CLIENT } from "../common/stripe_client";
 import {
   deleteStripeCustomerCreatingTaskStatement,
   getBillingAccount,
+  getStripeCustomerCreatingTaskMetadata,
   updateBillingAccountStatement,
-  updateStripeCustomerCreatingTaskStatement,
+  updateStripeCustomerCreatingTaskMetadataStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { ProcessStripeCustomerCreatingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
@@ -14,9 +15,14 @@ import {
   ProcessStripeCustomerCreatingTaskRequestBody,
   ProcessStripeCustomerCreatingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
-import { getAccountContact } from "@phading/user_service_interface/node/client";
-import { newInternalServerErrorError } from "@selfage/http_error";
+import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
+import {
+  newBadRequestError,
+  newInternalServerErrorError,
+} from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
+import { Ref } from "@selfage/ref";
+import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
 export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCustomerCreatingTaskHandlerInterface {
   public static create(): ProcessStripeCustomerCreatingTaskHandler {
@@ -28,17 +34,21 @@ export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCusto
     );
   }
 
-  private static RETRY_BACKOFF_MS = 5 * 60 * 1000;
-  public doneCallbackFn = (): void => {};
+  private taskHandler: ProcessTaskHandlerWrapper;
 
   public constructor(
     private database: Database,
     private serviceClient: NodeServiceClient,
-    private stripeClient: Stripe,
+    private stripeClient: Ref<Stripe>,
     private getNow: () => number,
     private testClockId?: string,
   ) {
     super();
+    this.taskHandler = ProcessTaskHandlerWrapper.create(
+      this.descriptor,
+      5 * 60 * 1000,
+      24 * 60 * 60 * 1000,
+    );
   }
 
   public async handle(
@@ -46,77 +56,90 @@ export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCusto
     body: ProcessStripeCustomerCreatingTaskRequestBody,
   ): Promise<ProcessStripeCustomerCreatingTaskResponse> {
     loggingPrefix = `${loggingPrefix} Billing customer creating task for billing account ${body.accountId}:`;
-    await this.claimTask(loggingPrefix, body.accountId);
-    this.startProcessingAndCatchError(loggingPrefix, body.accountId);
+    await this.taskHandler.wrap(
+      loggingPrefix,
+      () => this.claimTask(loggingPrefix, body),
+      () => this.processTask(loggingPrefix, body),
+    );
     return {};
   }
 
-  private async claimTask(
+  public async claimTask(
     loggingPrefix: string,
-    accountId: string,
+    body: ProcessStripeCustomerCreatingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let delayedTime =
-        this.getNow() +
-        ProcessStripeCustomerCreatingTaskHandler.RETRY_BACKOFF_MS;
-      console.log(
-        `${loggingPrefix} Claiming the task by delaying it to ${delayedTime}.`,
+      let rows = await getStripeCustomerCreatingTaskMetadata(
+        transaction,
+        body.accountId,
       );
+      if (rows.length === 0) {
+        throw newBadRequestError(`Task is not found.`);
+      }
+      let task = rows[0];
       await transaction.batchUpdate([
-        updateStripeCustomerCreatingTaskStatement(accountId, delayedTime),
+        updateStripeCustomerCreatingTaskMetadataStatement(
+          body.accountId,
+          task.stripeCustomerCreatingTaskRetryCount + 1,
+          this.getNow() +
+            this.taskHandler.getBackoffTime(
+              task.stripeCustomerCreatingTaskRetryCount,
+            ),
+        ),
       ]);
       await transaction.commit();
     });
   }
 
-  private async startProcessingAndCatchError(
+  public async processTask(
     loggingPrefix: string,
-    accountId: string,
+    body: ProcessStripeCustomerCreatingTaskRequestBody,
   ): Promise<void> {
-    try {
-      let accountResponse = await getAccountContact(this.serviceClient, {
-        accountId,
-      });
-      let customer = await this.stripeClient.customers.create(
-        {
-          email: accountResponse.contactEmail,
-          name: accountResponse.naturalName,
-          test_clock: this.testClockId,
-          tax: {
-            validate_location: "deferred",
-          },
+    let accountResponse = await this.serviceClient.send(
+      newGetAccountContactRequest({
+        accountId: body.accountId,
+      }),
+    );
+    let customer = await this.stripeClient.val.customers.create(
+      {
+        email: accountResponse.contactEmail,
+        name: accountResponse.naturalName,
+        test_clock: this.testClockId,
+        tax: {
+          validate_location: "deferred",
         },
-        {
-          idempotencyKey: accountId,
-        },
-      );
-      await this.database.runTransactionAsync(async (transaction) => {
-        let accountRows = await getBillingAccount(transaction, accountId);
-        if (accountRows.length === 0) {
+      },
+      {
+        idempotencyKey: body.accountId,
+      },
+    );
+    await this.database.runTransactionAsync(async (transaction) => {
+      let accountRows = await getBillingAccount(transaction, body.accountId);
+      if (accountRows.length === 0) {
+        throw newInternalServerErrorError(
+          `Billing account ${body.accountId} is not found.`,
+        );
+      }
+      let billingAccountData = accountRows[0].billingAccountData;
+      if (billingAccountData.stripeCustomerId) {
+        if (billingAccountData.stripeCustomerId !== customer.id) {
           throw newInternalServerErrorError(
-            `Billing account ${accountId} is not found.`,
+            `Billing account ${body.accountId} already has a stripe customer id ${billingAccountData.stripeCustomerId} which is different from the new one ${customer.id}.`,
           );
-        }
-        let billingAccountData = accountRows[0].billingAccountData;
-        if (billingAccountData.stripeCustomerId) {
-          if (billingAccountData.stripeCustomerId !== customer.id) {
-            throw newInternalServerErrorError(
-              `Billing account ${accountId} has a different customer ID ${billingAccountData.stripeCustomerId}.`,
-            );
-          }
         } else {
-          billingAccountData.stripeCustomerId = customer.id;
           await transaction.batchUpdate([
-            updateBillingAccountStatement(billingAccountData),
-            deleteStripeCustomerCreatingTaskStatement(accountId),
+            deleteStripeCustomerCreatingTaskStatement(body.accountId),
           ]);
           await transaction.commit();
         }
-      });
-      console.log(`${loggingPrefix} Task completed.`);
-    } catch (e) {
-      console.error(`${loggingPrefix} Task failed! ${e.stack ?? e}`);
-    }
-    this.doneCallbackFn();
+      } else {
+        billingAccountData.stripeCustomerId = customer.id;
+        await transaction.batchUpdate([
+          updateBillingAccountStatement(billingAccountData),
+          deleteStripeCustomerCreatingTaskStatement(body.accountId),
+        ]);
+        await transaction.commit();
+      }
+    });
   }
 }

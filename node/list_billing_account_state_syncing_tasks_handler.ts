@@ -1,5 +1,5 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { listBillingAccountStateSyncingTasks } from "../db/sql";
+import { listPendingBillingAccountStateSyncingTasks } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { ListBillingAccountStateSyncingTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
@@ -27,7 +27,7 @@ export class ListBillingAccountStateSyncingTasksHandler extends ListBillingAccou
     loggingPrefix: string,
     body: ListBillingAccountStateSyncingTasksRequestBody,
   ): Promise<ListBillingAccountStateSyncingTasksResponse> {
-    let rows = await listBillingAccountStateSyncingTasks(
+    let rows = await listPendingBillingAccountStateSyncingTasks(
       this.database,
       this.getNow(),
     );

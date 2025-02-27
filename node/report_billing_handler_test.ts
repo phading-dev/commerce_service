@@ -1,18 +1,16 @@
-// Mixed data and sum up.
-// Deplayed payment task.
-// Earnings already exist.
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PaymentState } from "../db/schema";
 import {
   GET_BILLING_ROW,
-  LIST_PAYMENT_TASKS_ROW,
+  GET_PAYMENT_TASK_ROW,
   deleteBillingAccountStatement,
   deleteBillingStatement,
   deletePaymentTaskStatement,
   getBilling,
+  getPaymentTask,
   insertBillingAccountStatement,
   insertBillingStatement,
-  listPaymentTasks,
+  listPendingPaymentTasks,
 } from "../db/sql";
 import { ReportBillingHandler } from "./report_billing_handler";
 import { ProductType } from "@phading/price";
@@ -96,14 +94,16 @@ TEST_RUNNER.run({
           "billing",
         );
         assertThat(
-          await listPaymentTasks(SPANNER_DATABASE, 1000000),
+          await getPaymentTask(SPANNER_DATABASE, "billing1"),
           isArray([
             eqMessage(
               {
                 paymentTaskBillingId: "billing1",
+                paymentTaskRetryCount: 0,
                 paymentTaskExecutionTimeMs: 1000,
+                paymentTaskCreatedTimeMs: 1000,
               },
-              LIST_PAYMENT_TASKS_ROW,
+              GET_PAYMENT_TASK_ROW,
             ),
           ]),
           "paymentTasks",
@@ -151,14 +151,16 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await listPaymentTasks(SPANNER_DATABASE, 1000000),
+          await getPaymentTask(SPANNER_DATABASE, "billing1"),
           isArray([
             eqMessage(
               {
                 paymentTaskBillingId: "billing1",
+                paymentTaskRetryCount: 0,
                 paymentTaskExecutionTimeMs: 2000,
+                paymentTaskCreatedTimeMs: 1000,
               },
-              LIST_PAYMENT_TASKS_ROW,
+              GET_PAYMENT_TASK_ROW,
             ),
           ]),
           "paymentTasks",
@@ -229,7 +231,7 @@ TEST_RUNNER.run({
           "billing",
         );
         assertThat(
-          await listPaymentTasks(SPANNER_DATABASE, 1000000),
+          await listPendingPaymentTasks(SPANNER_DATABASE, 1000000),
           isArray([]),
           "paymentTasks",
         );

@@ -5,9 +5,10 @@ import { Earnings, PayoutState } from "../db/schema";
 import {
   deletePayoutTaskStatement,
   getEarnings,
-  getEarningsAccount,
+  getEarningsAccountFromEarnings,
+  getPayoutTaskMetadata,
   updateEarningsStatement,
-  updatePayoutTaskStatement,
+  updatePayoutTaskMetadataStatement,
 } from "../db/sql";
 import { Database, Transaction } from "@google-cloud/spanner";
 import { ProcessPayoutTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
@@ -19,6 +20,8 @@ import {
   newBadRequestError,
   newInternalServerErrorError,
 } from "@selfage/http_error";
+import { Ref } from "@selfage/ref";
+import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
 export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface {
   public static create(): ProcessPayoutTaskHandler {
@@ -27,15 +30,19 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
     );
   }
 
-  private static RETRY_BACKOFF_MS = 5 * 60 * 1000;
-  public doneCallbackFn = (): void => {};
+  private taskHandler: ProcessTaskHandlerWrapper;
 
   public constructor(
     private database: Database,
-    private stripeClient: Stripe,
+    private stripeClient: Ref<Stripe>,
     private getNow: () => number,
   ) {
     super();
+    this.taskHandler = ProcessTaskHandlerWrapper.create(
+      this.descriptor,
+      5 * 60 * 1000,
+      24 * 60 * 60 * 1000,
+    );
   }
 
   public async handle(
@@ -43,70 +50,61 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
     body: ProcessPayoutTaskRequestBody,
   ): Promise<ProcessPayoutTaskResponse> {
     loggingPrefix = `${loggingPrefix} Payout task for earnings ${body.earningsId}:`;
-    let { earnings } = await this.getPayloadAndClaimTask(
+    await this.taskHandler.wrap(
       loggingPrefix,
-      body.earningsId,
+      () => this.claimTask(loggingPrefix, body),
+      () => this.processTask(loggingPrefix, body),
     );
-    this.startProcessingAndCatchError(loggingPrefix, earnings);
     return {};
   }
 
-  private async getPayloadAndClaimTask(
+  public async claimTask(
     loggingPrefix: string,
-    earningsId: string,
-  ): Promise<{
-    earnings: Earnings;
-  }> {
-    let earnings: Earnings;
+    body: ProcessPayoutTaskRequestBody,
+  ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      earnings = await this.getValidEarnings(transaction, earningsId);
-      let delayedTimeMs =
-        this.getNow() + ProcessPayoutTaskHandler.RETRY_BACKOFF_MS;
-      console.log(
-        `${loggingPrefix} Claiming the task by delaying it to ${delayedTimeMs}.`,
-      );
+      let rows = await getPayoutTaskMetadata(transaction, body.earningsId);
+      if (rows.length === 0) {
+        throw newBadRequestError(`${loggingPrefix} Task is not found.`);
+      }
+      let task = rows[0];
       await transaction.batchUpdate([
-        updatePayoutTaskStatement(earningsId, delayedTimeMs),
+        updatePayoutTaskMetadataStatement(
+          body.earningsId,
+          task.payoutTaskRetryCount + 1,
+          this.getNow() +
+            this.taskHandler.getBackoffTime(task.payoutTaskRetryCount),
+        ),
       ]);
       await transaction.commit();
     });
-    return { earnings };
   }
 
-  private async startProcessingAndCatchError(
+  public async processTask(
     loggingPrefix: string,
-    earnings: Earnings,
-  ) {
-    try {
-      await this.startProcessing(loggingPrefix, earnings);
-      console.log(`${loggingPrefix} Task completed.`);
-    } catch (e) {
-      console.error(`${loggingPrefix} Task failed! ${e.stack ?? e}`);
-    }
-    this.doneCallbackFn();
-  }
-
-  private async startProcessing(loggingPrefix: string, earnings: Earnings) {
-    let accountRows = await getEarningsAccount(
-      this.database,
-      earnings.accountId,
-    );
+    body: ProcessPayoutTaskRequestBody,
+  ): Promise<void> {
+    let [earnings, accountRows] = await Promise.all([
+      this.getValidEarnings(this.database, body.earningsId),
+      getEarningsAccountFromEarnings(this.database, body.earningsId),
+    ]);
     if (accountRows.length === 0) {
       throw newInternalServerErrorError(
         `${loggingPrefix} Earnings account ${earnings.accountId} is not found.`,
       );
     }
     let stripeConnectedAccountId =
-      accountRows[0].earningsAccountData.stripeConnectedAccountId;
-    let connectedAccount = await this.stripeClient.accounts.retrieve(
+      accountRows[0].aData.stripeConnectedAccountId;
+    let connectedAccount = await this.stripeClient.val.accounts.retrieve(
       stripeConnectedAccountId,
     );
     if (!connectedAccount.payouts_enabled) {
       await this.reportFailure(loggingPrefix, earnings.earningsId);
+      return;
     }
 
     // Any error will be retried.
-    let transfer = await this.stripeClient.transfers.create(
+    let transfer = await this.stripeClient.val.transfers.create(
       {
         amount: earnings.totalAmount,
         currency: earnings.currency.toLowerCase(),
@@ -150,10 +148,10 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
   }
 
   private async getValidEarnings(
-    transaction: Transaction,
+    runner: Database | Transaction,
     earningsId: string,
   ): Promise<Earnings> {
-    let rows = await getEarnings(transaction, earningsId);
+    let rows = await getEarnings(runner, earningsId);
     if (rows.length === 0) {
       // Earnings should almost never be deleted, or should be drained by a long lead time.
       throw newInternalServerErrorError(`Earnings ${earningsId} is not found.`);

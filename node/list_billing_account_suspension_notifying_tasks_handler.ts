@@ -1,5 +1,5 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { listBillingAccountSuspensionNotifyingTasks } from "../db/sql";
+import { listPendingBillingAccountSuspensionNotifyingTasks } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { ListBillingAccountSuspensionNotifyingTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
@@ -27,7 +27,7 @@ export class ListBillingAccountSuspensionNotifyingTasksHandler extends ListBilli
     loggingPrefix: string,
     body: ListBillingAccountSuspensionNotifyingTasksRequestBody,
   ): Promise<ListBillingAccountSuspensionNotifyingTasksResponse> {
-    let rows = await listBillingAccountSuspensionNotifyingTasks(
+    let rows = await listPendingBillingAccountSuspensionNotifyingTasks(
       this.database,
       this.getNow(),
     );

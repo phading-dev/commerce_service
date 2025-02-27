@@ -1,15 +1,14 @@
-// Mixed data and sum up.
-// Earnings already exist.
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PayoutState } from "../db/schema";
 import {
   GET_EARNINGS_ROW,
-  LIST_PAYOUT_TASKS_ROW,
+  GET_PAYOUT_TASK_ROW,
   deleteEarningsStatement,
   deletePayoutTaskStatement,
   getEarnings,
+  getPayoutTask,
   insertEarningsStatement,
-  listPayoutTasks,
+  listPendingPayoutTasks,
 } from "../db/sql";
 import { ReportEarningsHandler } from "./report_earnings_handler";
 import { ProductType } from "@phading/price";
@@ -66,14 +65,16 @@ TEST_RUNNER.run({
           "earnings",
         );
         assertThat(
-          await listPayoutTasks(SPANNER_DATABASE, 1000000),
+          await getPayoutTask(SPANNER_DATABASE, "earnings1"),
           isArray([
             eqMessage(
               {
                 payoutTaskEarningsId: "earnings1",
+                payoutTaskRetryCount: 0,
                 payoutTaskExecutionTimeMs: 1000,
+                payoutTaskCreatedTimeMs: 1000,
               },
-              LIST_PAYOUT_TASKS_ROW,
+              GET_PAYOUT_TASK_ROW,
             ),
           ]),
           "payoutTasks",
@@ -136,7 +137,7 @@ TEST_RUNNER.run({
           "earnings",
         );
         assertThat(
-          await listPayoutTasks(SPANNER_DATABASE, 1000000),
+          await listPendingPayoutTasks(SPANNER_DATABASE, 1000000),
           isArray([]),
           "payoutTasks",
         );

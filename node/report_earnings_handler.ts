@@ -1,4 +1,4 @@
-import { CURRENCY } from "../common/params";
+import { CURRENCY } from "../common/constants";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { Earnings, PayoutState } from "../db/schema";
 import {
@@ -74,7 +74,7 @@ export class ReportEarningsHandler extends ReportEarningsHandlerInterface {
       );
       await transaction.batchUpdate([
         insertEarningsStatement(earnings),
-        insertPayoutTaskStatement(earnings.earningsId, now, now),
+        insertPayoutTaskStatement(earnings.earningsId, 0, now, now),
       ]);
       await transaction.commit();
     });

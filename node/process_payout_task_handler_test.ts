@@ -2,21 +2,29 @@ import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PayoutState } from "../db/schema";
 import {
   GET_EARNINGS_ROW,
-  LIST_PAYOUT_TASKS_ROW,
+  GET_PAYOUT_TASK_METADATA_ROW,
   deleteEarningsAccountStatement,
   deleteEarningsStatement,
   deletePayoutTaskStatement,
   getEarnings,
+  getPayoutTaskMetadata,
   insertEarningsAccountStatement,
   insertEarningsStatement,
   insertPayoutTaskStatement,
-  listPayoutTasks,
+  listPendingPayoutTasks,
 } from "../db/sql";
 import { ProcessPayoutTaskHandler } from "./process_payout_task_handler";
 import { newBadRequestError } from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
-import { assertReject, assertThat, eq, isArray } from "@selfage/test_matcher";
+import { Ref } from "@selfage/ref";
+import {
+  assertReject,
+  assertThat,
+  eq,
+  eqError,
+  isArray,
+} from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 async function cleanupAll(): Promise<void> {
@@ -34,7 +42,7 @@ TEST_RUNNER.run({
   name: "ProcessPayoutTaskHandlerTest",
   cases: [
     {
-      name: "Success",
+      name: "ProcessTask",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -51,7 +59,7 @@ TEST_RUNNER.run({
               totalAmount: 1200,
               currency: "USD",
             }),
-            insertPayoutTaskStatement("earnings1", 100, 100),
+            insertPayoutTaskStatement("earnings1", 0, 100, 100),
           ]);
           await transaction.commit();
         });
@@ -75,17 +83,14 @@ TEST_RUNNER.run({
         };
         let handler = new ProcessPayoutTaskHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        handler.handle("", {
+        await handler.processTask("", {
           earningsId: "earnings1",
         });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
-        );
 
         // Verify
         assertThat(
@@ -134,7 +139,7 @@ TEST_RUNNER.run({
           "earnings",
         );
         assertThat(
-          await listPayoutTasks(SPANNER_DATABASE, 1000000),
+          await listPendingPayoutTasks(SPANNER_DATABASE, 1000000),
           isArray([]),
           "payoutTasks",
         );
@@ -144,7 +149,7 @@ TEST_RUNNER.run({
       },
     },
     {
-      name: "PayoutFailedAndRetried",
+      name: "PayoutFailed",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -161,7 +166,7 @@ TEST_RUNNER.run({
               totalAmount: 1200,
               currency: "USD",
             }),
-            insertPayoutTaskStatement("earnings1", 100, 100),
+            insertPayoutTaskStatement("earnings1", 0, 100, 100),
           ]);
           await transaction.commit();
         });
@@ -179,19 +184,19 @@ TEST_RUNNER.run({
         };
         let handler = new ProcessPayoutTaskHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        handler.handle("", {
-          earningsId: "earnings1",
-        });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
+        let error = await assertReject(
+          handler.processTask("", {
+            earningsId: "earnings1",
+          }),
         );
 
         // Verify
+        assertThat(error, eqError(new Error("Fake error")), "error");
         assertThat(
           await getEarnings(SPANNER_DATABASE, "earnings1"),
           isArray([
@@ -210,19 +215,6 @@ TEST_RUNNER.run({
             ),
           ]),
           "earnings",
-        );
-        assertThat(
-          await listPayoutTasks(SPANNER_DATABASE, 1000000),
-          isArray([
-            eqMessage(
-              {
-                payoutTaskEarningsId: "earnings1",
-                payoutTaskExecutionTimeMs: 301000,
-              },
-              LIST_PAYOUT_TASKS_ROW,
-            ),
-          ]),
-          "payoutTasks",
         );
       },
       tearDown: async () => {
@@ -247,7 +239,7 @@ TEST_RUNNER.run({
               totalAmount: 1200,
               currency: "USD",
             }),
-            insertPayoutTaskStatement("earnings1", 100, 100),
+            insertPayoutTaskStatement("earnings1", 0, 100, 100),
           ]);
           await transaction.commit();
         });
@@ -260,17 +252,14 @@ TEST_RUNNER.run({
         };
         let handler = new ProcessPayoutTaskHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        handler.handle("", {
+        await handler.processTask("", {
           earningsId: "earnings1",
         });
-        await new Promise<void>(
-          (resolve) => (handler.doneCallbackFn = resolve),
-        );
 
         // Verify
         assertThat(
@@ -293,7 +282,7 @@ TEST_RUNNER.run({
           "earnings",
         );
         assertThat(
-          await listPayoutTasks(SPANNER_DATABASE, 1000000),
+          await listPendingPayoutTasks(SPANNER_DATABASE, 1000000),
           isArray([]),
           "payoutTasks",
         );
@@ -326,13 +315,13 @@ TEST_RUNNER.run({
         let stripeClientMock: any = {};
         let handler = new ProcessPayoutTaskHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
         let error = await assertReject(
-          handler.handle("", {
+          handler.processTask("", {
             earningsId: "earnings1",
           }),
         );
@@ -352,6 +341,45 @@ TEST_RUNNER.run({
         await cleanupAll();
       },
     },
-    // Add a test for insufficient balance.
+    {
+      name: "ClaimTask",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertPayoutTaskStatement("earnings1", 0, 100, 100),
+          ]);
+          await transaction.commit();
+        });
+        let handler = new ProcessPayoutTaskHandler(
+          SPANNER_DATABASE,
+          undefined,
+          () => 1000,
+        );
+
+        // Execute
+        await handler.claimTask("", {
+          earningsId: "earnings1",
+        });
+
+        // Verify
+        assertThat(
+          await getPayoutTaskMetadata(SPANNER_DATABASE, "earnings1"),
+          isArray([
+            eqMessage(
+              {
+                payoutTaskRetryCount: 1,
+                payoutTaskExecutionTimeMs: 301000,
+              },
+              GET_PAYOUT_TASK_METADATA_ROW,
+            ),
+          ]),
+          "payoutTask",
+        );
+      },
+      tearDown: async () => {
+        await cleanupAll();
+      },
+    },
   ],
 });

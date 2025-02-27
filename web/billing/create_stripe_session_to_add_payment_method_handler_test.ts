@@ -9,6 +9,7 @@ import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
+import { Ref } from "@selfage/ref";
 import { assertThat, eq } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
@@ -51,7 +52,7 @@ TEST_RUNNER.run({
         let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new CreateStripeSessionToAddPaymentMethodHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           clientMock,
           urlBuilder,
         );
@@ -73,14 +74,14 @@ TEST_RUNNER.run({
         assertThat(
           createSessionParamsCaptured.success_url,
           eq(
-            "https://test.com/replace_primary_payment_method?e=%7B%22accountId%22%3A%22account1%22%7D&session_id=%7BCHECKOUT_SESSION_ID%7D",
+            "https://test.com/?e=%7B%222%22%3A%7B%221%22%3A%22account1%22%7D%7D&session_id=%7BCHECKOUT_SESSION_ID%7D",
           ),
           "createSessionParams.success_url",
         );
         assertThat(
           createSessionParamsCaptured.cancel_url,
           eq(
-            "https://test.com/?e=%7B%22accountId%22%3A%22account1%22%2C%22account%22%3A%7B%22billing%22%3A%7B%7D%7D%7D",
+            "https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%22account1%22%2C%222%22%3A%7B%222%22%3A%7B%7D%7D%7D%7D",
           ),
           "createSessionParams.cancel_url",
         );

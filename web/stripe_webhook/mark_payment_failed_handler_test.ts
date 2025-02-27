@@ -1,20 +1,24 @@
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
+  GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
   GET_BILLING_ROW,
-  LIST_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASKS_ROW,
-  LIST_UPDATE_PAYMENT_METHOD_NOTIFYING_TASKS_ROW,
+  GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_METADATA_ROW,
+  GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
   deleteBillingAccountSuspendingDueToPastDueTaskStatement,
   deleteBillingStatement,
   deleteUpdatePaymentMethodNotifyingTaskStatement,
   getBilling,
+  getBillingAccountSuspendingDueToPastDueTask,
+  getUpdatePaymentMethodNotifyingTask,
+  getUpdatePaymentMethodNotifyingTaskMetadata,
   insertBillingStatement,
   insertUpdatePaymentMethodNotifyingTaskStatement,
-  listBillingAccountSuspendingDueToPastDueTasks,
-  listUpdatePaymentMethodNotifyingTasks,
+  listPendingBillingAccountSuspendingDueToPastDueTasks,
 } from "../../db/sql";
 import { MarkPaymentFailedHandler } from "./mark_payment_failed_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
+import { Ref } from "@selfage/ref";
 import { assertThat, eq, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 import { Readable } from "stream";
@@ -83,7 +87,7 @@ TEST_RUNNER.run({
         };
         let handler = new MarkPaymentFailedHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           "secret1",
           () => 1000,
         );
@@ -114,33 +118,37 @@ TEST_RUNNER.run({
           "billing",
         );
         assertThat(
-          await listUpdatePaymentMethodNotifyingTasks(
+          await getUpdatePaymentMethodNotifyingTask(
             SPANNER_DATABASE,
-            FUTURE_TIME_MS,
+            "billing1",
           ),
           isArray([
             eqMessage(
               {
                 updatePaymentMethodNotifyingTaskBillingId: "billing1",
+                updatePaymentMethodNotifyingTaskRetryCount: 0,
                 updatePaymentMethodNotifyingTaskExecutionTimeMs: 1000,
+                updatePaymentMethodNotifyingTaskCreatedTimeMs: 1000,
               },
-              LIST_UPDATE_PAYMENT_METHOD_NOTIFYING_TASKS_ROW,
+              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
             ),
           ]),
           "notifyingTasks",
         );
         assertThat(
-          await listBillingAccountSuspendingDueToPastDueTasks(
+          await getBillingAccountSuspendingDueToPastDueTask(
             SPANNER_DATABASE,
-            FUTURE_TIME_MS,
+            "billing1",
           ),
           isArray([
             eqMessage(
               {
                 billingAccountSuspendingDueToPastDueTaskBillingId: "billing1",
+                billingAccountSuspendingDueToPastDueTaskRetryCount: 0,
                 billingAccountSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
+                billingAccountSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
               },
-              LIST_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASKS_ROW,
+              GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
             ),
           ]),
           "accountSuspendingTasks",
@@ -190,7 +198,7 @@ TEST_RUNNER.run({
         };
         let handler = new MarkPaymentFailedHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           "secret1",
           () => 1000,
         );
@@ -217,23 +225,25 @@ TEST_RUNNER.run({
           "billing",
         );
         assertThat(
-          await listUpdatePaymentMethodNotifyingTasks(
+          await getUpdatePaymentMethodNotifyingTask(
             SPANNER_DATABASE,
-            FUTURE_TIME_MS,
+            "billing1",
           ),
           isArray([
             eqMessage(
               {
                 updatePaymentMethodNotifyingTaskBillingId: "billing1",
+                updatePaymentMethodNotifyingTaskRetryCount: 0,
                 updatePaymentMethodNotifyingTaskExecutionTimeMs: 1000,
+                updatePaymentMethodNotifyingTaskCreatedTimeMs: 1000,
               },
-              LIST_UPDATE_PAYMENT_METHOD_NOTIFYING_TASKS_ROW,
+              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
             ),
           ]),
           "notifyingTasks",
         );
         assertThat(
-          await listBillingAccountSuspendingDueToPastDueTasks(
+          await listPendingBillingAccountSuspendingDueToPastDueTasks(
             SPANNER_DATABASE,
             FUTURE_TIME_MS,
           ),
@@ -257,7 +267,12 @@ TEST_RUNNER.run({
               state: PaymentState.FAILED,
               month: "2024-10",
             }),
-            insertUpdatePaymentMethodNotifyingTaskStatement("billing1", 0, 0),
+            insertUpdatePaymentMethodNotifyingTaskStatement(
+              "billing1",
+              0,
+              100,
+              100,
+            ),
           ]);
           await transaction.commit();
         });
@@ -286,7 +301,7 @@ TEST_RUNNER.run({
         };
         let handler = new MarkPaymentFailedHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           "secret1",
           () => 1000,
         );
@@ -296,17 +311,17 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await listUpdatePaymentMethodNotifyingTasks(
+          await getUpdatePaymentMethodNotifyingTaskMetadata(
             SPANNER_DATABASE,
-            FUTURE_TIME_MS,
+            "billing1",
           ),
           isArray([
             eqMessage(
               {
-                updatePaymentMethodNotifyingTaskBillingId: "billing1",
-                updatePaymentMethodNotifyingTaskExecutionTimeMs: 0,
+                updatePaymentMethodNotifyingTaskRetryCount: 0,
+                updatePaymentMethodNotifyingTaskExecutionTimeMs: 100,
               },
-              LIST_UPDATE_PAYMENT_METHOD_NOTIFYING_TASKS_ROW,
+              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_METADATA_ROW,
             ),
           ]),
           "notifyingTasks",

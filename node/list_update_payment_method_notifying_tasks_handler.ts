@@ -1,5 +1,5 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { listUpdatePaymentMethodNotifyingTasks } from "../db/sql";
+import { listPendingUpdatePaymentMethodNotifyingTasks } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { ListUpdatePaymentMethodNotifyingTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
@@ -27,7 +27,7 @@ export class ListUpdatePaymentMethodNotifyingTasksHandler extends ListUpdatePaym
     loggingPrefix: string,
     body: ListUpdatePaymentMethodNotifyingTasksRequestBody,
   ): Promise<ListUpdatePaymentMethodNotifyingTasksResponse> {
-    let rows = await listUpdatePaymentMethodNotifyingTasks(
+    let rows = await listPendingUpdatePaymentMethodNotifyingTasks(
       this.database,
       this.getNow(),
     );

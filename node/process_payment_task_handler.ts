@@ -1,17 +1,18 @@
 import Stripe from "stripe";
+import { GRACE_PERIOD_DAYS_IN_MS } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
-import { GRACE_PERIOD_DAYS_IN_MS } from "../common/params";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
 import { Billing, PaymentState } from "../db/schema";
 import {
   deletePaymentTaskStatement,
   getBilling,
-  getBillingAccount,
+  getBillingAccountFromBilling,
+  getPaymentTaskMetadata,
   insertBillingAccountSuspendingDueToPastDueTaskStatement,
   insertUpdatePaymentMethodNotifyingTaskStatement,
   updateBillingStatement,
-  updatePaymentTaskStatement,
+  updatePaymentTaskMetadataStatement,
 } from "../db/sql";
 import { Database, Transaction } from "@google-cloud/spanner";
 import { ProcessPaymentTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
@@ -23,6 +24,8 @@ import {
   newBadRequestError,
   newInternalServerErrorError,
 } from "@selfage/http_error";
+import { Ref } from "@selfage/ref";
+import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
 export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterface {
   public static create(): ProcessPaymentTaskHandler {
@@ -31,15 +34,19 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     );
   }
 
-  private static RETRY_BACKOFF_MS = 5 * 60 * 1000;
-  public doneCallbackFn = (): void => {};
+  private taskHandler: ProcessTaskHandlerWrapper;
 
   public constructor(
     private database: Database,
-    private stripeClient: Stripe,
+    private stripeClient: Ref<Stripe>,
     private getNow: () => number,
   ) {
     super();
+    this.taskHandler = ProcessTaskHandlerWrapper.create(
+      this.descriptor,
+      5 * 60 * 1000,
+      24 * 60 * 60 * 1000,
+    );
   }
 
   public async handle(
@@ -47,64 +54,52 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     body: ProcessPaymentTaskRequestBody,
   ): Promise<ProcessPaymentTaskResponse> {
     loggingPrefix = `${loggingPrefix} Payment task for billing ${body.billingId}:`;
-    let { billing } = await this.getPayloadAndClaimTask(
+    await this.taskHandler.wrap(
       loggingPrefix,
-      body.billingId,
+      () => this.claimTask(loggingPrefix, body),
+      () => this.processTask(loggingPrefix, body),
     );
-    this.startProcessingAndCatchError(loggingPrefix, billing);
     return {};
   }
 
-  private async getPayloadAndClaimTask(
+  public async claimTask(
     loggingPrefix: string,
-    billingId: string,
-  ): Promise<{
-    billing: Billing;
-  }> {
-    let billing: Billing;
+    body: ProcessPaymentTaskRequestBody,
+  ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      billing = await this.getValidBilling(transaction, billingId);
-      let delayedTimeMs =
-        this.getNow() + ProcessPaymentTaskHandler.RETRY_BACKOFF_MS;
-      console.log(
-        `${loggingPrefix} Claiming the task by delaying it to ${delayedTimeMs}.`,
-      );
+      let rows = await getPaymentTaskMetadata(transaction, body.billingId);
+      if (rows.length === 0) {
+        throw newBadRequestError(`Task is not found.`);
+      }
+      let task = rows[0];
       await transaction.batchUpdate([
-        updatePaymentTaskStatement(billingId, delayedTimeMs),
+        updatePaymentTaskMetadataStatement(
+          body.billingId,
+          task.paymentTaskRetryCount + 1,
+          this.getNow() +
+            this.taskHandler.getBackoffTime(task.paymentTaskRetryCount),
+        ),
       ]);
       await transaction.commit();
     });
-    return {
-      billing,
-    };
   }
 
-  private async startProcessingAndCatchError(
+  public async processTask(
     loggingPrefix: string,
-    billing: Billing,
+    body: ProcessPaymentTaskRequestBody,
   ): Promise<void> {
-    try {
-      await this.startProcessing(loggingPrefix, billing);
-      console.log(`${loggingPrefix} Task completed.`);
-    } catch (e) {
-      console.error(`${loggingPrefix} Task failed! ${e.stack ?? e}`);
-    }
-    this.doneCallbackFn();
-  }
-
-  private async startProcessing(
-    loggingPrefix: string,
-    billing: Billing,
-  ): Promise<void> {
-    let accountRows = await getBillingAccount(this.database, billing.accountId);
+    let [billing, accountRows] = await Promise.all([
+      this.getValidBilling(this.database, body.billingId),
+      getBillingAccountFromBilling(this.database, body.billingId),
+    ]);
     if (accountRows.length === 0) {
       throw newInternalServerErrorError(
-        `${loggingPrefix} Billing account ${billing.accountId} is not found.`,
+        `${loggingPrefix} Billing account for billing ${body.billingId} is not found.`,
       );
     }
-    let stripeCustomerId = accountRows[0].billingAccountData.stripeCustomerId;
+    let stripeCustomerId = accountRows[0].aData.stripeCustomerId;
     let stripeCustomer =
-      await this.stripeClient.customers.retrieve(stripeCustomerId);
+      await this.stripeClient.val.customers.retrieve(stripeCustomerId);
     if (
       !(stripeCustomer as Stripe.Customer).invoice_settings
         ?.default_payment_method
@@ -113,7 +108,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       return;
     }
 
-    let invoice = await this.stripeClient.invoices.create(
+    let invoice = await this.stripeClient.val.invoices.create(
       {
         customer: stripeCustomerId,
         automatic_tax: {
@@ -129,7 +124,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         idempotencyKey: billing.billingId,
       },
     );
-    await this.stripeClient.invoices.addLines(
+    await this.stripeClient.val.invoices.addLines(
       invoice.id,
       {
         lines: [
@@ -143,7 +138,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         idempotencyKey: billing.billingId,
       },
     );
-    invoice = await this.stripeClient.invoices.finalizeInvoice(
+    invoice = await this.stripeClient.val.invoices.finalizeInvoice(
       invoice.id,
       {
         auto_advance: true,
@@ -172,11 +167,13 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         updateBillingStatement(billing),
         insertUpdatePaymentMethodNotifyingTaskStatement(
           billing.billingId,
+          0,
           now,
           now,
         ),
         insertBillingAccountSuspendingDueToPastDueTaskStatement(
           billing.billingId,
+          0,
           now + GRACE_PERIOD_DAYS_IN_MS,
           now,
         ),
@@ -206,10 +203,10 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
   }
 
   private async getValidBilling(
-    transaction: Transaction,
+    runner: Database | Transaction,
     billingId: string,
   ): Promise<Billing> {
-    let rows = await getBilling(transaction, billingId);
+    let rows = await getBilling(runner, billingId);
     if (rows.length === 0) {
       // Billing should almost never be deleted, or should be drained by a long lead time.
       throw newInternalServerErrorError(`Billing ${billingId} is not found.`);

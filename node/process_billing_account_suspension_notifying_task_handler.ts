@@ -1,24 +1,24 @@
-import {
-  ACCOUNT_SUSPENSION_CONTACT_EMAIL_ADDRESS,
-  FROM_EMAIL_ADDRESS,
-} from "../common/env_vars";
+import { APP_NAME } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
-import { APP_NAME } from "../common/params";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
   deleteBillingAccountSuspensionNotifyingTaskStatement,
-  updateBillingAccountSuspensionNotifyingTaskStatement,
+  getBillingAccountSuspensionNotifyingTaskMetadata,
+  updateBillingAccountSuspensionNotifyingTaskMetadataStatement,
 } from "../db/sql";
+import { ENV_VARS } from "../env";
 import { Database } from "@google-cloud/spanner";
 import { ProcessBillingAccountSuspensionNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
   ProcessBillingAccountSuspensionNotifyingTaskRequestBody,
   ProcessBillingAccountSuspensionNotifyingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
-import { getAccountContact } from "@phading/user_service_interface/node/client";
+import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
+import { newBadRequestError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
+import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
 export class ProcessBillingAccountSuspensionNotifyingTaskHandler extends ProcessBillingAccountSuspensionNotifyingTaskHandlerInterface {
   public static create(): ProcessBillingAccountSuspensionNotifyingTaskHandler {
@@ -30,8 +30,7 @@ export class ProcessBillingAccountSuspensionNotifyingTaskHandler extends Process
     );
   }
 
-  private static RETRY_BACKOFF_MS = 5 * 60 * 1000;
-  public doneCallbackFn = (): void => {};
+  private taskHandler: ProcessTaskHandlerWrapper;
 
   public constructor(
     private database: Database,
@@ -40,65 +39,83 @@ export class ProcessBillingAccountSuspensionNotifyingTaskHandler extends Process
     private getNow: () => number,
   ) {
     super();
+    this.taskHandler = ProcessTaskHandlerWrapper.create(
+      this.descriptor,
+      5 * 60 * 1000,
+      24 * 60 * 60 * 1000,
+    );
   }
 
   public async handle(
     loggingPrefix: string,
     body: ProcessBillingAccountSuspensionNotifyingTaskRequestBody,
   ): Promise<ProcessBillingAccountSuspensionNotifyingTaskResponse> {
-    await this.database.runTransactionAsync(async (transaction) => {
-      await transaction.batchUpdate([
-        updateBillingAccountSuspensionNotifyingTaskStatement(
-          body.accountId,
-          body.version,
-          this.getNow() +
-            ProcessBillingAccountSuspensionNotifyingTaskHandler.RETRY_BACKOFF_MS,
-        ),
-      ]);
-      await transaction.commit();
-    });
-    this.startProcessingAndCatchError(
+    loggingPrefix = `${loggingPrefix} Billing account suspension notifying task for account ${body.accountId} version ${body.version}:`;
+    await this.taskHandler.wrap(
       loggingPrefix,
-      body.accountId,
-      body.version,
+      () => this.claimTask(loggingPrefix, body),
+      () => this.processTask(loggingPrefix, body),
     );
     return {};
   }
 
-  private async startProcessingAndCatchError(
+  public async claimTask(
     loggingPrefix: string,
-    accountId: string,
-    version: number,
+    body: ProcessBillingAccountSuspensionNotifyingTaskRequestBody,
   ): Promise<void> {
-    try {
-      let accountResponse = await getAccountContact(this.serviceClient, {
-        accountId,
-      });
-      await this.sendgridClient.send({
-        to: accountResponse.contactEmail,
-        from: FROM_EMAIL_ADDRESS,
-        templateId: LOCALIZATION.accountSuspensionEmailTemplateId,
-        dynamicTemplateData: {
-          name: accountResponse.naturalName,
-          appName: APP_NAME,
-          accountSuspensionContactEmail:
-            ACCOUNT_SUSPENSION_CONTACT_EMAIL_ADDRESS,
-        },
-      });
-      await this.database.runTransactionAsync(async (transaction) => {
-        await transaction.batchUpdate([
-          deleteBillingAccountSuspensionNotifyingTaskStatement(
-            accountId,
-            version,
-          ),
-        ]);
-        await transaction.commit();
-      });
-    } catch (e) {
-      console.log(
-        `${loggingPrefix} For billing account ${accountId} and version ${version}, failed to send account suspension email. ${e.stack ?? e}`,
+    await this.database.runTransactionAsync(async (transaction) => {
+      let rows = await getBillingAccountSuspensionNotifyingTaskMetadata(
+        transaction,
+        body.accountId,
+        body.version,
       );
-    }
-    this.doneCallbackFn();
+      if (rows.length === 0) {
+        throw newBadRequestError(`Task is not found.`);
+      }
+      let task = rows[0];
+      await transaction.batchUpdate([
+        updateBillingAccountSuspensionNotifyingTaskMetadataStatement(
+          body.accountId,
+          body.version,
+          task.billingAccountSuspensionNotifyingTaskRetryCount + 1,
+          this.getNow() +
+            this.taskHandler.getBackoffTime(
+              task.billingAccountSuspensionNotifyingTaskRetryCount,
+            ),
+        ),
+      ]);
+      await transaction.commit();
+    });
+  }
+
+  public async processTask(
+    loggingPrefix: string,
+    body: ProcessBillingAccountSuspensionNotifyingTaskRequestBody,
+  ): Promise<void> {
+    let accountResponse = await this.serviceClient.send(
+      newGetAccountContactRequest({
+        accountId: body.accountId,
+      }),
+    );
+    await this.sendgridClient.send({
+      to: accountResponse.contactEmail,
+      from: ENV_VARS.fromEmailAddress,
+      templateId: LOCALIZATION.accountSuspensionEmailTemplateId,
+      dynamicTemplateData: {
+        name: accountResponse.naturalName,
+        appName: APP_NAME,
+        accountSuspensionContactEmail:
+          ENV_VARS.accountSuspensionContactEmailAddress,
+      },
+    });
+    await this.database.runTransactionAsync(async (transaction) => {
+      await transaction.batchUpdate([
+        deleteBillingAccountSuspensionNotifyingTaskStatement(
+          body.accountId,
+          body.version,
+        ),
+      ]);
+      await transaction.commit();
+    });
   }
 }

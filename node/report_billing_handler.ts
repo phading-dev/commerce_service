@@ -1,4 +1,4 @@
-import { CURRENCY } from "../common/params";
+import { CURRENCY } from "../common/constants";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { Billing, PaymentState } from "../db/schema";
 import {
@@ -114,6 +114,7 @@ export class ReportBillingHandler extends ReportBillingHandlerInterface {
         insertBillingStatement(billing),
         insertPaymentTaskStatement(
           billing.billingId,
+          0,
           account.paymentAfterMs > now ? account.paymentAfterMs : now,
           now,
         ),

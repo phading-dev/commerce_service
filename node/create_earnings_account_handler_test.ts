@@ -1,18 +1,16 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
   GET_EARNINGS_ACCOUNT_ROW,
-  LIST_STRIPE_CONNECTED_ACCOUNT_CREATING_TASKS_ROW,
+  GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW,
   deleteEarningsAccountStatement,
   deleteStripeConnectedAccountCreatingTaskStatement,
   getEarningsAccount,
-  listStripeConnectedAccountCreatingTasks,
+  getStripeConnectedAccountCreatingTask,
 } from "../db/sql";
 import { CreateEarningsAccountHandler } from "./create_earnings_account_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { assertThat, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
-
-let FUTURE_TIME_MS = 365 * 24 * 60 * 60 * 1000;
 
 TEST_RUNNER.run({
   name: "CreateEarningsAccountHandlerTest",
@@ -45,17 +43,19 @@ TEST_RUNNER.run({
           "account",
         );
         assertThat(
-          await listStripeConnectedAccountCreatingTasks(
+          await getStripeConnectedAccountCreatingTask(
             SPANNER_DATABASE,
-            FUTURE_TIME_MS,
+            "account1",
           ),
           isArray([
             eqMessage(
               {
                 stripeConnectedAccountCreatingTaskAccountId: "account1",
+                stripeConnectedAccountCreatingTaskRetryCount: 0,
                 stripeConnectedAccountCreatingTaskExecutionTimeMs: 1000,
+                stripeConnectedAccountCreatingTaskCreatedTimeMs: 1000,
               },
-              LIST_STRIPE_CONNECTED_ACCOUNT_CREATING_TASKS_ROW,
+              GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW,
             ),
           ]),
           "task",

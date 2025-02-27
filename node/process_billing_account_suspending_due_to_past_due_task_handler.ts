@@ -60,12 +60,14 @@ export class ProcessBillingAccountSuspendingDueToPastDueTaskHandler extends Proc
           insertBillingAccountSuspensionNotifyingTaskStatement(
             billingAccount.accountId,
             billingAccount.stateInfo.version,
+            0,
             now,
             now,
           ),
           insertBillingAccountStateSyncingTaskStatement(
             billingAccount.accountId,
             billingAccount.stateInfo.version,
+            0,
             now,
             now,
           ),

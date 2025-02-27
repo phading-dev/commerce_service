@@ -1,5 +1,5 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { listSetupStripeConnectedAccountNotifyingTasks } from "../db/sql";
+import { listPendingSetupStripeConnectedAccountNotifyingTasks } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { ListSetupStripeConnectedAccountNotifyingTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
@@ -27,7 +27,7 @@ export class ListSetupStripeConnectedAccountNotifyingTasksHandler extends ListSe
     loggingPrefix: string,
     body: ListSetupStripeConnectedAccountNotifyingTasksRequestBody,
   ): Promise<ListSetupStripeConnectedAccountNotifyingTasksResponse> {
-    let rows = await listSetupStripeConnectedAccountNotifyingTasks(
+    let rows = await listPendingSetupStripeConnectedAccountNotifyingTasks(
       this.database,
       this.getNow(),
     );

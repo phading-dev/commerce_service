@@ -159,10 +159,10 @@
         - accountId
       primaryKeys:
         - accountId
-      insertStatementName: InsertBillingAccount
-      deleteStatementName: DeleteBillingAccount
-      getStatementName: GetBillingAccount
-      updateStatementName: UpdateBillingAccount
+      insert: InsertBillingAccount
+      delete: DeleteBillingAccount
+      get: GetBillingAccount
+      update: UpdateBillingAccount
     - kind: MessageTable
       name: Billing
       storedInColumn: data
@@ -183,10 +183,10 @@
           columns:
             - accountId
             - state
-      insertStatementName: InsertBilling
-      deleteStatementName: DeleteBilling
-      getStatementName: GetBilling
-      updateStatementName: UpdateBilling
+      insert: InsertBilling
+      delete: DeleteBilling
+      get: GetBilling
+      update: UpdateBilling
     - kind: MessageTable
       name: EarningsAccount
       storedInColumn: data
@@ -194,10 +194,10 @@
         - accountId
       primaryKeys:
         - accountId
-      insertStatementName: InsertEarningsAccount
-      deleteStatementName: DeleteEarningsAccount
-      getStatementName: GetEarningsAccount
-      updateStatementName: UpdateEarningsAccount
+      insert: InsertEarningsAccount
+      delete: DeleteEarningsAccount
+      get: GetEarningsAccount
+      update: UpdateEarningsAccount
     - kind: MessageTable
       name: Earnings
       storedInColumn: data
@@ -218,334 +218,169 @@
           columns:
             - accountId
             - state
-      insertStatementName: InsertEarnings
-      deleteStatementName: DeleteEarnings
-      getStatementName: GetEarnings
-      updateStatementName: UpdateEarnings
-    - kind: Table
+      insert: InsertEarnings
+      delete: DeleteEarnings
+      get: GetEarnings
+      update: UpdateEarnings
+    - kind: TaskTable
       name: StripeCustomerCreatingTask
       columns:
         - name: accountId
           type: string
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - accountId
-      indexes:
-        - name: StripeCustomerCreatingTaskByExecutionTime
-          columns:
-            - executionTimeMs
-    - kind: Table
+      executionTimeIndex: StripeCustomerCreatingTaskByExecutionTime
+      insert: InsertStripeCustomerCreatingTask
+      delete: DeleteStripeCustomerCreatingTask
+      get: GetStripeCustomerCreatingTask
+      listPendingTasks: ListPendingStripeCustomerCreatingTasks
+      getMetadata: GetStripeCustomerCreatingTaskMetadata
+      updateMetadata: UpdateStripeCustomerCreatingTaskMetadata
+    - kind: TaskTable
       name: PaymentTask
       columns:
         - name: billingId
           type: string
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - billingId
-      indexes:
-        - name: PaymentTaskByExecutionTime
-          columns:
-            - executionTimeMs
-    - kind: Table
+      executionTimeIndex: PaymentTaskByExecutionTime
+      insert: InsertPaymentTask
+      delete: DeletePaymentTask
+      get: GetPaymentTask
+      listPendingTasks: ListPendingPaymentTasks
+      getMetadata: GetPaymentTaskMetadata
+      updateMetadata: UpdatePaymentTaskMetadata
+    - kind: TaskTable
       name: UpdatePaymentMethodNotifyingTask
       columns:
         - name: billingId
           type: string
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - billingId
-      indexes:
-        - name: UpdatePaymentMethodNotifyingTaskByExecutionTime
-          columns:
-            - executionTimeMs
-    - kind: Table
+      executionTimeIndex: UpdatePaymentMethodNotifyingTaskByExecutionTime
+      insert: InsertUpdatePaymentMethodNotifyingTask
+      delete: DeleteUpdatePaymentMethodNotifyingTask
+      get: GetUpdatePaymentMethodNotifyingTask
+      listPendingTasks: ListPendingUpdatePaymentMethodNotifyingTasks
+      getMetadata: GetUpdatePaymentMethodNotifyingTaskMetadata
+      updateMetadata: UpdateUpdatePaymentMethodNotifyingTaskMetadata
+    - kind: TaskTable
       name: BillingAccountSuspendingDueToPastDueTask
       columns:
         - name: billingId
           type: string
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - billingId
-      indexes:
-        - name: BillingAccountSuspendingDueToPastDueTaskByExecutionTime
-          columns:
-            - executionTimeMs
-    - kind: Table
+      executionTimeIndex: BillingAccountSuspendingDueToPastDueTaskByExecutionTime
+      insert: InsertBillingAccountSuspendingDueToPastDueTask
+      delete: DeleteBillingAccountSuspendingDueToPastDueTask
+      get: GetBillingAccountSuspendingDueToPastDueTask
+      listPendingTasks: ListPendingBillingAccountSuspendingDueToPastDueTasks
+      getMetadata: GetBillingAccountSuspendingDueToPastDueTaskMetadata
+      updateMetadata: UpdateBillingAccountSuspendingDueToPastDueTaskMetadata
+    - kind: TaskTable
       name: BillingAccountSuspensionNotifyingTask
       columns:
         - name: accountId
           type: string
         - name: version
           type: float64
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - accountId
         - version
-      indexes:
-        - name: BillingAccountSuspensionNotifyingTaskByExecutionTime
-          columns:
-            - executionTimeMs
-    - kind: Table
+      executionTimeIndex: BillingAccountSuspensionNotifyingTaskByExecutionTime
+      insert: InsertBillingAccountSuspensionNotifyingTask
+      delete: DeleteBillingAccountSuspensionNotifyingTask
+      get: GetBillingAccountSuspensionNotifyingTask
+      listPendingTasks: ListPendingBillingAccountSuspensionNotifyingTasks
+      getMetadata: GetBillingAccountSuspensionNotifyingTaskMetadata
+      updateMetadata: UpdateBillingAccountSuspensionNotifyingTaskMetadata
+    - kind: TaskTable
       name: BillingAccountStateSyncingTask
       columns:
         - name: accountId
           type: string
         - name: version
           type: float64
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - accountId
         - version
-      indexes:
-        - name: BillingAccountStateSyncingTaskByExecutionTime
-          columns:
-            - executionTimeMs
-    - kind: Table
+      executionTimeIndex: BillingAccountStateSyncingTaskByExecutionTime
+      insert: InsertBillingAccountStateSyncingTask
+      delete: DeleteBillingAccountStateSyncingTask
+      get: GetBillingAccountStateSyncingTask
+      listPendingTasks: ListPendingBillingAccountStateSyncingTasks
+      getMetadata: GetBillingAccountStateSyncingTaskMetadata
+      updateMetadata: UpdateBillingAccountStateSyncingTaskMetadata
+    - kind: TaskTable
       name: StripeConnectedAccountCreatingTask
       columns:
         - name: accountId
           type: string
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - accountId
-      indexes:
-        - name: StripeConnectedAccountCreatingTaskByExecutionTime
-          columns:
-            - executionTimeMs
-    - kind: Table
+      executionTimeIndex: StripeConnectedAccountCreatingTaskByExecutionTime
+      insert: InsertStripeConnectedAccountCreatingTask
+      delete: DeleteStripeConnectedAccountCreatingTask
+      get: GetStripeConnectedAccountCreatingTask
+      listPendingTasks: ListPendingStripeConnectedAccountCreatingTasks
+      getMetadata: GetStripeConnectedAccountCreatingTaskMetadata
+      updateMetadata: UpdateStripeConnectedAccountCreatingTaskMetadata
+    - kind: TaskTable
       name: SetupStripeConnectedAccountNotifyingTask
       columns:
         - name: accountId
           type: string
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - accountId
-      indexes:
-        - name: SetupStripeConnectedAccountNotifyingTaskByExecutionTime
-          columns:
-            - executionTimeMs
-    - kind: Table
+      executionTimeIndex: SetupStripeConnectedAccountNotifyingTaskByExecutionTime
+      insert: InsertSetupStripeConnectedAccountNotifyingTask
+      delete: DeleteSetupStripeConnectedAccountNotifyingTask
+      get: GetSetupStripeConnectedAccountNotifyingTask
+      listPendingTasks: ListPendingSetupStripeConnectedAccountNotifyingTasks
+      getMetadata: GetSetupStripeConnectedAccountNotifyingTaskMetadata
+      updateMetadata: UpdateSetupStripeConnectedAccountNotifyingTaskMetadata
+    - kind: TaskTable
       name: PayoutTask
       columns:
         - name: earningsId
           type: string
-        - name: executionTimeMs
-          type: timestamp
-        - name: createdTimeMs
-          type: timestamp
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
       primaryKeys:
         - earningsId
-      indexes:
-        - name: PayoutTaskByExecutionTime
-          columns:
-            - executionTimeMs
-  inserts:
-    - name: InsertStripeCustomerCreatingTask
-      table: StripeCustomerCreatingTask
-      setColumns:
-        - accountId
-        - executionTimeMs
-        - createdTimeMs
-    - name: InsertPaymentTask
-      table: PaymentTask
-      setColumns:
-        - billingId
-        - executionTimeMs
-        - createdTimeMs
-    - name: InsertUpdatePaymentMethodNotifyingTask
-      table: UpdatePaymentMethodNotifyingTask
-      setColumns:
-        - billingId
-        - executionTimeMs
-        - createdTimeMs
-    - name: InsertBillingAccountSuspendingDueToPastDueTask
-      table: BillingAccountSuspendingDueToPastDueTask
-      setColumns:
-        - billingId
-        - executionTimeMs
-        - createdTimeMs
-    - name: InsertBillingAccountSuspensionNotifyingTask
-      table: BillingAccountSuspensionNotifyingTask
-      setColumns:
-        - accountId
-        - version
-        - executionTimeMs
-        - createdTimeMs
-    - name: InsertBillingAccountStateSyncingTask
-      table: BillingAccountStateSyncingTask
-      setColumns:
-        - accountId
-        - version
-        - executionTimeMs
-        - createdTimeMs
-    - name: InsertStripeConnectedAccountCreatingTask
-      table: StripeConnectedAccountCreatingTask
-      setColumns:
-        - accountId
-        - executionTimeMs
-        - createdTimeMs
-    - name: InsertSetupStripeConnectedAccountNotifyingTask
-      table: SetupStripeConnectedAccountNotifyingTask
-      setColumns:
-        - accountId
-        - executionTimeMs
-        - createdTimeMs
-    - name: InsertPayoutTask
-      table: PayoutTask
-      setColumns:
-        - earningsId
-        - executionTimeMs
-        - createdTimeMs
-  updates:
-    - name: UpdateStripeCustomerCreatingTask
-      table: StripeCustomerCreatingTask
-      where:
-        op: =
-        leftColumn: accountId
-      setColumns:
-        - executionTimeMs
-    - name: UpdatePaymentTask
-      table: PaymentTask
-      where:
-        op: =
-        leftColumn: billingId
-      setColumns:
-        - executionTimeMs
-    - name: UpdateUpdatePaymentMethodNotifyingTask
-      table: UpdatePaymentMethodNotifyingTask
-      where:
-        op: =
-        leftColumn: billingId
-      setColumns:
-        - executionTimeMs
-    - name: UpdateBillingAccountSuspendingDueToPastDueTask
-      table: BillingAccountSuspendingDueToPastDueTask
-      where:
-        op: =
-        leftColumn: billingId
-      setColumns:
-        - executionTimeMs
-    - name: UpdateBillingAccountSuspensionNotifyingTask
-      table: BillingAccountSuspensionNotifyingTask
-      where:
-        op: AND
-        exps:
-          - op: =
-            leftColumn: accountId
-          - op: =
-            leftColumn: version
-      setColumns:
-        - executionTimeMs
-    - name: UpdateBillingAccountStateSyncingTask
-      table: BillingAccountStateSyncingTask
-      where:
-        op: AND
-        exps:
-          - op: =
-            leftColumn: accountId
-          - op: =
-            leftColumn: version
-      setColumns:
-        - executionTimeMs
-    - name: UpdateStripeConnectedAccountCreatingTask
-      table: StripeConnectedAccountCreatingTask
-      where:
-        op: =
-        leftColumn: accountId
-      setColumns:
-        - executionTimeMs
-    - name: UpdateSetupStripeConnectedAccountNotifyingTask
-      table: SetupStripeConnectedAccountNotifyingTask
-      where:
-        op: =
-        leftColumn: accountId
-      setColumns:
-        - executionTimeMs
-    - name: UpdatePayoutTask
-      table: PayoutTask
-      where:
-        op: =
-        leftColumn: earningsId
-      setColumns:
-        - executionTimeMs
-  deletes:
-    - name: DeleteStripeCustomerCreatingTask
-      table: StripeCustomerCreatingTask
-      where:
-        op: =
-        leftColumn: accountId
-    - name: DeletePaymentTask
-      table: PaymentTask
-      where:
-        op: =
-        leftColumn: billingId
-    - name: DeleteUpdatePaymentMethodNotifyingTask
-      table: UpdatePaymentMethodNotifyingTask
-      where:
-        op: =
-        leftColumn: billingId
-    - name: DeleteBillingAccountSuspendingDueToPastDueTask
-      table: BillingAccountSuspendingDueToPastDueTask
-      where:
-        op: =
-        leftColumn: billingId
-    - name: DeleteBillingAccountSuspensionNotifyingTask
-      table: BillingAccountSuspensionNotifyingTask
-      where:
-        op: AND
-        exps:
-          - op: =
-            leftColumn: accountId
-          - op: =
-            leftColumn: version
-    - name: DeleteBillingAccountStateSyncingTask
-      table: BillingAccountStateSyncingTask
-      where:
-        op: AND
-        exps:
-          - op: =
-            leftColumn: accountId
-          - op: =
-            leftColumn: version
-    - name: DeleteStripeConnectedAccountCreatingTask
-      table: StripeConnectedAccountCreatingTask
-      where:
-        op: =
-        leftColumn: accountId
-    - name: DeleteSetupStripeConnectedAccountNotifyingTask
-      table: SetupStripeConnectedAccountNotifyingTask
-      where:
-        op: =
-        leftColumn: accountId
-    - name: DeletePayoutTask
-      table: PayoutTask
-      where:
-        op: =
-        leftColumn: earningsId
+      executionTimeIndex: PayoutTaskByExecutionTime
+      insert: InsertPayoutTask
+      delete: DeletePayoutTask
+      get: GetPayoutTask
+      listPendingTasks: ListPendingPayoutTasks
+      getMetadata: GetPayoutTaskMetadata
+      updateMetadata: UpdatePayoutTaskMetadata
   selects:
     - name: GetBillingAccountFromBilling
       table:
@@ -606,6 +441,27 @@
             leftColumn: state
       getColumns:
         - data
+    - name: GetEarningsAccountFromEarnings
+      table:
+        name: Earnings
+        as: e
+      join:
+        - type: INNER
+          table:
+            name: EarningsAccount
+            as: a
+          on:
+            op: =
+            leftColumn:
+              name: accountId
+              table: e
+            rightColumn: accountId
+      where:
+        op: =
+        leftColumn: earningsId
+      getColumns:
+        - name: data
+          table: a
     - name: GetEarningsByMonth
       table: Earnings
       where:
@@ -644,104 +500,5 @@
             leftColumn: state
       getColumns:
         - data
-    - name: ListStripeCustomerCreatingTasks
-      table: StripeCustomerCreatingTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - accountId
-        - executionTimeMs
-    - name: ListPaymentTasks
-      table: PaymentTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - billingId
-        - executionTimeMs
-    - name: ListUpdatePaymentMethodNotifyingTasks
-      table: UpdatePaymentMethodNotifyingTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - billingId
-        - executionTimeMs
-    - name: CheckUpdatePaymentMethodNotifyingTask
-      table: UpdatePaymentMethodNotifyingTask
-      where:
-        op: =
-        leftColumn: billingId
-      getColumns:
-        - executionTimeMs
-    - name: ListBillingAccountSuspendingDueToPastDueTasks
-      table: BillingAccountSuspendingDueToPastDueTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - billingId
-        - executionTimeMs
-    - name: ListBillingAccountSuspensionNotifyingTasks
-      table: BillingAccountSuspensionNotifyingTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - accountId
-        - version
-        - executionTimeMs
-    - name: ListBillingAccountStateSyncingTasks
-      table: BillingAccountStateSyncingTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - accountId
-        - version
-        - executionTimeMs
-    - name: ListStripeConnectedAccountCreatingTasks
-      table: StripeConnectedAccountCreatingTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - accountId
-        - executionTimeMs
-    - name: ListSetupStripeConnectedAccountNotifyingTasks
-      table: SetupStripeConnectedAccountNotifyingTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - accountId
-        - executionTimeMs
-    - name: ListPayoutTasks
-      table: PayoutTask
-      where:
-        op: <=
-        leftColumn: executionTimeMs
-      orderBy:
-        - executionTimeMs
-      getColumns:
-        - earningsId
-        - executionTimeMs
   outputDdl: ./db/ddl
   outputSql: ./db/sql

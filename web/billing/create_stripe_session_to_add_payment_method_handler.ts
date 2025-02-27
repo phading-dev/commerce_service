@@ -1,8 +1,9 @@
 import Stripe from "stripe";
-import { CURRENCY } from "../../common/params";
+import { CURRENCY } from "../../common/constants";
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
+import { URL_BUILDER } from "../../common/url_builder";
 import { getBillingAccount } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { CreateStripeSessionToAddPaymentMethodHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
@@ -10,15 +11,11 @@ import {
   CreateStripeSessionToAddPaymentMethodRequestBody,
   CreateStripeSessionToAddPaymentMethodResponse,
 } from "@phading/commerce_service_interface/web/billing/interface";
-import { exchangeSessionAndCheckCapability } from "@phading/user_session_service_interface/node/client";
-import {
-  URL_BUILDER,
-  UrlBuilder,
-  buildMainAppUrl,
-  buildReplacePrimaryPaymentMethodUrl,
-} from "@phading/web_interface/url_builder";
+import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
+import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { newNotFoundError, newUnauthorizedError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
+import { Ref } from "@selfage/ref";
 
 export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSessionToAddPaymentMethodHandlerInterface {
   public static create(): CreateStripeSessionToAddPaymentMethodHandler {
@@ -32,7 +29,7 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
 
   public constructor(
     private database: Database,
-    private stripeClient: Stripe,
+    private stripeClient: Ref<Stripe>,
     private serviceClient: NodeServiceClient,
     private urlBuilder: UrlBuilder,
   ) {
@@ -44,14 +41,13 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
     body: CreateStripeSessionToAddPaymentMethodRequestBody,
     sessionStr: string,
   ): Promise<CreateStripeSessionToAddPaymentMethodResponse> {
-    let { accountId, capabilities } = await exchangeSessionAndCheckCapability(
-      this.serviceClient,
-      {
+    let { accountId, capabilities } = await this.serviceClient.send(
+      newExchangeSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanBeBilled: true,
         },
-      },
+      }),
     );
     if (!capabilities.canBeBilled) {
       throw newUnauthorizedError(
@@ -63,23 +59,26 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
       throw newNotFoundError(`Billing account ${accountId} is not found.`);
     }
     let account = rows[0].billingAccountData;
-    let session = await this.stripeClient.checkout.sessions.create({
+    let session = await this.stripeClient.val.checkout.sessions.create({
       billing_address_collection: "required",
       mode: "setup",
       currency: CURRENCY.toLocaleLowerCase(),
       customer: account.stripeCustomerId,
       payment_method_types: ["card"],
-      success_url: buildReplacePrimaryPaymentMethodUrl(
-        this.urlBuilder,
+      success_url: this.urlBuilder.build(
         {
-          accountId,
+          replacePrimaryPaymnetMethod: {
+            accountId,
+          },
         },
-        "{CHECKOUT_SESSION_ID}",
+        [["session_id", "{CHECKOUT_SESSION_ID}"]],
       ),
-      cancel_url: buildMainAppUrl(this.urlBuilder, {
-        accountId,
-        account: {
-          billing: {},
+      cancel_url: this.urlBuilder.build({
+        main: {
+          accountId,
+          account: {
+            billing: {},
+          },
         },
       }),
     });

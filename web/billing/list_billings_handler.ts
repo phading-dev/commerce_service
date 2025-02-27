@@ -11,7 +11,7 @@ import {
 } from "@phading/commerce_service_interface/web/billing/interface";
 import { PaymentState as PaymentStateResponse } from "@phading/commerce_service_interface/web/billing/statement";
 import { MAX_MONTH_RANGE } from "@phading/constants/commerce";
-import { exchangeSessionAndCheckCapability } from "@phading/user_session_service_interface/node/client";
+import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import {
   newBadRequestError,
   newInternalServerErrorError,
@@ -58,14 +58,13 @@ export class ListBillingsHandler extends ListBillingsHandlerInterface {
         `The range between "startMonth" and "endMonth" is too large.`,
       );
     }
-    let { accountId, capabilities } = await exchangeSessionAndCheckCapability(
-      this.serviceClient,
-      {
+    let { accountId, capabilities } = await this.serviceClient.send(
+      newExchangeSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanBeBilled: true,
         },
-      },
+      }),
     );
     if (!capabilities.canBeBilled) {
       throw newUnauthorizedError(`Account ${accountId} cannot list billings.`);

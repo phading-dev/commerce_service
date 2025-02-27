@@ -1,6 +1,3 @@
-// Mixed data including processing and charging state.
-// startMonth invalid.
-// Month range too large.
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import { deleteBillingStatement, insertBillingStatement } from "../../db/sql";

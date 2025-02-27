@@ -2,22 +2,23 @@ import { SPANNER_DATABASE } from "../common/spanner_database";
 import { BillingAccountState, PaymentState } from "../db/schema";
 import {
   GET_BILLING_ACCOUNT_ROW,
-  LIST_BILLING_ACCOUNT_STATE_SYNCING_TASKS_ROW,
-  LIST_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASKS_ROW,
+  GET_BILLING_ACCOUNT_STATE_SYNCING_TASK_ROW,
+  GET_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASK_ROW,
   deleteBillingAccountStateSyncingTaskStatement,
   deleteBillingAccountStatement,
   deleteBillingAccountSuspendingDueToPastDueTaskStatement,
   deleteBillingAccountSuspensionNotifyingTaskStatement,
   deleteBillingStatement,
   getBillingAccount,
+  getBillingAccountStateSyncingTask,
+  getBillingAccountSuspensionNotifyingTask,
   insertBillingAccountStateSyncingTaskStatement,
   insertBillingAccountStatement,
   insertBillingAccountSuspendingDueToPastDueTaskStatement,
-  insertBillingAccountSuspensionNotifyingTaskStatement,
   insertBillingStatement,
-  listBillingAccountStateSyncingTasks,
-  listBillingAccountSuspendingDueToPastDueTasks,
-  listBillingAccountSuspensionNotifyingTasks,
+  listPendingBillingAccountStateSyncingTasks,
+  listPendingBillingAccountSuspendingDueToPastDueTasks,
+  listPendingBillingAccountSuspensionNotifyingTasks,
 } from "../db/sql";
 import { ProcessBillingAccountSuspendingDueToPastDueTaskHandler } from "./process_billing_account_suspending_due_to_past_due_task_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -59,6 +60,7 @@ TEST_RUNNER.run({
             insertBillingAccountStateSyncingTaskStatement(
               "account1",
               1,
+              0,
               100,
               100,
             ),
@@ -70,6 +72,7 @@ TEST_RUNNER.run({
             }),
             insertBillingAccountSuspendingDueToPastDueTaskStatement(
               "billing1",
+              0,
               100,
               100,
             ),
@@ -108,43 +111,52 @@ TEST_RUNNER.run({
           "billingAccount",
         );
         assertThat(
-          await listBillingAccountSuspensionNotifyingTasks(
+          await getBillingAccountSuspensionNotifyingTask(
             SPANNER_DATABASE,
-            1000000,
+            "account1",
+            2,
           ),
           isArray([
             eqMessage(
               {
                 billingAccountSuspensionNotifyingTaskAccountId: "account1",
                 billingAccountSuspensionNotifyingTaskVersion: 2,
+                billingAccountSuspensionNotifyingTaskRetryCount: 0,
                 billingAccountSuspensionNotifyingTaskExecutionTimeMs: 1000,
+                billingAccountSuspensionNotifyingTaskCreatedTimeMs: 1000,
               },
-              LIST_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASKS_ROW,
+              GET_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASK_ROW,
             ),
           ]),
-          "listBillingAccountSuspensionNotifyingTasks",
+          "BillingAccountSuspensionNotifyingTasks",
         );
         assertThat(
-          await listBillingAccountStateSyncingTasks(SPANNER_DATABASE, 1000000),
+          await getBillingAccountStateSyncingTask(
+            SPANNER_DATABASE,
+            "account1",
+            2,
+          ),
           isArray([
             eqMessage(
               {
                 billingAccountStateSyncingTaskAccountId: "account1",
                 billingAccountStateSyncingTaskVersion: 2,
+                billingAccountStateSyncingTaskRetryCount: 0,
                 billingAccountStateSyncingTaskExecutionTimeMs: 1000,
+                billingAccountStateSyncingTaskCreatedTimeMs: 1000,
               },
-              LIST_BILLING_ACCOUNT_STATE_SYNCING_TASKS_ROW,
+              GET_BILLING_ACCOUNT_STATE_SYNCING_TASK_ROW,
             ),
           ]),
-          "listBillingAccountStateSyncingTasks",
+          "BillingAccountStateSyncingTasks",
         );
         assertThat(
-          await listBillingAccountSuspendingDueToPastDueTasks(
+          await listPendingBillingAccountSuspendingDueToPastDueTasks(
             SPANNER_DATABASE,
             1000000,
           ),
           isArray([]),
-          "listBillingAccountSuspendingDueToPastDueTasks",
+          "BillingAccountSuspendingDueToPastDueTasks",
         );
       },
       tearDown: async () => {
@@ -165,18 +177,6 @@ TEST_RUNNER.run({
                 updatedTimeMs: 100,
               },
             }),
-            insertBillingAccountStateSyncingTaskStatement(
-              "account1",
-              2,
-              100,
-              100,
-            ),
-            insertBillingAccountSuspensionNotifyingTaskStatement(
-              "account1",
-              2,
-              100,
-              100,
-            ),
             insertBillingStatement({
               billingId: "billing1",
               accountId: "account1",
@@ -185,6 +185,7 @@ TEST_RUNNER.run({
             }),
             insertBillingAccountSuspendingDueToPastDueTaskStatement(
               "billing1",
+              0,
               100,
               100,
             ),
@@ -223,43 +224,28 @@ TEST_RUNNER.run({
           "billingAccount",
         );
         assertThat(
-          await listBillingAccountSuspensionNotifyingTasks(
-            SPANNER_DATABASE,
-            1000000,
-          ),
-          isArray([
-            eqMessage(
-              {
-                billingAccountSuspensionNotifyingTaskAccountId: "account1",
-                billingAccountSuspensionNotifyingTaskVersion: 2,
-                billingAccountSuspensionNotifyingTaskExecutionTimeMs: 100,
-              },
-              LIST_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASKS_ROW,
-            ),
-          ]),
-          "listBillingAccountSuspensionNotifyingTasks",
-        );
-        assertThat(
-          await listBillingAccountStateSyncingTasks(SPANNER_DATABASE, 1000000),
-          isArray([
-            eqMessage(
-              {
-                billingAccountStateSyncingTaskAccountId: "account1",
-                billingAccountStateSyncingTaskVersion: 2,
-                billingAccountStateSyncingTaskExecutionTimeMs: 100,
-              },
-              LIST_BILLING_ACCOUNT_STATE_SYNCING_TASKS_ROW,
-            ),
-          ]),
-          "listBillingAccountStateSyncingTasks",
-        );
-        assertThat(
-          await listBillingAccountSuspendingDueToPastDueTasks(
+          await listPendingBillingAccountSuspensionNotifyingTasks(
             SPANNER_DATABASE,
             1000000,
           ),
           isArray([]),
-          "listBillingAccountSuspendingDueToPastDueTasks",
+          "BillingAccountSuspensionNotifyingTasks",
+        );
+        assertThat(
+          await listPendingBillingAccountStateSyncingTasks(
+            SPANNER_DATABASE,
+            1000000,
+          ),
+          isArray([]),
+          "BillingAccountStateSyncingTasks",
+        );
+        assertThat(
+          await listPendingBillingAccountSuspendingDueToPastDueTasks(
+            SPANNER_DATABASE,
+            1000000,
+          ),
+          isArray([]),
+          "BillingAccountSuspendingDueToPastDueTasks",
         );
       },
       tearDown: async () => {

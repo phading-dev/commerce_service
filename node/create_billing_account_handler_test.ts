@@ -2,18 +2,16 @@ import { SPANNER_DATABASE } from "../common/spanner_database";
 import { BillingAccountState } from "../db/schema";
 import {
   GET_BILLING_ACCOUNT_ROW,
-  LIST_STRIPE_CUSTOMER_CREATING_TASKS_ROW,
+  GET_STRIPE_CUSTOMER_CREATING_TASK_ROW,
   deleteBillingAccountStatement,
   deleteStripeCustomerCreatingTaskStatement,
   getBillingAccount,
-  listStripeCustomerCreatingTasks,
+  getStripeCustomerCreatingTask,
 } from "../db/sql";
 import { CreateBillingAccountHandler } from "./create_billing_account_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { assertThat, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
-
-let FUTURE_TIME_MS = 365 * 24 * 60 * 60 * 1000;
 
 TEST_RUNNER.run({
   name: "CreateBillingAccountHandlerTest",
@@ -52,17 +50,16 @@ TEST_RUNNER.run({
           "account",
         );
         assertThat(
-          await listStripeCustomerCreatingTasks(
-            SPANNER_DATABASE,
-            FUTURE_TIME_MS,
-          ),
+          await getStripeCustomerCreatingTask(SPANNER_DATABASE, "account1"),
           isArray([
             eqMessage(
               {
                 stripeCustomerCreatingTaskAccountId: "account1",
+                stripeCustomerCreatingTaskRetryCount: 0,
                 stripeCustomerCreatingTaskExecutionTimeMs: 1000,
+                stripeCustomerCreatingTaskCreatedTimeMs: 1000,
               },
-              LIST_STRIPE_CUSTOMER_CREATING_TASKS_ROW,
+              GET_STRIPE_CUSTOMER_CREATING_TASK_ROW,
             ),
           ]),
           "tasks",

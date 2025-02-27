@@ -1,5 +1,5 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { listBillingAccountSuspendingDueToPastDueTasks } from "../db/sql";
+import { listPendingBillingAccountSuspendingDueToPastDueTasks } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { ListBillingAccountSuspendingDueToPastDueTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
@@ -27,7 +27,7 @@ export class ListBillingAccountSuspendingDueToPastDueTasksHandler extends ListBi
     loggingPrefix: string,
     body: ListBillingAccountSuspendingDueToPastDueTasksRequestBody,
   ): Promise<ListBillingAccountSuspendingDueToPastDueTasksResponse> {
-    let accountRows = await listBillingAccountSuspendingDueToPastDueTasks(
+    let accountRows = await listPendingBillingAccountSuspendingDueToPastDueTasks(
       this.database,
       this.getNow(),
     );

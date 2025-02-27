@@ -1,23 +1,21 @@
-// Set primary payment method only.
-// Set primary and retry failed payments.
-// Set primary and detach other payment methods.
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
+  GET_PAYMENT_TASK_ROW,
   LIST_BILLINGS_ROW,
-  LIST_PAYMENT_TASKS_ROW,
   deleteBillingAccountStatement,
   deleteBillingStatement,
   deletePaymentTaskStatement,
+  getPaymentTask,
   insertBillingAccountStatement,
   insertBillingStatement,
   listBillings,
-  listPaymentTasks,
 } from "../../db/sql";
 import { ReplacePrimaryPaymentMethodHandler } from "./replace_primary_payment_method_handler";
 import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
+import { Ref } from "@selfage/ref";
 import {
   assertThat,
   eq,
@@ -80,7 +78,7 @@ TEST_RUNNER.run({
         } as ExchangeSessionAndCheckCapabilityResponse;
         let handler = new ReplacePrimaryPaymentMethodHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           clientMock,
           () => 1000,
         );
@@ -195,7 +193,7 @@ TEST_RUNNER.run({
         } as ExchangeSessionAndCheckCapabilityResponse;
         let handler = new ReplacePrimaryPaymentMethodHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           clientMock,
           () => 1000,
         );
@@ -277,24 +275,34 @@ TEST_RUNNER.run({
           "billings",
         );
         assertThat(
-          await listPaymentTasks(SPANNER_DATABASE, 1000000),
+          await getPaymentTask(SPANNER_DATABASE, "billing1"),
           isUnorderedArray([
             eqMessage(
               {
                 paymentTaskBillingId: "billing1",
+                paymentTaskRetryCount: 0,
                 paymentTaskExecutionTimeMs: 1000,
+                paymentTaskCreatedTimeMs: 1000,
               },
-              LIST_PAYMENT_TASKS_ROW,
+              GET_PAYMENT_TASK_ROW,
             ),
+          ]),
+          "paymentTask for billing1",
+        );
+        assertThat(
+          await getPaymentTask(SPANNER_DATABASE, "billing5"),
+          isUnorderedArray([
             eqMessage(
               {
                 paymentTaskBillingId: "billing5",
+                paymentTaskRetryCount: 0,
                 paymentTaskExecutionTimeMs: 1000,
+                paymentTaskCreatedTimeMs: 1000,
               },
-              LIST_PAYMENT_TASKS_ROW,
+              GET_PAYMENT_TASK_ROW,
             ),
           ]),
-          "paymentTasks",
+          "paymentTask for billing5",
         );
       },
       tearDown: async () => {
@@ -380,7 +388,7 @@ TEST_RUNNER.run({
         } as ExchangeSessionAndCheckCapabilityResponse;
         let handler = new ReplacePrimaryPaymentMethodHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           clientMock,
           () => 1000,
         );

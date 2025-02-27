@@ -8,6 +8,7 @@ import {
 } from "../../db/sql";
 import { MarkPaymentDoneHandler } from "./mark_payment_done_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
+import { Ref } from "@selfage/ref";
 import { assertThat, eq, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 import { Readable } from "stream";
@@ -63,7 +64,7 @@ TEST_RUNNER.run({
         };
         let handler = new MarkPaymentDoneHandler(
           SPANNER_DATABASE,
-          stripeClientMock,
+          new Ref(stripeClientMock),
           "secret1",
         );
 

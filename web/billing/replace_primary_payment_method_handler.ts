@@ -16,9 +16,10 @@ import {
   ReplacePrimaryPaymentMethodRequestBody,
   ReplacePrimaryPaymentMethodResponse,
 } from "@phading/commerce_service_interface/web/billing/interface";
-import { exchangeSessionAndCheckCapability } from "@phading/user_session_service_interface/node/client";
+import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newInternalServerErrorError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
+import { Ref } from "@selfage/ref";
 
 export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMethodHandlerInterface {
   public static create(): ReplacePrimaryPaymentMethodHandler {
@@ -32,7 +33,7 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
 
   public constructor(
     private database: Database,
-    private stripeClient: Stripe,
+    private stripeClient: Ref<Stripe>,
     private serviceClient: NodeServiceClient,
     private getNow: () => number,
   ) {
@@ -44,14 +45,13 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
     body: ReplacePrimaryPaymentMethodRequestBody,
     sessionStr: string,
   ): Promise<ReplacePrimaryPaymentMethodResponse> {
-    let { accountId, capabilities } = await exchangeSessionAndCheckCapability(
-      this.serviceClient,
-      {
+    let { accountId, capabilities } = await this.serviceClient.send(
+      newExchangeSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanBeBilled: true,
         },
-      },
+      }),
     );
     if (!capabilities.canBeBilled) {
       throw newInternalServerErrorError(
@@ -65,7 +65,7 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
       );
     }
     let stripeCustomerId = accountRows[0].billingAccountData.stripeCustomerId;
-    let session = await this.stripeClient.checkout.sessions.retrieve(
+    let session = await this.stripeClient.val.checkout.sessions.retrieve(
       body.checkoutSessionId,
       {
         expand: ["setup_intent"],
@@ -84,7 +84,7 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
     stripeCustomerId: string,
     paymentMethodId: string,
   ): Promise<void> {
-    await this.stripeClient.customers.update(stripeCustomerId, {
+    await this.stripeClient.val.customers.update(stripeCustomerId, {
       invoice_settings: {
         default_payment_method: paymentMethodId,
       },
@@ -105,7 +105,7 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
         billingData.state = PaymentState.PROCESSING;
         statements.push(
           updateBillingStatement(billingData),
-          insertPaymentTaskStatement(billingData.billingId, now, now),
+          insertPaymentTaskStatement(billingData.billingId, 0, now, now),
         );
       });
       if (statements.length > 0) {
@@ -120,12 +120,14 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
     paymentMethodId: string,
   ): Promise<void> {
     let paymentMethods =
-      await this.stripeClient.customers.listPaymentMethods(stripeCustomerId);
+      await this.stripeClient.val.customers.listPaymentMethods(
+        stripeCustomerId,
+      );
     await Promise.all(
       paymentMethods.data
         .filter((paymentMethod) => paymentMethod.id !== paymentMethodId)
         .map((paymentMethod) =>
-          this.stripeClient.paymentMethods.detach(paymentMethod.id),
+          this.stripeClient.val.paymentMethods.detach(paymentMethod.id),
         ),
     );
   }
