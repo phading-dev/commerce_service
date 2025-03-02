@@ -10,7 +10,7 @@ import {
   getUpdatePaymentMethodNotifyingTaskMetadata,
   updateUpdatePaymentMethodNotifyingTaskMetadataStatement,
 } from "../db/sql";
-import { ENV_VARS } from "../env";
+import { ENV_VARS } from "../env_vars";
 import { Database } from "@google-cloud/spanner";
 import { ProcessUpdatePaymentMethodNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {

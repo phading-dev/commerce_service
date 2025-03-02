@@ -1,6 +1,6 @@
 import getStream from "get-stream";
 import Stripe from "stripe";
-import { ENV_VARS } from "../env";
+import { ENV_VARS } from "../env_vars";
 import { STORAGE_CLIENT } from "./storage_client";
 import { Ref } from "@selfage/ref";
 

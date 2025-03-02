@@ -1,3 +1,4 @@
+import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
   GET_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASK_METADATA_ROW,

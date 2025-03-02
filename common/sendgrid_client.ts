@@ -1,6 +1,6 @@
 import sgMail = require("@sendgrid/mail");
 import getStream = require("get-stream");
-import { ENV_VARS } from "../env";
+import { ENV_VARS } from "../env_vars";
 import { STORAGE_CLIENT } from "./storage_client";
 
 export let SENDGRID_CLIENT = sgMail;

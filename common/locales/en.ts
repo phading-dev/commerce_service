@@ -1,4 +1,4 @@
-import { ENV_VARS } from "../../env";
+import { ENV_VARS } from "../../env_vars";
 
 export default class EN {
   get locale() {

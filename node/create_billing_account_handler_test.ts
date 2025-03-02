@@ -1,3 +1,4 @@
+import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { BillingAccountState } from "../db/schema";
 import {

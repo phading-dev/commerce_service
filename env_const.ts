@@ -1,4 +1,4 @@
-import { ENV_VARS } from "./env";
+import { ENV_VARS } from "./env_vars";
 
 ENV_VARS.spannerDatabaseId = "commerce-db";
 ENV_VARS.stripeSecretKeyFile = "stripe_secret_key";

@@ -3,7 +3,7 @@ import http = require("http");
 import { initSendgridClient } from "./common/sendgrid_client";
 import { STORAGE_CLIENT } from "./common/storage_client";
 import { initStripeClient } from "./common/stripe_client";
-import { ENV_VARS } from "./env";
+import { ENV_VARS } from "./env_vars";
 import { CreateBillingAccountHandler } from "./node/create_billing_account_handler";
 import { CreateEarningsAccountHandler } from "./node/create_earnings_account_handler";
 import { ListBillingAccountStateSyncingTasksHandler } from "./node/list_billing_account_state_syncing_tasks_handler";

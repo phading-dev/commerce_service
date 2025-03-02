@@ -1,3 +1,4 @@
+import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PayoutState } from "../../db/schema";
 import { deleteEarningsStatement, insertEarningsStatement } from "../../db/sql";
