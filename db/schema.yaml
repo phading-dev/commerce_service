@@ -1,95 +1,22 @@
 - kind: Enum
-  name: BillingAccountState
+  name: BillingProfileState
   values:
     - name: HEALTHY
       value: 1
     - name: SUSPENDED
       value: 2
 - kind: Message
-  name: BillingAccountStateInfo
+  name: BillingProfileStateInfo
   fields:
     - name: version
       type: number
       index: 1
     - name: state
-      type: BillingAccountState
+      type: BillingProfileState
       index: 2
     - name: updatedTimeMs
       type: number
       index: 3
-- kind: Message
-  name: BillingAccount
-  fields:
-    - name: accountId
-      type: string
-      index: 1
-    - name: stripeCustomerId
-      type: string
-      index: 2
-    - name: stateInfo
-      type: BillingAccountStateInfo
-      index: 3
-    - name: paymentAfterMs
-      type: number
-      index: 4
-- kind: Enum
-  name: PaymentState
-  values:
-    - name: PROCESSING
-      value: 1
-    - name: CHARGING
-      value: 2
-    - name: PAID
-      value: 3
-    - name: FAILED
-      value: 4
-- kind: Message
-  name: LineItem
-  fields:
-    - name: productType
-      type: ProductType
-      import: "@phading/price/price"
-      index: 1
-    - name: quantity # The number of units per price config.
-      type: number
-      index: 2
-    - name: amount # Amount under the smallest unit of the currency. E.g. cents for USD.
-      type: number
-      index: 3
-- kind: Message
-  name: Billing
-  fields:
-    - name: accountId
-      type: string
-      index: 1
-    - name: billingId
-      type: string
-      index: 2
-    - name: createdTimeMs
-      type: number
-      index: 3
-    - name: state
-      type: PaymentState
-      index: 4
-    - name: month # ISO string
-      type: string
-      index: 5
-    - name: currency
-      type: string
-      index: 6
-    - name: totalAmount # Amount under the smallest unit of the currency. E.g. cents for USD.
-      type: number
-      index: 7
-    - name: items
-      type: LineItem
-      isArray: true
-      index: 8
-    - name: stripeInvoiceId
-      type: string
-      index: 9
-    - name: stripeInvoiceUrl
-      type: string
-      index: 10
 - kind: Enum
   name: StripeConnectedAccountState
   values:
@@ -98,17 +25,57 @@
     - name: ONBOARDED
       value: 2
 - kind: Message
-  name: EarningsAccount
+  name: LineItem
   fields:
-    - name: accountId
-      type: string
+    - name: productID
+      type: ProductID
+      import: "@phading/price/price"
       index: 1
-    - name: stripeConnectedAccountId
+    - name: unit # The unit for the quantity.
       type: string
       index: 2
-    - name: stripeConnectedAccountState
-      type: StripeConnectedAccountState
+    - name: amountType
+      type: AmountType
+      import: "@phading/price/amount_type"
       index: 3
+    - name: quantity # The number of units per price config.
+      type: number
+      index: 4
+    - name: amount # Amount under the smallest unit of the currency. E.g. cents for USD.
+      type: number
+      index: 5
+- kind: Message
+  name: TransactionStatement
+  fields:
+    - name: currency
+      type: string
+      index: 1
+    - name: totalAmount # Amount under the smallest unit of the currency. E.g. cents for USD.
+      type: number
+      index: 2
+    - name: totalAmountType
+      type: AmountType
+      import: "@phading/price/amount_type"
+      index: 3
+    - name: positiveAmountType
+      type: AmountType
+      import: "@phading/price/amount_type"
+      index: 4
+    - name: items
+      type: LineItem
+      isArray: true
+      index: 5
+- kind: Enum
+  name: PaymentState
+  values:
+    - name: PROCESSING
+      value: 1
+    - name: CHARGING_VIA_STRIPE_INVOICE
+      value: 2
+    - name: PAID
+      value: 3
+    - name: FAILED
+      value: 4
 - kind: Enum
   name: PayoutState
   values:
@@ -118,112 +85,148 @@
       value: 2
     - name: FAILED
       value: 3
-- kind: Message
-  name: Earnings
-  fields:
-    - name: accountId
-      type: string
-      index: 1
-    - name: earningsId
-      type: string
-      index: 2
-    - name: createdTimeMs
-      type: number
-      index: 3
-    - name: state
-      type: PayoutState
-      index: 4
-    - name: month # ISO string
-      type: string
-      index: 5
-    - name: currency
-      type: string
-      index: 6
-    - name: totalAmount # Amount under the smallest unit of the currency. E.g. cents for USD.
-      type: number
-      index: 7
-    - name: items
-      type: LineItem
-      isArray: true
-      index: 8
-    - name: stripeTransferId
-      type: string
-      index: 9
 - kind: SpannerDatabase
   name: CommerceDatabase
   tables:
-    - kind: MessageTable
-      name: BillingAccount
-      storedInColumn: data
+    - kind: Table
+      name: BillingProfile
       columns:
-        - accountId
+        - name: accountId
+          type: string
+        - name: stripePaymentCustomerId
+          type: string
+          nullable: true
+        - name: stateInfo
+          type: BillingProfileStateInfo
+          nullable: true
+        - name: paymentAfterMs
+          type: float64
+          nullable: true
+        - name: createdTimeMs
+          type: float64
+          nullable: true
       primaryKeys:
         - accountId
-      insert: InsertBillingAccount
-      delete: DeleteBillingAccount
-      get: GetBillingAccount
-      update: UpdateBillingAccount
-    - kind: MessageTable
-      name: Billing
-      storedInColumn: data
+      insert: InsertBillingProfile
+      delete: DeleteBillingProfile
+      get: GetBillingProfile
+    - kind: Table
+      name: EarningsProfile
       columns:
-        - billingId
-        - accountId
-        - state
-        - month
+        - name: accountId
+          type: string
+        - name: stripeConnectedAccountId
+          type: string
+          nullable: true
+        - name: stripeConnectedAccountState
+          type: StripeConnectedAccountState
+          nullable: true
+        - name: createdTimeMs
+          type: float64
+          nullable: true
       primaryKeys:
-        - billingId
+        - accountId
+      insert: InsertEarningsProfile
+      delete: DeleteEarningsProfile
+      get: GetEarningsProfile
+    - kind: Table
+      name: TransactionStatement
+      columns:
+        - name: statementId
+          type: string
+        - name: accountId
+          type: string
+          nullable: true
+        - name: month
+          type: string
+          nullable: true
+        - name: statement
+          type: TransactionStatement
+          nullable: true
+        - name: createdTimeMs
+          type: float64
+          nullable: true
+      primaryKeys:
+        - statementId
       indexes:
-        - name: BillingByMonth
+        - name: StatementByMonth
           columns:
             - accountId
+            - statementId
             - name: month
               desc: true
-        - name: BillingByState
+      insert: InsertTransactionStatement
+      delete: DeleteTransactionStatement
+      get: GetTransactionStatement
+    - kind: Table
+      name: Payment
+      columns:
+        - name: statementId
+          type: string
+        - name: accountId
+          type: string
+          nullable: true
+        - name: state
+          type: PaymentState
+          nullable: true
+        - name: stripeInvoiceId
+          type: string
+          nullable: true
+        - name: stripeInvoiceUrl
+          type: string
+          nullable: true
+        - name: updatedTimeMs
+          type: float64
+          nullable: true
+        - name: createdTimeMs
+          type: float64
+          nullable: true
+      primaryKeys:
+        - statementId
+      indexes:
+        - name: PaymentByState
           columns:
             - accountId
             - state
-      insert: InsertBilling
-      delete: DeleteBilling
-      get: GetBilling
-      update: UpdateBilling
-    - kind: MessageTable
-      name: EarningsAccount
-      storedInColumn: data
-      columns:
-        - accountId
-      primaryKeys:
-        - accountId
-      insert: InsertEarningsAccount
-      delete: DeleteEarningsAccount
-      get: GetEarningsAccount
-      update: UpdateEarningsAccount
-    - kind: MessageTable
-      name: Earnings
-      storedInColumn: data
-      columns:
-        - earningsId
-        - accountId
-        - state
-        - month
-      primaryKeys:
-        - earningsId
-      indexes:
-        - name: EarningsByMonth
-          columns:
-            - accountId
-            - name: month
+            - name: createdTimeMs
               desc: true
-        - name: EarningsByState
+      insert: InsertPayment
+      delete: DeletePayment
+      get: GetPayment
+    - kind: Table
+      name: Payout
+      columns:
+        - name: statementId
+          type: string
+        - name: accountId
+          type: string
+          nullable: true
+        - name: state
+          type: PayoutState
+          nullable: true
+        - name: stripeTransferId
+          type: string
+          nullable: true
+        - name: updatedTimeMs
+          type: float64
+          nullable: true
+        - name: createdTimeMs
+          type: float64
+          nullable: true
+      primaryKeys:
+        - statementId
+      indexes:
+        - name: PayoutByState
           columns:
             - accountId
             - state
-      insert: InsertEarnings
-      delete: DeleteEarnings
-      get: GetEarnings
-      update: UpdateEarnings
+            - name: createdTimeMs
+              desc: true
+      insert: InsertPayout
+      delete: DeletePayout
+      get: GetPayout
     - kind: TaskTable
-      name: StripeCustomerCreatingTask
+      name: StripePaymentCustomerCreatingTask
       columns:
         - name: accountId
           type: string
@@ -232,104 +235,13 @@
       createdTimeColumn: createdTimeMs
       primaryKeys:
         - accountId
-      executionTimeIndex: StripeCustomerCreatingTaskByExecutionTime
-      insert: InsertStripeCustomerCreatingTask
-      delete: DeleteStripeCustomerCreatingTask
-      get: GetStripeCustomerCreatingTask
-      listPendingTasks: ListPendingStripeCustomerCreatingTasks
-      getMetadata: GetStripeCustomerCreatingTaskMetadata
-      updateMetadata: UpdateStripeCustomerCreatingTaskMetadata
-    - kind: TaskTable
-      name: PaymentTask
-      columns:
-        - name: billingId
-          type: string
-      retryCountColumn: retryCount
-      executionTimeColumn: executionTimeMs
-      createdTimeColumn: createdTimeMs
-      primaryKeys:
-        - billingId
-      executionTimeIndex: PaymentTaskByExecutionTime
-      insert: InsertPaymentTask
-      delete: DeletePaymentTask
-      get: GetPaymentTask
-      listPendingTasks: ListPendingPaymentTasks
-      getMetadata: GetPaymentTaskMetadata
-      updateMetadata: UpdatePaymentTaskMetadata
-    - kind: TaskTable
-      name: UpdatePaymentMethodNotifyingTask
-      columns:
-        - name: billingId
-          type: string
-      retryCountColumn: retryCount
-      executionTimeColumn: executionTimeMs
-      createdTimeColumn: createdTimeMs
-      primaryKeys:
-        - billingId
-      executionTimeIndex: UpdatePaymentMethodNotifyingTaskByExecutionTime
-      insert: InsertUpdatePaymentMethodNotifyingTask
-      delete: DeleteUpdatePaymentMethodNotifyingTask
-      get: GetUpdatePaymentMethodNotifyingTask
-      listPendingTasks: ListPendingUpdatePaymentMethodNotifyingTasks
-      getMetadata: GetUpdatePaymentMethodNotifyingTaskMetadata
-      updateMetadata: UpdateUpdatePaymentMethodNotifyingTaskMetadata
-    - kind: TaskTable
-      name: BillingAccountSuspendingDueToPastDueTask
-      columns:
-        - name: billingId
-          type: string
-      retryCountColumn: retryCount
-      executionTimeColumn: executionTimeMs
-      createdTimeColumn: createdTimeMs
-      primaryKeys:
-        - billingId
-      executionTimeIndex: BillingAccountSuspendingDueToPastDueTaskByExecutionTime
-      insert: InsertBillingAccountSuspendingDueToPastDueTask
-      delete: DeleteBillingAccountSuspendingDueToPastDueTask
-      get: GetBillingAccountSuspendingDueToPastDueTask
-      listPendingTasks: ListPendingBillingAccountSuspendingDueToPastDueTasks
-      getMetadata: GetBillingAccountSuspendingDueToPastDueTaskMetadata
-      updateMetadata: UpdateBillingAccountSuspendingDueToPastDueTaskMetadata
-    - kind: TaskTable
-      name: BillingAccountSuspensionNotifyingTask
-      columns:
-        - name: accountId
-          type: string
-        - name: version
-          type: float64
-      retryCountColumn: retryCount
-      executionTimeColumn: executionTimeMs
-      createdTimeColumn: createdTimeMs
-      primaryKeys:
-        - accountId
-        - version
-      executionTimeIndex: BillingAccountSuspensionNotifyingTaskByExecutionTime
-      insert: InsertBillingAccountSuspensionNotifyingTask
-      delete: DeleteBillingAccountSuspensionNotifyingTask
-      get: GetBillingAccountSuspensionNotifyingTask
-      listPendingTasks: ListPendingBillingAccountSuspensionNotifyingTasks
-      getMetadata: GetBillingAccountSuspensionNotifyingTaskMetadata
-      updateMetadata: UpdateBillingAccountSuspensionNotifyingTaskMetadata
-    - kind: TaskTable
-      name: BillingAccountStateSyncingTask
-      columns:
-        - name: accountId
-          type: string
-        - name: version
-          type: float64
-      retryCountColumn: retryCount
-      executionTimeColumn: executionTimeMs
-      createdTimeColumn: createdTimeMs
-      primaryKeys:
-        - accountId
-        - version
-      executionTimeIndex: BillingAccountStateSyncingTaskByExecutionTime
-      insert: InsertBillingAccountStateSyncingTask
-      delete: DeleteBillingAccountStateSyncingTask
-      get: GetBillingAccountStateSyncingTask
-      listPendingTasks: ListPendingBillingAccountStateSyncingTasks
-      getMetadata: GetBillingAccountStateSyncingTaskMetadata
-      updateMetadata: UpdateBillingAccountStateSyncingTaskMetadata
+      executionTimeIndex: StripePaymentCustomerCreatingTaskByExecutionTime
+      insert: InsertStripePaymentCustomerCreatingTask
+      delete: DeleteStripePaymentCustomerCreatingTask
+      get: GetStripePaymentCustomerCreatingTask
+      listPendingTasks: ListPendingStripePaymentCustomerCreatingTasks
+      getMetadata: GetStripePaymentCustomerCreatingTaskMetadata
+      updateMetadata: UpdateStripePaymentCustomerCreatingTaskMetadata
     - kind: TaskTable
       name: StripeConnectedAccountCreatingTask
       columns:
@@ -348,7 +260,7 @@
       getMetadata: GetStripeConnectedAccountCreatingTaskMetadata
       updateMetadata: UpdateStripeConnectedAccountCreatingTaskMetadata
     - kind: TaskTable
-      name: SetupStripeConnectedAccountNotifyingTask
+      name: StripeConnectedAccountNeedsSetupNotifyingTask
       columns:
         - name: accountId
           type: string
@@ -357,23 +269,114 @@
       createdTimeColumn: createdTimeMs
       primaryKeys:
         - accountId
-      executionTimeIndex: SetupStripeConnectedAccountNotifyingTaskByExecutionTime
-      insert: InsertSetupStripeConnectedAccountNotifyingTask
-      delete: DeleteSetupStripeConnectedAccountNotifyingTask
-      get: GetSetupStripeConnectedAccountNotifyingTask
-      listPendingTasks: ListPendingSetupStripeConnectedAccountNotifyingTasks
-      getMetadata: GetSetupStripeConnectedAccountNotifyingTaskMetadata
-      updateMetadata: UpdateSetupStripeConnectedAccountNotifyingTaskMetadata
+      executionTimeIndex: StripeConnectedAccountNeedsSetupNotifyingTaskByExecutionTime
+      insert: InsertStripeConnectedAccountNeedsSetupNotifyingTask
+      delete: DeleteStripeConnectedAccountNeedsSetupNotifyingTask
+      get: GetStripeConnectedAccountNeedsSetupNotifyingTask
+      listPendingTasks: ListPendingStripeConnectedAccountNeedsSetupNotifyingTasks
+      getMetadata: GetStripeConnectedAccountNeedsSetupNotifyingTaskMetadata
+      updateMetadata: UpdateStripeConnectedAccountNeedsSetupNotifyingTaskMetadata
     - kind: TaskTable
-      name: PayoutTask
+      name: PaymentTask
       columns:
-        - name: earningsId
+        - name: statementId
           type: string
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
       primaryKeys:
-        - earningsId
+        - statementId
+      executionTimeIndex: PaymentTaskByExecutionTime
+      insert: InsertPaymentTask
+      delete: DeletePaymentTask
+      get: GetPaymentTask
+      listPendingTasks: ListPendingPaymentTasks
+      getMetadata: GetPaymentTaskMetadata
+      updateMetadata: UpdatePaymentTaskMetadata
+    - kind: TaskTable
+      name: PaymentMethodNeedsUpdateNotifyingTask
+      columns:
+        - name: statementId
+          type: string
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - statementId
+      executionTimeIndex: PaymentMethodNeedsUpdateNotifyingTaskByExecutionTime
+      insert: InsertPaymentMethodNeedsUpdateNotifyingTask
+      delete: DeletePaymentMethodNeedsUpdateNotifyingTask
+      get: GetPaymentMethodNeedsUpdateNotifyingTask
+      listPendingTasks: ListPendingPaymentMethodNeedsUpdateNotifyingTasks
+      getMetadata: GetPaymentMethodNeedsUpdateNotifyingTaskMetadata
+      updateMetadata: UpdatePaymentMethodNeedsUpdateNotifyingTaskMetadata
+    - kind: TaskTable
+      name: BillingProfileSuspendingDueToPastDueTask
+      columns:
+        - name: statementId
+          type: string
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - statementId
+      executionTimeIndex: BillingProfileSuspendingDueToPastDueTaskByExecutionTime
+      insert: InsertBillingProfileSuspendingDueToPastDueTask
+      delete: DeleteBillingProfileSuspendingDueToPastDueTask
+      get: GetBillingProfileSuspendingDueToPastDueTask
+      listPendingTasks: ListPendingBillingProfileSuspendingDueToPastDueTasks
+      getMetadata: GetBillingProfileSuspendingDueToPastDueTaskMetadata
+      updateMetadata: UpdateBillingProfileSuspendingDueToPastDueTaskMetadata
+    - kind: TaskTable
+      name: BillingProfileSuspensionNotifyingTask
+      columns:
+        - name: accountId
+          type: string
+        - name: version
+          type: float64
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - accountId
+        - version
+      executionTimeIndex: BillingProfileSuspensionNotifyingTaskByExecutionTime
+      insert: InsertBillingProfileSuspensionNotifyingTask
+      delete: DeleteBillingProfileSuspensionNotifyingTask
+      get: GetBillingProfileSuspensionNotifyingTask
+      listPendingTasks: ListPendingBillingProfileSuspensionNotifyingTasks
+      getMetadata: GetBillingProfileSuspensionNotifyingTaskMetadata
+      updateMetadata: UpdateBillingProfileSuspensionNotifyingTaskMetadata
+    - kind: TaskTable
+      name: BillingProfileStateSyncingTask
+      columns:
+        - name: accountId
+          type: string
+        - name: version
+          type: float64
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - accountId
+        - version
+      executionTimeIndex: BillingProfileStateSyncingTaskByExecutionTime
+      insert: InsertBillingProfileStateSyncingTask
+      delete: DeleteBillingProfileStateSyncingTask
+      get: GetBillingProfileStateSyncingTask
+      listPendingTasks: ListPendingBillingProfileStateSyncingTasks
+      getMetadata: GetBillingProfileStateSyncingTaskMetadata
+      updateMetadata: UpdateBillingProfileStateSyncingTaskMetadata
+    - kind: TaskTable
+      name: PayoutTask
+      columns:
+        - name: statementId
+          type: string
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - statementId
       executionTimeIndex: PayoutTaskByExecutionTime
       insert: InsertPayoutTask
       delete: DeletePayoutTask
@@ -381,124 +384,205 @@
       listPendingTasks: ListPendingPayoutTasks
       getMetadata: GetPayoutTaskMetadata
       updateMetadata: UpdatePayoutTaskMetadata
+  updates:
+    - name: UpdateBillingProfileState
+      table: BillingProfile
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: accountId
+      set:
+        - stateInfo
+    - name: UpdateBillingProfilePaymentCustomer
+      table: BillingProfile
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: accountId
+      set:
+        - stripePaymentCustomerId
+    - name: UpdateEarningsProfileConnectedAccount
+      table: EarningsProfile
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: accountId
+      set:
+        - stripeConnectedAccountId
+        - stripeConnectedAccountState
+    - name: UpdateEarningsProfileConnectedAccountState
+      table: EarningsProfile
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: accountId
+      set:
+        - stripeConnectedAccountState
+    - name: UpdatePaymentState
+      table: Payment
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: statementId
+      set:
+        - state
+        - updatedTimeMs
+    - name: UpdatePaymentStateAndStripeInvoice
+      table: Payment
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: statementId
+      set:
+        - state
+        - stripeInvoiceId
+        - stripeInvoiceUrl
+        - updatedTimeMs
+    - name: UpdatePayoutState
+      table: Payout
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: statementId
+      set:
+        - state
+        - updatedTimeMs
+    - name: UpdatePayoutStateAndStripeTransfer
+      table: Payout
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: statementId
+      set:
+        - state
+        - stripeTransferId
+        - updatedTimeMs
   selects:
-    - name: GetBillingAccountFromBilling
-      table:
-        name: Billing
-        as: b
+    - name: GetBillingProfileFromStatement
+      from: TransactionStatement
+      as: t
       join:
         - type: INNER
-          table:
-            name: BillingAccount
-            as: a
+          with: BillingProfile
+          as: b
           on:
             op: =
-            leftColumn:
-              name: accountId
-              table: b
-            rightColumn: accountId
-      where:
-        op: =
-        leftColumn: billingId
-      getColumns:
-        - name: data
-          table: a
-    - name: GetBillingByMonth
-      table: Billing
+            lColumn: accountId
+            lTable: t
+            rColumn: accountId
       where:
         op: AND
-        exps:
+        exprs:
           - op: =
-            leftColumn: accountId
-          - op: =
-            leftColumn: month
-      getColumns:
-        - data
-    - name: ListBillings
-      table: Billing
+            lColumn: statementId
+      get:
+        - all: true
+          table: b
+    - name: GetEarningsProfileFromStatement
+      from: TransactionStatement
+      as: t
+      join:
+        - type: INNER
+          with: EarningsProfile
+          as: e
+          on:
+            op: =
+            lColumn: accountId
+            lTable: t
+            rColumn: accountId
       where:
         op: AND
-        exps:
+        exprs:
           - op: =
-            leftColumn: accountId
+            lColumn: statementId
+      get:
+        - all: true
+          table: e
+    - name: GetTransactionStatementByMonth
+      from: TransactionStatement
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: accountId
+          - op: =
+            lColumn: month
+      get:
+        - all: true
+    - name: ListTransactionStatements
+      from: TransactionStatement
+      as: t
+      join:
+        - type: LEFT
+          with: Payment
+          as: pa
+          on:
+            op: =
+            lColumn: statementId
+            lTable: t
+            rColumn: statementId
+        - type: LEFT
+          with: Payout
+          as: po
+          on:
+            op: =
+            lColumn: statementId
+            lTable: t
+            rColumn: statementId
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: accountId
           - op: ">="
-            leftColumn: month
+            lColumn: month
           - op: "<="
-            leftColumn: month
+            lColumn: month
       orderBy:
         - column: month
           desc: true
-      getColumns:
-        - data
-    - name: ListBillingsByState
-      table: Billing
+      get:
+        - all: true
+          table: t
+        - all: true
+          table: pa
+        - all: true
+          table: po
+    - name: ListPaymentsByState
+      from: Payment
       where:
         op: AND
-        exps:
+        exprs:
           - op: =
-            leftColumn: accountId
+            lColumn: accountId
           - op: =
-            leftColumn: state
-      getColumns:
-        - data
-    - name: GetEarningsAccountFromEarnings
-      table:
-        name: Earnings
-        as: e
-      join:
-        - type: INNER
-          table:
-            name: EarningsAccount
-            as: a
-          on:
-            op: =
-            leftColumn:
-              name: accountId
-              table: e
-            rightColumn: accountId
-      where:
-        op: =
-        leftColumn: earningsId
-      getColumns:
-        - name: data
-          table: a
-    - name: GetEarningsByMonth
-      table: Earnings
-      where:
-        op: AND
-        exps:
-          - op: =
-            leftColumn: accountId
-          - op: =
-            leftColumn: month
-      getColumns:
-        - data
-    - name: ListEarnings
-      table: Earnings
-      where:
-        op: AND
-        exps:
-          - op: =
-            leftColumn: accountId
-          - op: ">="
-            leftColumn: month
-          - op: "<="
-            leftColumn: month
+            lColumn: state
       orderBy:
-        - column: month
+        - column: createdTimeMs
           desc: true
-      getColumns:
-        - data
-    - name: ListEarningsByState
-      table: Earnings
+      get:
+        - all: true
+    - name: ListPayoutsByState
+      from: Payout
       where:
         op: AND
-        exps:
+        exprs:
           - op: =
-            leftColumn: accountId
+            lColumn: accountId
           - op: =
-            leftColumn: state
-      getColumns:
-        - data
+            lColumn: state
+      orderBy:
+        - column: createdTimeMs
+          desc: true
+      get:
+        - all: true
   outputDdl: ./db/ddl
   outputSql: ./db/sql

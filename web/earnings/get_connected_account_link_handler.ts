@@ -4,7 +4,7 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { URL_BUILDER } from "../../common/url_builder";
 import { StripeConnectedAccountState } from "../../db/schema";
-import { getEarningsAccount } from "../../db/sql";
+import { getEarningsProfile } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { GetConnectedAccountLinkHandlerInterface } from "@phading/commerce_service_interface/web/earnings/handler";
 import {
@@ -12,7 +12,7 @@ import {
   GetConnectedAccountLinkResponse,
   LinkType,
 } from "@phading/commerce_service_interface/web/earnings/interface";
-import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
+import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import {
   newBadRequestError,
@@ -46,7 +46,7 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
     sessionStr: string,
   ): Promise<GetConnectedAccountLinkResponse> {
     let { accountId, capabilities } = await this.serviceClient.send(
-      newExchangeSessionAndCheckCapabilityRequest({
+      newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanEarn: true,
@@ -55,20 +55,22 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
     );
     if (!capabilities.canEarn) {
       throw newInternalServerErrorError(
-        `Account ${accountId} cannot get connected account link.`,
+        `Account ${accountId} is not allowed to get connected account link.`,
       );
     }
-    let rows = await getEarningsAccount(this.database, accountId);
+    let rows = await getEarningsProfile(this.database, {
+      earningsProfileAccountIdEq: accountId,
+    });
     if (rows.length === 0) {
       throw newBadRequestError(`Earnings account ${accountId} not found.`);
     }
-    let earningsAccount = rows[0].earningsAccountData;
+    let profile = rows[0];
     if (
-      earningsAccount.stripeConnectedAccountState ===
+      profile.earningsProfileStripeConnectedAccountState ===
       StripeConnectedAccountState.ONBOARDING
     ) {
       let onboardingLink = await this.stripeClient.val.accountLinks.create({
-        account: earningsAccount.stripeConnectedAccountId,
+        account: profile.earningsProfileStripeConnectedAccountId,
         return_url: this.urlBuilder.build({
           setConnectedAccountOnboarded: {
             accountId,
@@ -89,11 +91,11 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
         url: onboardingLink.url,
       };
     } else if (
-      earningsAccount.stripeConnectedAccountState ===
+      profile.earningsProfileStripeConnectedAccountState ===
       StripeConnectedAccountState.ONBOARDED
     ) {
       let loginLink = await this.stripeClient.val.accounts.createLoginLink(
-        earningsAccount.stripeConnectedAccountId,
+        profile.earningsProfileStripeConnectedAccountId,
       );
       return {
         type: LinkType.LOGIN,
@@ -101,7 +103,7 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
       };
     } else {
       throw newInternalServerErrorError(
-        `StripeConnectedAccountState ${StripeConnectedAccountState[earningsAccount.stripeConnectedAccountState]} is not handled.`,
+        `StripeConnectedAccountState ${StripeConnectedAccountState[profile.earningsProfileStripeConnectedAccountState]} is not handled.`,
       );
     }
   }

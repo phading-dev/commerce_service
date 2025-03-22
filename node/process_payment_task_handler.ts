@@ -3,15 +3,18 @@ import { GRACE_PERIOD_DAYS_IN_MS } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
-import { Billing, PaymentState } from "../db/schema";
+import { PaymentState } from "../db/schema";
 import {
+  GetPaymentRow,
   deletePaymentTaskStatement,
-  getBilling,
-  getBillingAccountFromBilling,
+  getBillingProfileFromStatement,
+  getPayment,
   getPaymentTaskMetadata,
-  insertBillingAccountSuspendingDueToPastDueTaskStatement,
-  insertUpdatePaymentMethodNotifyingTaskStatement,
-  updateBillingStatement,
+  getTransactionStatement,
+  insertBillingProfileSuspendingDueToPastDueTaskStatement,
+  insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  updatePaymentStateAndStripeInvoiceStatement,
+  updatePaymentStateStatement,
   updatePaymentTaskMetadataStatement,
 } from "../db/sql";
 import { Database, Transaction } from "@google-cloud/spanner";
@@ -20,6 +23,7 @@ import {
   ProcessPaymentTaskRequestBody,
   ProcessPaymentTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
+import { AmountType } from "@phading/price/amount_type";
 import {
   newBadRequestError,
   newInternalServerErrorError,
@@ -34,7 +38,11 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     );
   }
 
-  private taskHandler: ProcessTaskHandlerWrapper;
+  private taskHandler = ProcessTaskHandlerWrapper.create(
+    this.descriptor,
+    5 * 60 * 1000,
+    24 * 60 * 60 * 1000,
+  );
 
   public constructor(
     private database: Database,
@@ -42,18 +50,13 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     private getNow: () => number,
   ) {
     super();
-    this.taskHandler = ProcessTaskHandlerWrapper.create(
-      this.descriptor,
-      5 * 60 * 1000,
-      24 * 60 * 60 * 1000,
-    );
   }
 
   public async handle(
     loggingPrefix: string,
     body: ProcessPaymentTaskRequestBody,
   ): Promise<ProcessPaymentTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payment task for billing ${body.billingId}:`;
+    loggingPrefix = `${loggingPrefix} Payment task for statement ${body.statementId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -67,18 +70,21 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     body: ProcessPaymentTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getPaymentTaskMetadata(transaction, body.billingId);
+      let rows = await getPaymentTaskMetadata(transaction, {
+        paymentTaskStatementIdEq: body.statementId,
+      });
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updatePaymentTaskMetadataStatement(
-          body.billingId,
-          task.paymentTaskRetryCount + 1,
-          this.getNow() +
+        updatePaymentTaskMetadataStatement({
+          paymentTaskStatementIdEq: body.statementId,
+          setRetryCount: task.paymentTaskRetryCount + 1,
+          setExecutionTimeMs:
+            this.getNow() +
             this.taskHandler.getBackoffTime(task.paymentTaskRetryCount),
-        ),
+        }),
       ]);
       await transaction.commit();
     });
@@ -88,23 +94,43 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     loggingPrefix: string,
     body: ProcessPaymentTaskRequestBody,
   ): Promise<void> {
-    let [billing, accountRows] = await Promise.all([
-      this.getValidBilling(this.database, body.billingId),
-      getBillingAccountFromBilling(this.database, body.billingId),
+    let [profileRows, statementRows] = await Promise.all([
+      getBillingProfileFromStatement(this.database, {
+        transactionStatementStatementIdEq: body.statementId,
+      }),
+      getTransactionStatement(this.database, {
+        transactionStatementStatementIdEq: body.statementId,
+      }),
+      this.getValidPayment(this.database, body.statementId),
     ]);
-    if (accountRows.length === 0) {
+    if (profileRows.length === 0) {
       throw newInternalServerErrorError(
-        `${loggingPrefix} Billing account for billing ${body.billingId} is not found.`,
+        `Billing profile for statement ${body.statementId} is not found.`,
       );
     }
-    let stripeCustomerId = accountRows[0].aData.stripeCustomerId;
+    if (statementRows.length === 0) {
+      throw newInternalServerErrorError(
+        `Transaction statement ${body.statementId} is not found.`,
+      );
+    }
+    let transactionStatement = statementRows[0];
+    if (
+      transactionStatement.transactionStatementStatement.totalAmountType !==
+      AmountType.DEBIT
+    ) {
+      throw newInternalServerErrorError(
+        `Transaction statement ${body.statementId}'s total amount is not a debit.`,
+      );
+    }
+
+    let stripeCustomerId = profileRows[0].billingProfileStripePaymentCustomerId;
     let stripeCustomer =
       await this.stripeClient.val.customers.retrieve(stripeCustomerId);
     if (
       !(stripeCustomer as Stripe.Customer).invoice_settings
         ?.default_payment_method
     ) {
-      await this.reportFailure(loggingPrefix, billing.billingId);
+      await this.reportFailure(loggingPrefix, body.statementId);
       return;
     }
 
@@ -114,14 +140,15 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         automatic_tax: {
           enabled: true,
         },
-        description: billing.month,
+        description: transactionStatement.transactionStatementMonth,
         metadata: {
-          billingId: billing.billingId,
+          statementId: body.statementId,
         },
-        currency: billing.currency.toLowerCase(),
+        currency:
+          transactionStatement.transactionStatementStatement.currency.toLowerCase(),
       },
       {
-        idempotencyKey: billing.billingId,
+        idempotencyKey: body.statementId,
       },
     );
     await this.stripeClient.val.invoices.addLines(
@@ -129,13 +156,14 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       {
         lines: [
           {
-            description: LOCALIZATION.totalUsage,
-            amount: billing.totalAmount,
+            description: LOCALIZATION.total,
+            amount:
+              transactionStatement.transactionStatementStatement.totalAmount,
           },
         ],
       },
       {
-        idempotencyKey: billing.billingId,
+        idempotencyKey: body.statementId,
       },
     );
     invoice = await this.stripeClient.val.invoices.finalizeInvoice(
@@ -144,12 +172,12 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         auto_advance: true,
       },
       {
-        idempotencyKey: billing.billingId,
+        idempotencyKey: body.statementId,
       },
     );
     await this.finalize(
       loggingPrefix,
-      billing.billingId,
+      body.statementId,
       invoice.id,
       invoice.hosted_invoice_url,
     );
@@ -157,27 +185,32 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
 
   private async reportFailure(
     loggingPrefix: string,
-    billingId: string,
+    statementId: string,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let billing = await this.getValidBilling(transaction, billingId);
-      billing.state = PaymentState.FAILED;
+      await this.getValidPayment(transaction, statementId);
       let now = this.getNow();
       await transaction.batchUpdate([
-        updateBillingStatement(billing),
-        insertUpdatePaymentMethodNotifyingTaskStatement(
-          billing.billingId,
-          0,
-          now,
-          now,
-        ),
-        insertBillingAccountSuspendingDueToPastDueTaskStatement(
-          billing.billingId,
-          0,
-          now + GRACE_PERIOD_DAYS_IN_MS,
-          now,
-        ),
-        deletePaymentTaskStatement(billingId),
+        updatePaymentStateStatement({
+          paymentStatementIdEq: statementId,
+          setState: PaymentState.FAILED,
+          setUpdatedTimeMs: now,
+        }),
+        insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+          statementId: statementId,
+          retryCount: 0,
+          executionTimeMs: now,
+          createdTimeMs: now,
+        }),
+        insertBillingProfileSuspendingDueToPastDueTaskStatement({
+          statementId: statementId,
+          retryCount: 0,
+          executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,
+          createdTimeMs: now,
+        }),
+        deletePaymentTaskStatement({
+          paymentTaskStatementIdEq: statementId,
+        }),
       ]);
       await transaction.commit();
     });
@@ -185,38 +218,43 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
 
   private async finalize(
     loggingPrefix: string,
-    billingId: string,
+    statementId: string,
     invoiceId: string,
     invoiceUrl: string,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let billing = await this.getValidBilling(transaction, billingId);
-      billing.state = PaymentState.CHARGING;
-      billing.stripeInvoiceId = invoiceId;
-      billing.stripeInvoiceUrl = invoiceUrl;
+      await this.getValidPayment(transaction, statementId);
       await transaction.batchUpdate([
-        updateBillingStatement(billing),
-        deletePaymentTaskStatement(billingId),
+        updatePaymentStateAndStripeInvoiceStatement({
+          paymentStatementIdEq: statementId,
+          setState: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+          setStripeInvoiceId: invoiceId,
+          setStripeInvoiceUrl: invoiceUrl,
+          setUpdatedTimeMs: this.getNow(),
+        }),
+        deletePaymentTaskStatement({
+          paymentTaskStatementIdEq: statementId,
+        }),
       ]);
       await transaction.commit();
     });
   }
 
-  private async getValidBilling(
+  private async getValidPayment(
     runner: Database | Transaction,
-    billingId: string,
-  ): Promise<Billing> {
-    let rows = await getBilling(runner, billingId);
+    statementId: string,
+  ): Promise<GetPaymentRow> {
+    let rows = await getPayment(runner, { paymentStatementIdEq: statementId });
     if (rows.length === 0) {
-      // Billing should almost never be deleted, or should be drained by a long lead time.
-      throw newInternalServerErrorError(`Billing ${billingId} is not found.`);
+      // Payment should almost never be deleted, or should be drained by a long lead time.
+      throw newInternalServerErrorError(`Payment ${statementId} is not found.`);
     }
-    let billing = rows[0].billingData;
-    if (billing.state !== PaymentState.PROCESSING) {
+    let row = rows[0];
+    if (row.paymentState !== PaymentState.PROCESSING) {
       throw newBadRequestError(
-        `Billing ${billingId} is not in PROCESSING state.`,
+        `Payment ${statementId} is not in PROCESSING state.`,
       );
     }
-    return billing;
+    return row;
   }
 }

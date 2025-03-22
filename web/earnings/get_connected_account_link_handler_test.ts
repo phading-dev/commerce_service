@@ -2,15 +2,15 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { StripeConnectedAccountState } from "../../db/schema";
 import {
-  deleteEarningsAccountStatement,
-  insertEarningsAccountStatement,
+  deleteEarningsProfileStatement,
+  insertEarningsProfileStatement,
 } from "../../db/sql";
 import { GetConnectedAccountLinkHandler } from "./get_connected_account_link_handler";
 import {
   GET_CONNECTED_ACCOUNT_LINK_RESPONSE,
   LinkType,
 } from "@phading/commerce_service_interface/web/earnings/interface";
-import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
+import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
@@ -27,7 +27,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
+            insertEarningsProfileStatement({
               accountId: "account1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDING,
@@ -53,7 +53,7 @@ TEST_RUNNER.run({
           capabilities: {
             canEarn: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new GetConnectedAccountLinkHandler(
           SPANNER_DATABASE,
@@ -100,7 +100,9 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
+            deleteEarningsProfileStatement({
+              earningsProfileAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });
@@ -112,7 +114,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
+            insertEarningsProfileStatement({
               accountId: "account1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDED,
@@ -138,7 +140,7 @@ TEST_RUNNER.run({
           capabilities: {
             canEarn: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new GetConnectedAccountLinkHandler(
           SPANNER_DATABASE,
@@ -171,7 +173,9 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
+            deleteEarningsProfileStatement({
+              earningsProfileAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });

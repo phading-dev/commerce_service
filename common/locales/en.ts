@@ -4,8 +4,8 @@ export default class EN {
   get locale() {
     return "en";
   }
-  get totalUsage() {
-    return "Total usage";
+  get total() {
+    return "Total";
   }
   get updatePaymentMethodEmailTemplateId() {
     return ENV_VARS.updatePaymentMethodEnEmailTemplateId;

@@ -24,11 +24,13 @@ export class ListPayoutTasksHandler extends ListPayoutTasksHandlerInterface {
     loggingPrefix: string,
     body: ListPayoutTasksRequestBody,
   ): Promise<ListPayoutTasksResponse> {
-    let rows = await listPendingPayoutTasks(this.database, this.getNow());
+    let rows = await listPendingPayoutTasks(this.database, {
+      payoutTaskExecutionTimeMsLe: this.getNow(),
+    });
     return {
       tasks: rows.map(
         (row): ProcessPayoutTaskRequestBody => ({
-          earningsId: row.payoutTaskEarningsId,
+          statementId: row.payoutTaskStatementId,
         }),
       ),
     };

@@ -9,10 +9,10 @@ import { STRIPE_CLIENT } from "../common/stripe_client";
 import { StripeConnectedAccountState } from "../db/schema";
 import {
   deleteStripeConnectedAccountCreatingTaskStatement,
-  getEarningsAccount,
+  getEarningsProfile,
   getStripeConnectedAccountCreatingTaskMetadata,
-  insertSetupStripeConnectedAccountNotifyingTaskStatement,
-  updateEarningsAccountStatement,
+  insertStripeConnectedAccountNeedsSetupNotifyingTaskStatement,
+  updateEarningsProfileConnectedAccountStatement,
   updateStripeConnectedAccountCreatingTaskMetadataStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
@@ -40,7 +40,11 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
     );
   }
 
-  private taskHandler: ProcessTaskHandlerWrapper;
+  private taskHandler = ProcessTaskHandlerWrapper.create(
+    this.descriptor,
+    5 * 60 * 1000,
+    24 * 60 * 60 * 1000,
+  );
 
   public constructor(
     private database: Database,
@@ -49,18 +53,13 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
     private getNow: () => number,
   ) {
     super();
-    this.taskHandler = ProcessTaskHandlerWrapper.create(
-      this.descriptor,
-      5 * 60 * 1000,
-      24 * 60 * 60 * 1000,
-    );
   }
 
   public async handle(
     loggingPrefix: string,
     body: ProcessStripeConnectedAccountCreatingTaskRequestBody,
   ): Promise<ProcessStripeConnectedAccountCreatingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Stripe connected account creating task for earnings account ${body.accountId}:`;
+    loggingPrefix = `${loggingPrefix} Stripe connected account creating task for earnings profile ${body.accountId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -76,21 +75,22 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
     await this.database.runTransactionAsync(async (transaction) => {
       let rows = await getStripeConnectedAccountCreatingTaskMetadata(
         transaction,
-        body.accountId,
+        { stripeConnectedAccountCreatingTaskAccountIdEq: body.accountId },
       );
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updateStripeConnectedAccountCreatingTaskMetadataStatement(
-          body.accountId,
-          task.stripeConnectedAccountCreatingTaskRetryCount + 1,
-          this.getNow() +
+        updateStripeConnectedAccountCreatingTaskMetadataStatement({
+          stripeConnectedAccountCreatingTaskAccountIdEq: body.accountId,
+          setRetryCount: task.stripeConnectedAccountCreatingTaskRetryCount + 1,
+          setExecutionTimeMs:
+            this.getNow() +
             this.taskHandler.getBackoffTime(
               task.stripeConnectedAccountCreatingTaskRetryCount,
             ),
-        ),
+        }),
       ]);
       await transaction.commit();
     });
@@ -100,14 +100,14 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
     loggingPrefix: string,
     body: ProcessStripeConnectedAccountCreatingTaskRequestBody,
   ): Promise<void> {
-    let accountResponse = await this.serviceClient.send(
+    let contactResponse = await this.serviceClient.send(
       newGetAccountContactRequest({
         accountId: body.accountId,
       }),
     );
     let account = await this.stripeClient.val.accounts.create(
       {
-        email: accountResponse.contactEmail,
+        email: contactResponse.contactEmail,
         business_profile: {
           mcc: MERCHANT_CATEGORY_CODE,
           product_description: PRODUCT_DESCRIPTION,
@@ -137,38 +137,43 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {
-      let accountRows = await getEarningsAccount(transaction, body.accountId);
-      if (accountRows.length === 0) {
+      let profileRows = await getEarningsProfile(transaction, {
+        earningsProfileAccountIdEq: body.accountId,
+      });
+      if (profileRows.length === 0) {
         throw newInternalServerErrorError(
-          `Earnings account ${body.accountId} is not found.`,
+          `Earnings profile ${body.accountId} is not found.`,
         );
       }
-      let earningsAccount = accountRows[0].earningsAccountData;
-      if (earningsAccount.stripeConnectedAccountId) {
-        if (earningsAccount.stripeConnectedAccountId !== account.id) {
+      let profile = profileRows[0];
+      if (profile.earningsProfileStripeConnectedAccountId) {
+        if (profile.earningsProfileStripeConnectedAccountId !== account.id) {
           throw newInternalServerErrorError(
-            `Earnings account ${body.accountId} already has a stripe connected account id ${earningsAccount.stripeConnectedAccountId} which is different from the new one ${account.id}.`,
+            `Earnings profile ${body.accountId} already has a stripe connected account id ${profile.earningsProfileStripeConnectedAccountId} which is different from the new one ${account.id}.`,
           );
         } else {
-          await transaction.batchUpdate([
-            deleteStripeConnectedAccountCreatingTaskStatement(body.accountId),
-          ]);
-          await transaction.commit();
+          throw newBadRequestError(
+            `Earnings profile ${body.accountId} already has a stripe connected account id ${profile.earningsProfileStripeConnectedAccountId}.`,
+          );
         }
       } else {
-        earningsAccount.stripeConnectedAccountId = account.id;
-        earningsAccount.stripeConnectedAccountState =
-          StripeConnectedAccountState.ONBOARDING;
         let now = this.getNow();
         await transaction.batchUpdate([
-          updateEarningsAccountStatement(earningsAccount),
-          insertSetupStripeConnectedAccountNotifyingTaskStatement(
-            body.accountId,
-            0,
-            now,
-            now,
-          ),
-          deleteStripeConnectedAccountCreatingTaskStatement(body.accountId),
+          updateEarningsProfileConnectedAccountStatement({
+            earningsProfileAccountIdEq: body.accountId,
+            setStripeConnectedAccountId: account.id,
+            setStripeConnectedAccountState:
+              StripeConnectedAccountState.ONBOARDING,
+          }),
+          insertStripeConnectedAccountNeedsSetupNotifyingTaskStatement({
+            accountId: body.accountId,
+            retryCount: 0,
+            executionTimeMs: now,
+            createdTimeMs: now,
+          }),
+          deleteStripeConnectedAccountCreatingTaskStatement({
+            stripeConnectedAccountCreatingTaskAccountIdEq: body.accountId,
+          }),
         ]);
         await transaction.commit();
       }

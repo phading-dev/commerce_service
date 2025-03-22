@@ -1,16 +1,15 @@
 import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { PaymentState } from "../db/schema";
 import {
-  GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_METADATA_ROW,
-  deleteBillingStatement,
-  deleteUpdatePaymentMethodNotifyingTaskStatement,
-  getUpdatePaymentMethodNotifyingTaskMetadata,
-  insertBillingStatement,
-  insertUpdatePaymentMethodNotifyingTaskStatement,
-  listPendingUpdatePaymentMethodNotifyingTasks,
+  GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_METADATA_ROW,
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deleteTransactionStatementStatement,
+  getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
+  insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  insertTransactionStatementStatement,
+  listPendingPaymentMethodNeedsUpdateNotifyingTasks,
 } from "../db/sql";
-import { ProcessUpdatePaymentMethodNotifyingTaskHandler } from "./process_update_payment_method_notifying_task_handler";
+import { ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler } from "./process_payment_method_needs_update_notifying_task_handler";
 import {
   GET_ACCOUNT_CONTACT,
   GET_ACCOUNT_CONTACT_REQUEST_BODY,
@@ -29,7 +28,7 @@ import {
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "ProcessUpdatePaymentMethodNotifyingTaskHandlerTest",
+  name: "ProcessPaymentMethodNeedsUpdateNotifyingTaskHandlerTest",
   cases: [
     {
       name: "ProcessTask",
@@ -37,18 +36,17 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingStatement({
-              billingId: "billing1",
+            insertTransactionStatementStatement({
+              statementId: "statement1",
               accountId: "account1",
-              state: PaymentState.CHARGING,
               month: "2024-01",
             }),
-            insertUpdatePaymentMethodNotifyingTaskStatement(
-              "billing1",
-              0,
-              100,
-              100,
-            ),
+            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -64,7 +62,7 @@ TEST_RUNNER.run({
           },
         };
         let urlBuilder = new UrlBuilder("https://test.com");
-        let handler = new ProcessUpdatePaymentMethodNotifyingTaskHandler(
+        let handler = new ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           sendgridClientMock,
@@ -74,7 +72,7 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.processTask("", {
-          billingId: "billing1",
+          statementId: "statement1",
         });
 
         // Verify
@@ -114,19 +112,23 @@ TEST_RUNNER.run({
           "RC body",
         );
         assertThat(
-          await listPendingUpdatePaymentMethodNotifyingTasks(
+          await listPendingPaymentMethodNeedsUpdateNotifyingTasks(
             SPANNER_DATABASE,
-            1000000,
+            { paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMsLe: 1000000 },
           ),
           isArray([]),
-          "UpdatePaymentMethodNotifyingTasks",
+          "PaymentMethodNeedsUpdateNotifyingTasks",
         );
       },
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingStatement("billing1"),
-            deleteUpdatePaymentMethodNotifyingTaskStatement("billing1"),
+            deleteTransactionStatementStatement({
+              transactionStatementStatementIdEq: "statement1",
+            }),
+            deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+              paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+            }),
           ]);
           await transaction.commit();
         });
@@ -138,18 +140,17 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingStatement({
-              billingId: "billing1",
+            insertTransactionStatementStatement({
+              statementId: "statement1",
               accountId: "account1",
-              state: PaymentState.CHARGING,
               month: "2024-01",
             }),
-            insertUpdatePaymentMethodNotifyingTaskStatement(
-              "billing1",
-              0,
-              100,
-              100,
-            ),
+            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -164,7 +165,7 @@ TEST_RUNNER.run({
           },
         };
         let urlBuilder = new UrlBuilder("https://test.com");
-        let handler = new ProcessUpdatePaymentMethodNotifyingTaskHandler(
+        let handler = new ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           sendgridClientMock,
@@ -175,7 +176,7 @@ TEST_RUNNER.run({
         // Execute
         let error = await assertReject(
           handler.processTask("", {
-            billingId: "billing1",
+            statementId: "statement1",
           }),
         );
 
@@ -185,8 +186,12 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingStatement("billing1"),
-            deleteUpdatePaymentMethodNotifyingTaskStatement("billing1"),
+            deleteTransactionStatementStatement({
+              transactionStatementStatementIdEq: "statement1",
+            }),
+            deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+              paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+            }),
           ]);
           await transaction.commit();
         });
@@ -198,16 +203,16 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertUpdatePaymentMethodNotifyingTaskStatement(
-              "billing1",
-              0,
-              100,
-              100,
-            ),
+            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
-        let handler = new ProcessUpdatePaymentMethodNotifyingTaskHandler(
+        let handler = new ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler(
           SPANNER_DATABASE,
           new NodeServiceClientMock(),
           undefined,
@@ -217,31 +222,35 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.claimTask("", {
-          billingId: "billing1",
+          statementId: "statement1",
         });
 
         // Verify
         assertThat(
-          await getUpdatePaymentMethodNotifyingTaskMetadata(
+          await getPaymentMethodNeedsUpdateNotifyingTaskMetadata(
             SPANNER_DATABASE,
-            "billing1",
+            {
+              paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+            },
           ),
           isArray([
             eqMessage(
               {
-                updatePaymentMethodNotifyingTaskRetryCount: 1,
-                updatePaymentMethodNotifyingTaskExecutionTimeMs: 301000,
+                paymentMethodNeedsUpdateNotifyingTaskRetryCount: 1,
+                paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: 301000,
               },
-              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_METADATA_ROW,
+              GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_METADATA_ROW,
             ),
           ]),
-          "UpdatePaymentMethodNotifyingTasks",
+          "PaymentMethodNeedsUpdateNotifyingTasks",
         );
       },
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteUpdatePaymentMethodNotifyingTaskStatement("billing1"),
+            deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+              paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+            }),
           ]);
           await transaction.commit();
         });

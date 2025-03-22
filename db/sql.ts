@@ -1,1437 +1,570 @@
+import { BillingProfileStateInfo, BILLING_PROFILE_STATE_INFO, StripeConnectedAccountState, STRIPE_CONNECTED_ACCOUNT_STATE, TransactionStatement, TRANSACTION_STATEMENT, PaymentState, PAYMENT_STATE, PayoutState, PAYOUT_STATE } from './schema';
+import { serializeMessage, deserializeMessage, toEnumFromNumber } from '@selfage/message/serializer';
+import { Spanner, Database, Transaction } from '@google-cloud/spanner';
 import { Statement } from '@google-cloud/spanner/build/src/transaction';
-import { BillingAccount, BILLING_ACCOUNT, PaymentState, Billing, BILLING, EarningsAccount, EARNINGS_ACCOUNT, PayoutState, Earnings, EARNINGS } from './schema';
-import { serializeMessage, deserializeMessage } from '@selfage/message/serializer';
-import { Database, Transaction, Spanner } from '@google-cloud/spanner';
-import { MessageDescriptor, PrimitiveType } from '@selfage/message/descriptor';
+import { PrimitiveType, MessageDescriptor } from '@selfage/message/descriptor';
 
-export function insertBillingAccountStatement(
-  data: BillingAccount,
-): Statement {
-  return insertBillingAccountInternalStatement(
-    data.accountId,
-    data
-  );
-}
-
-export function insertBillingAccountInternalStatement(
-  accountId: string,
-  data: BillingAccount,
-): Statement {
-  return {
-    sql: "INSERT BillingAccount (accountId, data) VALUES (@accountId, @data)",
-    params: {
-      accountId: accountId,
-      data: Buffer.from(serializeMessage(data, BILLING_ACCOUNT).buffer),
-    },
-    types: {
-      accountId: { type: "string" },
-      data: { type: "bytes" },
-    }
-  };
-}
-
-export function deleteBillingAccountStatement(
-  billingAccountAccountIdEq: string,
-): Statement {
-  return {
-    sql: "DELETE BillingAccount WHERE (BillingAccount.accountId = @billingAccountAccountIdEq)",
-    params: {
-      billingAccountAccountIdEq: billingAccountAccountIdEq,
-    },
-    types: {
-      billingAccountAccountIdEq: { type: "string" },
-    }
-  };
-}
-
-export interface GetBillingAccountRow {
-  billingAccountData: BillingAccount,
-}
-
-export let GET_BILLING_ACCOUNT_ROW: MessageDescriptor<GetBillingAccountRow> = {
-  name: 'GetBillingAccountRow',
-  fields: [{
-    name: 'billingAccountData',
-    index: 1,
-    messageType: BILLING_ACCOUNT,
-  }],
-};
-
-export async function getBillingAccount(
-  runner: Database | Transaction,
-  billingAccountAccountIdEq: string,
-): Promise<Array<GetBillingAccountRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT BillingAccount.data FROM BillingAccount WHERE (BillingAccount.accountId = @billingAccountAccountIdEq)",
-    params: {
-      billingAccountAccountIdEq: billingAccountAccountIdEq,
-    },
-    types: {
-      billingAccountAccountIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetBillingAccountRow>();
-  for (let row of rows) {
-    resRows.push({
-      billingAccountData: deserializeMessage(row.at(0).value, BILLING_ACCOUNT),
-    });
+export function insertBillingProfileStatement(
+  args: {
+    accountId: string,
+    stripePaymentCustomerId?: string,
+    stateInfo?: BillingProfileStateInfo,
+    paymentAfterMs?: number,
+    createdTimeMs?: number,
   }
-  return resRows;
-}
-
-export function updateBillingAccountStatement(
-  data: BillingAccount,
-): Statement {
-  return updateBillingAccountInternalStatement(
-    data.accountId,
-    data
-  );
-}
-
-export function updateBillingAccountInternalStatement(
-  billingAccountAccountIdEq: string,
-  setData: BillingAccount,
 ): Statement {
   return {
-    sql: "UPDATE BillingAccount SET data = @setData WHERE (BillingAccount.accountId = @billingAccountAccountIdEq)",
+    sql: "INSERT BillingProfile (accountId, stripePaymentCustomerId, stateInfo, paymentAfterMs, createdTimeMs) VALUES (@accountId, @stripePaymentCustomerId, @stateInfo, @paymentAfterMs, @createdTimeMs)",
     params: {
-      billingAccountAccountIdEq: billingAccountAccountIdEq,
-      setData: Buffer.from(serializeMessage(setData, BILLING_ACCOUNT).buffer),
+      accountId: args.accountId,
+      stripePaymentCustomerId: args.stripePaymentCustomerId == null ? null : args.stripePaymentCustomerId,
+      stateInfo: args.stateInfo == null ? null : Buffer.from(serializeMessage(args.stateInfo, BILLING_PROFILE_STATE_INFO).buffer),
+      paymentAfterMs: args.paymentAfterMs == null ? null : Spanner.float(args.paymentAfterMs),
+      createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
     },
     types: {
-      billingAccountAccountIdEq: { type: "string" },
-      setData: { type: "bytes" },
-    }
-  };
-}
-
-export function insertBillingStatement(
-  data: Billing,
-): Statement {
-  return insertBillingInternalStatement(
-    data.billingId,
-    data.accountId,
-    data.state,
-    data.month,
-    data
-  );
-}
-
-export function insertBillingInternalStatement(
-  billingId: string,
-  accountId: string,
-  state: PaymentState,
-  month: string,
-  data: Billing,
-): Statement {
-  return {
-    sql: "INSERT Billing (billingId, accountId, state, month, data) VALUES (@billingId, @accountId, @state, @month, @data)",
-    params: {
-      billingId: billingId,
-      accountId: accountId,
-      state: Spanner.float(state),
-      month: month,
-      data: Buffer.from(serializeMessage(data, BILLING).buffer),
-    },
-    types: {
-      billingId: { type: "string" },
       accountId: { type: "string" },
-      state: { type: "float64" },
-      month: { type: "string" },
-      data: { type: "bytes" },
+      stripePaymentCustomerId: { type: "string" },
+      stateInfo: { type: "bytes" },
+      paymentAfterMs: { type: "float64" },
+      createdTimeMs: { type: "float64" },
     }
   };
 }
 
-export function deleteBillingStatement(
-  billingBillingIdEq: string,
-): Statement {
-  return {
-    sql: "DELETE Billing WHERE (Billing.billingId = @billingBillingIdEq)",
-    params: {
-      billingBillingIdEq: billingBillingIdEq,
-    },
-    types: {
-      billingBillingIdEq: { type: "string" },
-    }
-  };
-}
-
-export interface GetBillingRow {
-  billingData: Billing,
-}
-
-export let GET_BILLING_ROW: MessageDescriptor<GetBillingRow> = {
-  name: 'GetBillingRow',
-  fields: [{
-    name: 'billingData',
-    index: 1,
-    messageType: BILLING,
-  }],
-};
-
-export async function getBilling(
-  runner: Database | Transaction,
-  billingBillingIdEq: string,
-): Promise<Array<GetBillingRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT Billing.data FROM Billing WHERE (Billing.billingId = @billingBillingIdEq)",
-    params: {
-      billingBillingIdEq: billingBillingIdEq,
-    },
-    types: {
-      billingBillingIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetBillingRow>();
-  for (let row of rows) {
-    resRows.push({
-      billingData: deserializeMessage(row.at(0).value, BILLING),
-    });
+export function deleteBillingProfileStatement(
+  args: {
+    billingProfileAccountIdEq: string,
   }
-  return resRows;
-}
-
-export function updateBillingStatement(
-  data: Billing,
-): Statement {
-  return updateBillingInternalStatement(
-    data.billingId,
-    data.accountId,
-    data.state,
-    data.month,
-    data
-  );
-}
-
-export function updateBillingInternalStatement(
-  billingBillingIdEq: string,
-  setAccountId: string,
-  setState: PaymentState,
-  setMonth: string,
-  setData: Billing,
 ): Statement {
   return {
-    sql: "UPDATE Billing SET accountId = @setAccountId, state = @setState, month = @setMonth, data = @setData WHERE (Billing.billingId = @billingBillingIdEq)",
+    sql: "DELETE BillingProfile WHERE (BillingProfile.accountId = @billingProfileAccountIdEq)",
     params: {
-      billingBillingIdEq: billingBillingIdEq,
-      setAccountId: setAccountId,
-      setState: Spanner.float(setState),
-      setMonth: setMonth,
-      setData: Buffer.from(serializeMessage(setData, BILLING).buffer),
+      billingProfileAccountIdEq: args.billingProfileAccountIdEq,
     },
     types: {
-      billingBillingIdEq: { type: "string" },
-      setAccountId: { type: "string" },
-      setState: { type: "float64" },
-      setMonth: { type: "string" },
-      setData: { type: "bytes" },
+      billingProfileAccountIdEq: { type: "string" },
     }
   };
 }
 
-export function insertEarningsAccountStatement(
-  data: EarningsAccount,
-): Statement {
-  return insertEarningsAccountInternalStatement(
-    data.accountId,
-    data
-  );
+export interface GetBillingProfileRow {
+  billingProfileAccountId?: string,
+  billingProfileStripePaymentCustomerId?: string,
+  billingProfileStateInfo?: BillingProfileStateInfo,
+  billingProfilePaymentAfterMs?: number,
+  billingProfileCreatedTimeMs?: number,
 }
 
-export function insertEarningsAccountInternalStatement(
-  accountId: string,
-  data: EarningsAccount,
-): Statement {
-  return {
-    sql: "INSERT EarningsAccount (accountId, data) VALUES (@accountId, @data)",
-    params: {
-      accountId: accountId,
-      data: Buffer.from(serializeMessage(data, EARNINGS_ACCOUNT).buffer),
-    },
-    types: {
-      accountId: { type: "string" },
-      data: { type: "bytes" },
-    }
-  };
-}
-
-export function deleteEarningsAccountStatement(
-  earningsAccountAccountIdEq: string,
-): Statement {
-  return {
-    sql: "DELETE EarningsAccount WHERE (EarningsAccount.accountId = @earningsAccountAccountIdEq)",
-    params: {
-      earningsAccountAccountIdEq: earningsAccountAccountIdEq,
-    },
-    types: {
-      earningsAccountAccountIdEq: { type: "string" },
-    }
-  };
-}
-
-export interface GetEarningsAccountRow {
-  earningsAccountData: EarningsAccount,
-}
-
-export let GET_EARNINGS_ACCOUNT_ROW: MessageDescriptor<GetEarningsAccountRow> = {
-  name: 'GetEarningsAccountRow',
+export let GET_BILLING_PROFILE_ROW: MessageDescriptor<GetBillingProfileRow> = {
+  name: 'GetBillingProfileRow',
   fields: [{
-    name: 'earningsAccountData',
-    index: 1,
-    messageType: EARNINGS_ACCOUNT,
-  }],
-};
-
-export async function getEarningsAccount(
-  runner: Database | Transaction,
-  earningsAccountAccountIdEq: string,
-): Promise<Array<GetEarningsAccountRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT EarningsAccount.data FROM EarningsAccount WHERE (EarningsAccount.accountId = @earningsAccountAccountIdEq)",
-    params: {
-      earningsAccountAccountIdEq: earningsAccountAccountIdEq,
-    },
-    types: {
-      earningsAccountAccountIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetEarningsAccountRow>();
-  for (let row of rows) {
-    resRows.push({
-      earningsAccountData: deserializeMessage(row.at(0).value, EARNINGS_ACCOUNT),
-    });
-  }
-  return resRows;
-}
-
-export function updateEarningsAccountStatement(
-  data: EarningsAccount,
-): Statement {
-  return updateEarningsAccountInternalStatement(
-    data.accountId,
-    data
-  );
-}
-
-export function updateEarningsAccountInternalStatement(
-  earningsAccountAccountIdEq: string,
-  setData: EarningsAccount,
-): Statement {
-  return {
-    sql: "UPDATE EarningsAccount SET data = @setData WHERE (EarningsAccount.accountId = @earningsAccountAccountIdEq)",
-    params: {
-      earningsAccountAccountIdEq: earningsAccountAccountIdEq,
-      setData: Buffer.from(serializeMessage(setData, EARNINGS_ACCOUNT).buffer),
-    },
-    types: {
-      earningsAccountAccountIdEq: { type: "string" },
-      setData: { type: "bytes" },
-    }
-  };
-}
-
-export function insertEarningsStatement(
-  data: Earnings,
-): Statement {
-  return insertEarningsInternalStatement(
-    data.earningsId,
-    data.accountId,
-    data.state,
-    data.month,
-    data
-  );
-}
-
-export function insertEarningsInternalStatement(
-  earningsId: string,
-  accountId: string,
-  state: PayoutState,
-  month: string,
-  data: Earnings,
-): Statement {
-  return {
-    sql: "INSERT Earnings (earningsId, accountId, state, month, data) VALUES (@earningsId, @accountId, @state, @month, @data)",
-    params: {
-      earningsId: earningsId,
-      accountId: accountId,
-      state: Spanner.float(state),
-      month: month,
-      data: Buffer.from(serializeMessage(data, EARNINGS).buffer),
-    },
-    types: {
-      earningsId: { type: "string" },
-      accountId: { type: "string" },
-      state: { type: "float64" },
-      month: { type: "string" },
-      data: { type: "bytes" },
-    }
-  };
-}
-
-export function deleteEarningsStatement(
-  earningsEarningsIdEq: string,
-): Statement {
-  return {
-    sql: "DELETE Earnings WHERE (Earnings.earningsId = @earningsEarningsIdEq)",
-    params: {
-      earningsEarningsIdEq: earningsEarningsIdEq,
-    },
-    types: {
-      earningsEarningsIdEq: { type: "string" },
-    }
-  };
-}
-
-export interface GetEarningsRow {
-  earningsData: Earnings,
-}
-
-export let GET_EARNINGS_ROW: MessageDescriptor<GetEarningsRow> = {
-  name: 'GetEarningsRow',
-  fields: [{
-    name: 'earningsData',
-    index: 1,
-    messageType: EARNINGS,
-  }],
-};
-
-export async function getEarnings(
-  runner: Database | Transaction,
-  earningsEarningsIdEq: string,
-): Promise<Array<GetEarningsRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT Earnings.data FROM Earnings WHERE (Earnings.earningsId = @earningsEarningsIdEq)",
-    params: {
-      earningsEarningsIdEq: earningsEarningsIdEq,
-    },
-    types: {
-      earningsEarningsIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetEarningsRow>();
-  for (let row of rows) {
-    resRows.push({
-      earningsData: deserializeMessage(row.at(0).value, EARNINGS),
-    });
-  }
-  return resRows;
-}
-
-export function updateEarningsStatement(
-  data: Earnings,
-): Statement {
-  return updateEarningsInternalStatement(
-    data.earningsId,
-    data.accountId,
-    data.state,
-    data.month,
-    data
-  );
-}
-
-export function updateEarningsInternalStatement(
-  earningsEarningsIdEq: string,
-  setAccountId: string,
-  setState: PayoutState,
-  setMonth: string,
-  setData: Earnings,
-): Statement {
-  return {
-    sql: "UPDATE Earnings SET accountId = @setAccountId, state = @setState, month = @setMonth, data = @setData WHERE (Earnings.earningsId = @earningsEarningsIdEq)",
-    params: {
-      earningsEarningsIdEq: earningsEarningsIdEq,
-      setAccountId: setAccountId,
-      setState: Spanner.float(setState),
-      setMonth: setMonth,
-      setData: Buffer.from(serializeMessage(setData, EARNINGS).buffer),
-    },
-    types: {
-      earningsEarningsIdEq: { type: "string" },
-      setAccountId: { type: "string" },
-      setState: { type: "float64" },
-      setMonth: { type: "string" },
-      setData: { type: "bytes" },
-    }
-  };
-}
-
-export function insertStripeCustomerCreatingTaskStatement(
-  accountId: string,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
-): Statement {
-  return {
-    sql: "INSERT StripeCustomerCreatingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
-    params: {
-      accountId: accountId,
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
-    },
-    types: {
-      accountId: { type: "string" },
-      retryCount: { type: "float64" },
-      executionTimeMs: { type: "timestamp" },
-      createdTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function deleteStripeCustomerCreatingTaskStatement(
-  stripeCustomerCreatingTaskAccountIdEq: string,
-): Statement {
-  return {
-    sql: "DELETE StripeCustomerCreatingTask WHERE (StripeCustomerCreatingTask.accountId = @stripeCustomerCreatingTaskAccountIdEq)",
-    params: {
-      stripeCustomerCreatingTaskAccountIdEq: stripeCustomerCreatingTaskAccountIdEq,
-    },
-    types: {
-      stripeCustomerCreatingTaskAccountIdEq: { type: "string" },
-    }
-  };
-}
-
-export interface GetStripeCustomerCreatingTaskRow {
-  stripeCustomerCreatingTaskAccountId: string,
-  stripeCustomerCreatingTaskRetryCount: number,
-  stripeCustomerCreatingTaskExecutionTimeMs: number,
-  stripeCustomerCreatingTaskCreatedTimeMs: number,
-}
-
-export let GET_STRIPE_CUSTOMER_CREATING_TASK_ROW: MessageDescriptor<GetStripeCustomerCreatingTaskRow> = {
-  name: 'GetStripeCustomerCreatingTaskRow',
-  fields: [{
-    name: 'stripeCustomerCreatingTaskAccountId',
+    name: 'billingProfileAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'stripeCustomerCreatingTaskRetryCount',
+    name: 'billingProfileStripePaymentCustomerId',
     index: 2,
-    primitiveType: PrimitiveType.NUMBER,
+    primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'stripeCustomerCreatingTaskExecutionTimeMs',
+    name: 'billingProfileStateInfo',
     index: 3,
-    primitiveType: PrimitiveType.NUMBER,
+    messageType: BILLING_PROFILE_STATE_INFO,
   }, {
-    name: 'stripeCustomerCreatingTaskCreatedTimeMs',
-    index: 4,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getStripeCustomerCreatingTask(
-  runner: Database | Transaction,
-  stripeCustomerCreatingTaskAccountIdEq: string,
-): Promise<Array<GetStripeCustomerCreatingTaskRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT StripeCustomerCreatingTask.accountId, StripeCustomerCreatingTask.retryCount, StripeCustomerCreatingTask.executionTimeMs, StripeCustomerCreatingTask.createdTimeMs FROM StripeCustomerCreatingTask WHERE (StripeCustomerCreatingTask.accountId = @stripeCustomerCreatingTaskAccountIdEq)",
-    params: {
-      stripeCustomerCreatingTaskAccountIdEq: stripeCustomerCreatingTaskAccountIdEq,
-    },
-    types: {
-      stripeCustomerCreatingTaskAccountIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetStripeCustomerCreatingTaskRow>();
-  for (let row of rows) {
-    resRows.push({
-      stripeCustomerCreatingTaskAccountId: row.at(0).value,
-      stripeCustomerCreatingTaskRetryCount: row.at(1).value.value,
-      stripeCustomerCreatingTaskExecutionTimeMs: row.at(2).value.valueOf(),
-      stripeCustomerCreatingTaskCreatedTimeMs: row.at(3).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export interface ListPendingStripeCustomerCreatingTasksRow {
-  stripeCustomerCreatingTaskAccountId: string,
-}
-
-export let LIST_PENDING_STRIPE_CUSTOMER_CREATING_TASKS_ROW: MessageDescriptor<ListPendingStripeCustomerCreatingTasksRow> = {
-  name: 'ListPendingStripeCustomerCreatingTasksRow',
-  fields: [{
-    name: 'stripeCustomerCreatingTaskAccountId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }],
-};
-
-export async function listPendingStripeCustomerCreatingTasks(
-  runner: Database | Transaction,
-  stripeCustomerCreatingTaskExecutionTimeMsLe: number,
-): Promise<Array<ListPendingStripeCustomerCreatingTasksRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT StripeCustomerCreatingTask.accountId FROM StripeCustomerCreatingTask WHERE StripeCustomerCreatingTask.executionTimeMs <= @stripeCustomerCreatingTaskExecutionTimeMsLe",
-    params: {
-      stripeCustomerCreatingTaskExecutionTimeMsLe: new Date(stripeCustomerCreatingTaskExecutionTimeMsLe).toISOString(),
-    },
-    types: {
-      stripeCustomerCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
-    }
-  });
-  let resRows = new Array<ListPendingStripeCustomerCreatingTasksRow>();
-  for (let row of rows) {
-    resRows.push({
-      stripeCustomerCreatingTaskAccountId: row.at(0).value,
-    });
-  }
-  return resRows;
-}
-
-export interface GetStripeCustomerCreatingTaskMetadataRow {
-  stripeCustomerCreatingTaskRetryCount: number,
-  stripeCustomerCreatingTaskExecutionTimeMs: number,
-}
-
-export let GET_STRIPE_CUSTOMER_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetStripeCustomerCreatingTaskMetadataRow> = {
-  name: 'GetStripeCustomerCreatingTaskMetadataRow',
-  fields: [{
-    name: 'stripeCustomerCreatingTaskRetryCount',
-    index: 1,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'stripeCustomerCreatingTaskExecutionTimeMs',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getStripeCustomerCreatingTaskMetadata(
-  runner: Database | Transaction,
-  stripeCustomerCreatingTaskAccountIdEq: string,
-): Promise<Array<GetStripeCustomerCreatingTaskMetadataRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT StripeCustomerCreatingTask.retryCount, StripeCustomerCreatingTask.executionTimeMs FROM StripeCustomerCreatingTask WHERE (StripeCustomerCreatingTask.accountId = @stripeCustomerCreatingTaskAccountIdEq)",
-    params: {
-      stripeCustomerCreatingTaskAccountIdEq: stripeCustomerCreatingTaskAccountIdEq,
-    },
-    types: {
-      stripeCustomerCreatingTaskAccountIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetStripeCustomerCreatingTaskMetadataRow>();
-  for (let row of rows) {
-    resRows.push({
-      stripeCustomerCreatingTaskRetryCount: row.at(0).value.value,
-      stripeCustomerCreatingTaskExecutionTimeMs: row.at(1).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export function updateStripeCustomerCreatingTaskMetadataStatement(
-  stripeCustomerCreatingTaskAccountIdEq: string,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
-): Statement {
-  return {
-    sql: "UPDATE StripeCustomerCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (StripeCustomerCreatingTask.accountId = @stripeCustomerCreatingTaskAccountIdEq)",
-    params: {
-      stripeCustomerCreatingTaskAccountIdEq: stripeCustomerCreatingTaskAccountIdEq,
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
-    },
-    types: {
-      stripeCustomerCreatingTaskAccountIdEq: { type: "string" },
-      setRetryCount: { type: "float64" },
-      setExecutionTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function insertPaymentTaskStatement(
-  billingId: string,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
-): Statement {
-  return {
-    sql: "INSERT PaymentTask (billingId, retryCount, executionTimeMs, createdTimeMs) VALUES (@billingId, @retryCount, @executionTimeMs, @createdTimeMs)",
-    params: {
-      billingId: billingId,
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
-    },
-    types: {
-      billingId: { type: "string" },
-      retryCount: { type: "float64" },
-      executionTimeMs: { type: "timestamp" },
-      createdTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function deletePaymentTaskStatement(
-  paymentTaskBillingIdEq: string,
-): Statement {
-  return {
-    sql: "DELETE PaymentTask WHERE (PaymentTask.billingId = @paymentTaskBillingIdEq)",
-    params: {
-      paymentTaskBillingIdEq: paymentTaskBillingIdEq,
-    },
-    types: {
-      paymentTaskBillingIdEq: { type: "string" },
-    }
-  };
-}
-
-export interface GetPaymentTaskRow {
-  paymentTaskBillingId: string,
-  paymentTaskRetryCount: number,
-  paymentTaskExecutionTimeMs: number,
-  paymentTaskCreatedTimeMs: number,
-}
-
-export let GET_PAYMENT_TASK_ROW: MessageDescriptor<GetPaymentTaskRow> = {
-  name: 'GetPaymentTaskRow',
-  fields: [{
-    name: 'paymentTaskBillingId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'paymentTaskRetryCount',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'paymentTaskExecutionTimeMs',
-    index: 3,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'paymentTaskCreatedTimeMs',
-    index: 4,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getPaymentTask(
-  runner: Database | Transaction,
-  paymentTaskBillingIdEq: string,
-): Promise<Array<GetPaymentTaskRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT PaymentTask.billingId, PaymentTask.retryCount, PaymentTask.executionTimeMs, PaymentTask.createdTimeMs FROM PaymentTask WHERE (PaymentTask.billingId = @paymentTaskBillingIdEq)",
-    params: {
-      paymentTaskBillingIdEq: paymentTaskBillingIdEq,
-    },
-    types: {
-      paymentTaskBillingIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetPaymentTaskRow>();
-  for (let row of rows) {
-    resRows.push({
-      paymentTaskBillingId: row.at(0).value,
-      paymentTaskRetryCount: row.at(1).value.value,
-      paymentTaskExecutionTimeMs: row.at(2).value.valueOf(),
-      paymentTaskCreatedTimeMs: row.at(3).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export interface ListPendingPaymentTasksRow {
-  paymentTaskBillingId: string,
-}
-
-export let LIST_PENDING_PAYMENT_TASKS_ROW: MessageDescriptor<ListPendingPaymentTasksRow> = {
-  name: 'ListPendingPaymentTasksRow',
-  fields: [{
-    name: 'paymentTaskBillingId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }],
-};
-
-export async function listPendingPaymentTasks(
-  runner: Database | Transaction,
-  paymentTaskExecutionTimeMsLe: number,
-): Promise<Array<ListPendingPaymentTasksRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT PaymentTask.billingId FROM PaymentTask WHERE PaymentTask.executionTimeMs <= @paymentTaskExecutionTimeMsLe",
-    params: {
-      paymentTaskExecutionTimeMsLe: new Date(paymentTaskExecutionTimeMsLe).toISOString(),
-    },
-    types: {
-      paymentTaskExecutionTimeMsLe: { type: "timestamp" },
-    }
-  });
-  let resRows = new Array<ListPendingPaymentTasksRow>();
-  for (let row of rows) {
-    resRows.push({
-      paymentTaskBillingId: row.at(0).value,
-    });
-  }
-  return resRows;
-}
-
-export interface GetPaymentTaskMetadataRow {
-  paymentTaskRetryCount: number,
-  paymentTaskExecutionTimeMs: number,
-}
-
-export let GET_PAYMENT_TASK_METADATA_ROW: MessageDescriptor<GetPaymentTaskMetadataRow> = {
-  name: 'GetPaymentTaskMetadataRow',
-  fields: [{
-    name: 'paymentTaskRetryCount',
-    index: 1,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'paymentTaskExecutionTimeMs',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getPaymentTaskMetadata(
-  runner: Database | Transaction,
-  paymentTaskBillingIdEq: string,
-): Promise<Array<GetPaymentTaskMetadataRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT PaymentTask.retryCount, PaymentTask.executionTimeMs FROM PaymentTask WHERE (PaymentTask.billingId = @paymentTaskBillingIdEq)",
-    params: {
-      paymentTaskBillingIdEq: paymentTaskBillingIdEq,
-    },
-    types: {
-      paymentTaskBillingIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetPaymentTaskMetadataRow>();
-  for (let row of rows) {
-    resRows.push({
-      paymentTaskRetryCount: row.at(0).value.value,
-      paymentTaskExecutionTimeMs: row.at(1).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export function updatePaymentTaskMetadataStatement(
-  paymentTaskBillingIdEq: string,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
-): Statement {
-  return {
-    sql: "UPDATE PaymentTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentTask.billingId = @paymentTaskBillingIdEq)",
-    params: {
-      paymentTaskBillingIdEq: paymentTaskBillingIdEq,
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
-    },
-    types: {
-      paymentTaskBillingIdEq: { type: "string" },
-      setRetryCount: { type: "float64" },
-      setExecutionTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function insertUpdatePaymentMethodNotifyingTaskStatement(
-  billingId: string,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
-): Statement {
-  return {
-    sql: "INSERT UpdatePaymentMethodNotifyingTask (billingId, retryCount, executionTimeMs, createdTimeMs) VALUES (@billingId, @retryCount, @executionTimeMs, @createdTimeMs)",
-    params: {
-      billingId: billingId,
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
-    },
-    types: {
-      billingId: { type: "string" },
-      retryCount: { type: "float64" },
-      executionTimeMs: { type: "timestamp" },
-      createdTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function deleteUpdatePaymentMethodNotifyingTaskStatement(
-  updatePaymentMethodNotifyingTaskBillingIdEq: string,
-): Statement {
-  return {
-    sql: "DELETE UpdatePaymentMethodNotifyingTask WHERE (UpdatePaymentMethodNotifyingTask.billingId = @updatePaymentMethodNotifyingTaskBillingIdEq)",
-    params: {
-      updatePaymentMethodNotifyingTaskBillingIdEq: updatePaymentMethodNotifyingTaskBillingIdEq,
-    },
-    types: {
-      updatePaymentMethodNotifyingTaskBillingIdEq: { type: "string" },
-    }
-  };
-}
-
-export interface GetUpdatePaymentMethodNotifyingTaskRow {
-  updatePaymentMethodNotifyingTaskBillingId: string,
-  updatePaymentMethodNotifyingTaskRetryCount: number,
-  updatePaymentMethodNotifyingTaskExecutionTimeMs: number,
-  updatePaymentMethodNotifyingTaskCreatedTimeMs: number,
-}
-
-export let GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW: MessageDescriptor<GetUpdatePaymentMethodNotifyingTaskRow> = {
-  name: 'GetUpdatePaymentMethodNotifyingTaskRow',
-  fields: [{
-    name: 'updatePaymentMethodNotifyingTaskBillingId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'updatePaymentMethodNotifyingTaskRetryCount',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'updatePaymentMethodNotifyingTaskExecutionTimeMs',
-    index: 3,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'updatePaymentMethodNotifyingTaskCreatedTimeMs',
-    index: 4,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getUpdatePaymentMethodNotifyingTask(
-  runner: Database | Transaction,
-  updatePaymentMethodNotifyingTaskBillingIdEq: string,
-): Promise<Array<GetUpdatePaymentMethodNotifyingTaskRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT UpdatePaymentMethodNotifyingTask.billingId, UpdatePaymentMethodNotifyingTask.retryCount, UpdatePaymentMethodNotifyingTask.executionTimeMs, UpdatePaymentMethodNotifyingTask.createdTimeMs FROM UpdatePaymentMethodNotifyingTask WHERE (UpdatePaymentMethodNotifyingTask.billingId = @updatePaymentMethodNotifyingTaskBillingIdEq)",
-    params: {
-      updatePaymentMethodNotifyingTaskBillingIdEq: updatePaymentMethodNotifyingTaskBillingIdEq,
-    },
-    types: {
-      updatePaymentMethodNotifyingTaskBillingIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetUpdatePaymentMethodNotifyingTaskRow>();
-  for (let row of rows) {
-    resRows.push({
-      updatePaymentMethodNotifyingTaskBillingId: row.at(0).value,
-      updatePaymentMethodNotifyingTaskRetryCount: row.at(1).value.value,
-      updatePaymentMethodNotifyingTaskExecutionTimeMs: row.at(2).value.valueOf(),
-      updatePaymentMethodNotifyingTaskCreatedTimeMs: row.at(3).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export interface ListPendingUpdatePaymentMethodNotifyingTasksRow {
-  updatePaymentMethodNotifyingTaskBillingId: string,
-}
-
-export let LIST_PENDING_UPDATE_PAYMENT_METHOD_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingUpdatePaymentMethodNotifyingTasksRow> = {
-  name: 'ListPendingUpdatePaymentMethodNotifyingTasksRow',
-  fields: [{
-    name: 'updatePaymentMethodNotifyingTaskBillingId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }],
-};
-
-export async function listPendingUpdatePaymentMethodNotifyingTasks(
-  runner: Database | Transaction,
-  updatePaymentMethodNotifyingTaskExecutionTimeMsLe: number,
-): Promise<Array<ListPendingUpdatePaymentMethodNotifyingTasksRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT UpdatePaymentMethodNotifyingTask.billingId FROM UpdatePaymentMethodNotifyingTask WHERE UpdatePaymentMethodNotifyingTask.executionTimeMs <= @updatePaymentMethodNotifyingTaskExecutionTimeMsLe",
-    params: {
-      updatePaymentMethodNotifyingTaskExecutionTimeMsLe: new Date(updatePaymentMethodNotifyingTaskExecutionTimeMsLe).toISOString(),
-    },
-    types: {
-      updatePaymentMethodNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
-    }
-  });
-  let resRows = new Array<ListPendingUpdatePaymentMethodNotifyingTasksRow>();
-  for (let row of rows) {
-    resRows.push({
-      updatePaymentMethodNotifyingTaskBillingId: row.at(0).value,
-    });
-  }
-  return resRows;
-}
-
-export interface GetUpdatePaymentMethodNotifyingTaskMetadataRow {
-  updatePaymentMethodNotifyingTaskRetryCount: number,
-  updatePaymentMethodNotifyingTaskExecutionTimeMs: number,
-}
-
-export let GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetUpdatePaymentMethodNotifyingTaskMetadataRow> = {
-  name: 'GetUpdatePaymentMethodNotifyingTaskMetadataRow',
-  fields: [{
-    name: 'updatePaymentMethodNotifyingTaskRetryCount',
-    index: 1,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'updatePaymentMethodNotifyingTaskExecutionTimeMs',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getUpdatePaymentMethodNotifyingTaskMetadata(
-  runner: Database | Transaction,
-  updatePaymentMethodNotifyingTaskBillingIdEq: string,
-): Promise<Array<GetUpdatePaymentMethodNotifyingTaskMetadataRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT UpdatePaymentMethodNotifyingTask.retryCount, UpdatePaymentMethodNotifyingTask.executionTimeMs FROM UpdatePaymentMethodNotifyingTask WHERE (UpdatePaymentMethodNotifyingTask.billingId = @updatePaymentMethodNotifyingTaskBillingIdEq)",
-    params: {
-      updatePaymentMethodNotifyingTaskBillingIdEq: updatePaymentMethodNotifyingTaskBillingIdEq,
-    },
-    types: {
-      updatePaymentMethodNotifyingTaskBillingIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetUpdatePaymentMethodNotifyingTaskMetadataRow>();
-  for (let row of rows) {
-    resRows.push({
-      updatePaymentMethodNotifyingTaskRetryCount: row.at(0).value.value,
-      updatePaymentMethodNotifyingTaskExecutionTimeMs: row.at(1).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export function updateUpdatePaymentMethodNotifyingTaskMetadataStatement(
-  updatePaymentMethodNotifyingTaskBillingIdEq: string,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
-): Statement {
-  return {
-    sql: "UPDATE UpdatePaymentMethodNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (UpdatePaymentMethodNotifyingTask.billingId = @updatePaymentMethodNotifyingTaskBillingIdEq)",
-    params: {
-      updatePaymentMethodNotifyingTaskBillingIdEq: updatePaymentMethodNotifyingTaskBillingIdEq,
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
-    },
-    types: {
-      updatePaymentMethodNotifyingTaskBillingIdEq: { type: "string" },
-      setRetryCount: { type: "float64" },
-      setExecutionTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function insertBillingAccountSuspendingDueToPastDueTaskStatement(
-  billingId: string,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
-): Statement {
-  return {
-    sql: "INSERT BillingAccountSuspendingDueToPastDueTask (billingId, retryCount, executionTimeMs, createdTimeMs) VALUES (@billingId, @retryCount, @executionTimeMs, @createdTimeMs)",
-    params: {
-      billingId: billingId,
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
-    },
-    types: {
-      billingId: { type: "string" },
-      retryCount: { type: "float64" },
-      executionTimeMs: { type: "timestamp" },
-      createdTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function deleteBillingAccountSuspendingDueToPastDueTaskStatement(
-  billingAccountSuspendingDueToPastDueTaskBillingIdEq: string,
-): Statement {
-  return {
-    sql: "DELETE BillingAccountSuspendingDueToPastDueTask WHERE (BillingAccountSuspendingDueToPastDueTask.billingId = @billingAccountSuspendingDueToPastDueTaskBillingIdEq)",
-    params: {
-      billingAccountSuspendingDueToPastDueTaskBillingIdEq: billingAccountSuspendingDueToPastDueTaskBillingIdEq,
-    },
-    types: {
-      billingAccountSuspendingDueToPastDueTaskBillingIdEq: { type: "string" },
-    }
-  };
-}
-
-export interface GetBillingAccountSuspendingDueToPastDueTaskRow {
-  billingAccountSuspendingDueToPastDueTaskBillingId: string,
-  billingAccountSuspendingDueToPastDueTaskRetryCount: number,
-  billingAccountSuspendingDueToPastDueTaskExecutionTimeMs: number,
-  billingAccountSuspendingDueToPastDueTaskCreatedTimeMs: number,
-}
-
-export let GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW: MessageDescriptor<GetBillingAccountSuspendingDueToPastDueTaskRow> = {
-  name: 'GetBillingAccountSuspendingDueToPastDueTaskRow',
-  fields: [{
-    name: 'billingAccountSuspendingDueToPastDueTaskBillingId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'billingAccountSuspendingDueToPastDueTaskRetryCount',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'billingAccountSuspendingDueToPastDueTaskExecutionTimeMs',
-    index: 3,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'billingAccountSuspendingDueToPastDueTaskCreatedTimeMs',
-    index: 4,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getBillingAccountSuspendingDueToPastDueTask(
-  runner: Database | Transaction,
-  billingAccountSuspendingDueToPastDueTaskBillingIdEq: string,
-): Promise<Array<GetBillingAccountSuspendingDueToPastDueTaskRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT BillingAccountSuspendingDueToPastDueTask.billingId, BillingAccountSuspendingDueToPastDueTask.retryCount, BillingAccountSuspendingDueToPastDueTask.executionTimeMs, BillingAccountSuspendingDueToPastDueTask.createdTimeMs FROM BillingAccountSuspendingDueToPastDueTask WHERE (BillingAccountSuspendingDueToPastDueTask.billingId = @billingAccountSuspendingDueToPastDueTaskBillingIdEq)",
-    params: {
-      billingAccountSuspendingDueToPastDueTaskBillingIdEq: billingAccountSuspendingDueToPastDueTaskBillingIdEq,
-    },
-    types: {
-      billingAccountSuspendingDueToPastDueTaskBillingIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetBillingAccountSuspendingDueToPastDueTaskRow>();
-  for (let row of rows) {
-    resRows.push({
-      billingAccountSuspendingDueToPastDueTaskBillingId: row.at(0).value,
-      billingAccountSuspendingDueToPastDueTaskRetryCount: row.at(1).value.value,
-      billingAccountSuspendingDueToPastDueTaskExecutionTimeMs: row.at(2).value.valueOf(),
-      billingAccountSuspendingDueToPastDueTaskCreatedTimeMs: row.at(3).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export interface ListPendingBillingAccountSuspendingDueToPastDueTasksRow {
-  billingAccountSuspendingDueToPastDueTaskBillingId: string,
-}
-
-export let LIST_PENDING_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASKS_ROW: MessageDescriptor<ListPendingBillingAccountSuspendingDueToPastDueTasksRow> = {
-  name: 'ListPendingBillingAccountSuspendingDueToPastDueTasksRow',
-  fields: [{
-    name: 'billingAccountSuspendingDueToPastDueTaskBillingId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }],
-};
-
-export async function listPendingBillingAccountSuspendingDueToPastDueTasks(
-  runner: Database | Transaction,
-  billingAccountSuspendingDueToPastDueTaskExecutionTimeMsLe: number,
-): Promise<Array<ListPendingBillingAccountSuspendingDueToPastDueTasksRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT BillingAccountSuspendingDueToPastDueTask.billingId FROM BillingAccountSuspendingDueToPastDueTask WHERE BillingAccountSuspendingDueToPastDueTask.executionTimeMs <= @billingAccountSuspendingDueToPastDueTaskExecutionTimeMsLe",
-    params: {
-      billingAccountSuspendingDueToPastDueTaskExecutionTimeMsLe: new Date(billingAccountSuspendingDueToPastDueTaskExecutionTimeMsLe).toISOString(),
-    },
-    types: {
-      billingAccountSuspendingDueToPastDueTaskExecutionTimeMsLe: { type: "timestamp" },
-    }
-  });
-  let resRows = new Array<ListPendingBillingAccountSuspendingDueToPastDueTasksRow>();
-  for (let row of rows) {
-    resRows.push({
-      billingAccountSuspendingDueToPastDueTaskBillingId: row.at(0).value,
-    });
-  }
-  return resRows;
-}
-
-export interface GetBillingAccountSuspendingDueToPastDueTaskMetadataRow {
-  billingAccountSuspendingDueToPastDueTaskRetryCount: number,
-  billingAccountSuspendingDueToPastDueTaskExecutionTimeMs: number,
-}
-
-export let GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_METADATA_ROW: MessageDescriptor<GetBillingAccountSuspendingDueToPastDueTaskMetadataRow> = {
-  name: 'GetBillingAccountSuspendingDueToPastDueTaskMetadataRow',
-  fields: [{
-    name: 'billingAccountSuspendingDueToPastDueTaskRetryCount',
-    index: 1,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'billingAccountSuspendingDueToPastDueTaskExecutionTimeMs',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getBillingAccountSuspendingDueToPastDueTaskMetadata(
-  runner: Database | Transaction,
-  billingAccountSuspendingDueToPastDueTaskBillingIdEq: string,
-): Promise<Array<GetBillingAccountSuspendingDueToPastDueTaskMetadataRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT BillingAccountSuspendingDueToPastDueTask.retryCount, BillingAccountSuspendingDueToPastDueTask.executionTimeMs FROM BillingAccountSuspendingDueToPastDueTask WHERE (BillingAccountSuspendingDueToPastDueTask.billingId = @billingAccountSuspendingDueToPastDueTaskBillingIdEq)",
-    params: {
-      billingAccountSuspendingDueToPastDueTaskBillingIdEq: billingAccountSuspendingDueToPastDueTaskBillingIdEq,
-    },
-    types: {
-      billingAccountSuspendingDueToPastDueTaskBillingIdEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetBillingAccountSuspendingDueToPastDueTaskMetadataRow>();
-  for (let row of rows) {
-    resRows.push({
-      billingAccountSuspendingDueToPastDueTaskRetryCount: row.at(0).value.value,
-      billingAccountSuspendingDueToPastDueTaskExecutionTimeMs: row.at(1).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export function updateBillingAccountSuspendingDueToPastDueTaskMetadataStatement(
-  billingAccountSuspendingDueToPastDueTaskBillingIdEq: string,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
-): Statement {
-  return {
-    sql: "UPDATE BillingAccountSuspendingDueToPastDueTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingAccountSuspendingDueToPastDueTask.billingId = @billingAccountSuspendingDueToPastDueTaskBillingIdEq)",
-    params: {
-      billingAccountSuspendingDueToPastDueTaskBillingIdEq: billingAccountSuspendingDueToPastDueTaskBillingIdEq,
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
-    },
-    types: {
-      billingAccountSuspendingDueToPastDueTaskBillingIdEq: { type: "string" },
-      setRetryCount: { type: "float64" },
-      setExecutionTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function insertBillingAccountSuspensionNotifyingTaskStatement(
-  accountId: string,
-  version: number,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
-): Statement {
-  return {
-    sql: "INSERT BillingAccountSuspensionNotifyingTask (accountId, version, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @version, @retryCount, @executionTimeMs, @createdTimeMs)",
-    params: {
-      accountId: accountId,
-      version: Spanner.float(version),
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
-    },
-    types: {
-      accountId: { type: "string" },
-      version: { type: "float64" },
-      retryCount: { type: "float64" },
-      executionTimeMs: { type: "timestamp" },
-      createdTimeMs: { type: "timestamp" },
-    }
-  };
-}
-
-export function deleteBillingAccountSuspensionNotifyingTaskStatement(
-  billingAccountSuspensionNotifyingTaskAccountIdEq: string,
-  billingAccountSuspensionNotifyingTaskVersionEq: number,
-): Statement {
-  return {
-    sql: "DELETE BillingAccountSuspensionNotifyingTask WHERE (BillingAccountSuspensionNotifyingTask.accountId = @billingAccountSuspensionNotifyingTaskAccountIdEq AND BillingAccountSuspensionNotifyingTask.version = @billingAccountSuspensionNotifyingTaskVersionEq)",
-    params: {
-      billingAccountSuspensionNotifyingTaskAccountIdEq: billingAccountSuspensionNotifyingTaskAccountIdEq,
-      billingAccountSuspensionNotifyingTaskVersionEq: Spanner.float(billingAccountSuspensionNotifyingTaskVersionEq),
-    },
-    types: {
-      billingAccountSuspensionNotifyingTaskAccountIdEq: { type: "string" },
-      billingAccountSuspensionNotifyingTaskVersionEq: { type: "float64" },
-    }
-  };
-}
-
-export interface GetBillingAccountSuspensionNotifyingTaskRow {
-  billingAccountSuspensionNotifyingTaskAccountId: string,
-  billingAccountSuspensionNotifyingTaskVersion: number,
-  billingAccountSuspensionNotifyingTaskRetryCount: number,
-  billingAccountSuspensionNotifyingTaskExecutionTimeMs: number,
-  billingAccountSuspensionNotifyingTaskCreatedTimeMs: number,
-}
-
-export let GET_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASK_ROW: MessageDescriptor<GetBillingAccountSuspensionNotifyingTaskRow> = {
-  name: 'GetBillingAccountSuspensionNotifyingTaskRow',
-  fields: [{
-    name: 'billingAccountSuspensionNotifyingTaskAccountId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'billingAccountSuspensionNotifyingTaskVersion',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'billingAccountSuspensionNotifyingTaskRetryCount',
-    index: 3,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'billingAccountSuspensionNotifyingTaskExecutionTimeMs',
+    name: 'billingProfilePaymentAfterMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingAccountSuspensionNotifyingTaskCreatedTimeMs',
+    name: 'billingProfileCreatedTimeMs',
     index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingAccountSuspensionNotifyingTask(
+export async function getBillingProfile(
   runner: Database | Transaction,
-  billingAccountSuspensionNotifyingTaskAccountIdEq: string,
-  billingAccountSuspensionNotifyingTaskVersionEq: number,
-): Promise<Array<GetBillingAccountSuspensionNotifyingTaskRow>> {
+  args: {
+    billingProfileAccountIdEq: string,
+  }
+): Promise<Array<GetBillingProfileRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingAccountSuspensionNotifyingTask.accountId, BillingAccountSuspensionNotifyingTask.version, BillingAccountSuspensionNotifyingTask.retryCount, BillingAccountSuspensionNotifyingTask.executionTimeMs, BillingAccountSuspensionNotifyingTask.createdTimeMs FROM BillingAccountSuspensionNotifyingTask WHERE (BillingAccountSuspensionNotifyingTask.accountId = @billingAccountSuspensionNotifyingTaskAccountIdEq AND BillingAccountSuspensionNotifyingTask.version = @billingAccountSuspensionNotifyingTaskVersionEq)",
+    sql: "SELECT BillingProfile.accountId, BillingProfile.stripePaymentCustomerId, BillingProfile.stateInfo, BillingProfile.paymentAfterMs, BillingProfile.createdTimeMs FROM BillingProfile WHERE (BillingProfile.accountId = @billingProfileAccountIdEq)",
     params: {
-      billingAccountSuspensionNotifyingTaskAccountIdEq: billingAccountSuspensionNotifyingTaskAccountIdEq,
-      billingAccountSuspensionNotifyingTaskVersionEq: Spanner.float(billingAccountSuspensionNotifyingTaskVersionEq),
+      billingProfileAccountIdEq: args.billingProfileAccountIdEq,
     },
     types: {
-      billingAccountSuspensionNotifyingTaskAccountIdEq: { type: "string" },
-      billingAccountSuspensionNotifyingTaskVersionEq: { type: "float64" },
+      billingProfileAccountIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingAccountSuspensionNotifyingTaskRow>();
+  let resRows = new Array<GetBillingProfileRow>();
   for (let row of rows) {
     resRows.push({
-      billingAccountSuspensionNotifyingTaskAccountId: row.at(0).value,
-      billingAccountSuspensionNotifyingTaskVersion: row.at(1).value.value,
-      billingAccountSuspensionNotifyingTaskRetryCount: row.at(2).value.value,
-      billingAccountSuspensionNotifyingTaskExecutionTimeMs: row.at(3).value.valueOf(),
-      billingAccountSuspensionNotifyingTaskCreatedTimeMs: row.at(4).value.valueOf(),
+      billingProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      billingProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
+      billingProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, BILLING_PROFILE_STATE_INFO),
+      billingProfilePaymentAfterMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      billingProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
     });
   }
   return resRows;
 }
 
-export interface ListPendingBillingAccountSuspensionNotifyingTasksRow {
-  billingAccountSuspensionNotifyingTaskAccountId: string,
-  billingAccountSuspensionNotifyingTaskVersion: number,
-}
-
-export let LIST_PENDING_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingBillingAccountSuspensionNotifyingTasksRow> = {
-  name: 'ListPendingBillingAccountSuspensionNotifyingTasksRow',
-  fields: [{
-    name: 'billingAccountSuspensionNotifyingTaskAccountId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'billingAccountSuspensionNotifyingTaskVersion',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function listPendingBillingAccountSuspensionNotifyingTasks(
-  runner: Database | Transaction,
-  billingAccountSuspensionNotifyingTaskExecutionTimeMsLe: number,
-): Promise<Array<ListPendingBillingAccountSuspensionNotifyingTasksRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT BillingAccountSuspensionNotifyingTask.accountId, BillingAccountSuspensionNotifyingTask.version FROM BillingAccountSuspensionNotifyingTask WHERE BillingAccountSuspensionNotifyingTask.executionTimeMs <= @billingAccountSuspensionNotifyingTaskExecutionTimeMsLe",
-    params: {
-      billingAccountSuspensionNotifyingTaskExecutionTimeMsLe: new Date(billingAccountSuspensionNotifyingTaskExecutionTimeMsLe).toISOString(),
-    },
-    types: {
-      billingAccountSuspensionNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
-    }
-  });
-  let resRows = new Array<ListPendingBillingAccountSuspensionNotifyingTasksRow>();
-  for (let row of rows) {
-    resRows.push({
-      billingAccountSuspensionNotifyingTaskAccountId: row.at(0).value,
-      billingAccountSuspensionNotifyingTaskVersion: row.at(1).value.value,
-    });
+export function insertEarningsProfileStatement(
+  args: {
+    accountId: string,
+    stripeConnectedAccountId?: string,
+    stripeConnectedAccountState?: StripeConnectedAccountState,
+    createdTimeMs?: number,
   }
-  return resRows;
-}
-
-export interface GetBillingAccountSuspensionNotifyingTaskMetadataRow {
-  billingAccountSuspensionNotifyingTaskRetryCount: number,
-  billingAccountSuspensionNotifyingTaskExecutionTimeMs: number,
-}
-
-export let GET_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetBillingAccountSuspensionNotifyingTaskMetadataRow> = {
-  name: 'GetBillingAccountSuspensionNotifyingTaskMetadataRow',
-  fields: [{
-    name: 'billingAccountSuspensionNotifyingTaskRetryCount',
-    index: 1,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'billingAccountSuspensionNotifyingTaskExecutionTimeMs',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export async function getBillingAccountSuspensionNotifyingTaskMetadata(
-  runner: Database | Transaction,
-  billingAccountSuspensionNotifyingTaskAccountIdEq: string,
-  billingAccountSuspensionNotifyingTaskVersionEq: number,
-): Promise<Array<GetBillingAccountSuspensionNotifyingTaskMetadataRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT BillingAccountSuspensionNotifyingTask.retryCount, BillingAccountSuspensionNotifyingTask.executionTimeMs FROM BillingAccountSuspensionNotifyingTask WHERE (BillingAccountSuspensionNotifyingTask.accountId = @billingAccountSuspensionNotifyingTaskAccountIdEq AND BillingAccountSuspensionNotifyingTask.version = @billingAccountSuspensionNotifyingTaskVersionEq)",
-    params: {
-      billingAccountSuspensionNotifyingTaskAccountIdEq: billingAccountSuspensionNotifyingTaskAccountIdEq,
-      billingAccountSuspensionNotifyingTaskVersionEq: Spanner.float(billingAccountSuspensionNotifyingTaskVersionEq),
-    },
-    types: {
-      billingAccountSuspensionNotifyingTaskAccountIdEq: { type: "string" },
-      billingAccountSuspensionNotifyingTaskVersionEq: { type: "float64" },
-    }
-  });
-  let resRows = new Array<GetBillingAccountSuspensionNotifyingTaskMetadataRow>();
-  for (let row of rows) {
-    resRows.push({
-      billingAccountSuspensionNotifyingTaskRetryCount: row.at(0).value.value,
-      billingAccountSuspensionNotifyingTaskExecutionTimeMs: row.at(1).value.valueOf(),
-    });
-  }
-  return resRows;
-}
-
-export function updateBillingAccountSuspensionNotifyingTaskMetadataStatement(
-  billingAccountSuspensionNotifyingTaskAccountIdEq: string,
-  billingAccountSuspensionNotifyingTaskVersionEq: number,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
 ): Statement {
   return {
-    sql: "UPDATE BillingAccountSuspensionNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingAccountSuspensionNotifyingTask.accountId = @billingAccountSuspensionNotifyingTaskAccountIdEq AND BillingAccountSuspensionNotifyingTask.version = @billingAccountSuspensionNotifyingTaskVersionEq)",
+    sql: "INSERT EarningsProfile (accountId, stripeConnectedAccountId, stripeConnectedAccountState, createdTimeMs) VALUES (@accountId, @stripeConnectedAccountId, @stripeConnectedAccountState, @createdTimeMs)",
     params: {
-      billingAccountSuspensionNotifyingTaskAccountIdEq: billingAccountSuspensionNotifyingTaskAccountIdEq,
-      billingAccountSuspensionNotifyingTaskVersionEq: Spanner.float(billingAccountSuspensionNotifyingTaskVersionEq),
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
+      accountId: args.accountId,
+      stripeConnectedAccountId: args.stripeConnectedAccountId == null ? null : args.stripeConnectedAccountId,
+      stripeConnectedAccountState: args.stripeConnectedAccountState == null ? null : Spanner.float(args.stripeConnectedAccountState),
+      createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
     },
     types: {
-      billingAccountSuspensionNotifyingTaskAccountIdEq: { type: "string" },
-      billingAccountSuspensionNotifyingTaskVersionEq: { type: "float64" },
-      setRetryCount: { type: "float64" },
-      setExecutionTimeMs: { type: "timestamp" },
+      accountId: { type: "string" },
+      stripeConnectedAccountId: { type: "string" },
+      stripeConnectedAccountState: { type: "float64" },
+      createdTimeMs: { type: "float64" },
     }
   };
 }
 
-export function insertBillingAccountStateSyncingTaskStatement(
-  accountId: string,
-  version: number,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
+export function deleteEarningsProfileStatement(
+  args: {
+    earningsProfileAccountIdEq: string,
+  }
 ): Statement {
   return {
-    sql: "INSERT BillingAccountStateSyncingTask (accountId, version, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @version, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "DELETE EarningsProfile WHERE (EarningsProfile.accountId = @earningsProfileAccountIdEq)",
     params: {
-      accountId: accountId,
-      version: Spanner.float(version),
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
+      earningsProfileAccountIdEq: args.earningsProfileAccountIdEq,
+    },
+    types: {
+      earningsProfileAccountIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetEarningsProfileRow {
+  earningsProfileAccountId?: string,
+  earningsProfileStripeConnectedAccountId?: string,
+  earningsProfileStripeConnectedAccountState?: StripeConnectedAccountState,
+  earningsProfileCreatedTimeMs?: number,
+}
+
+export let GET_EARNINGS_PROFILE_ROW: MessageDescriptor<GetEarningsProfileRow> = {
+  name: 'GetEarningsProfileRow',
+  fields: [{
+    name: 'earningsProfileAccountId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'earningsProfileStripeConnectedAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'earningsProfileStripeConnectedAccountState',
+    index: 3,
+    enumType: STRIPE_CONNECTED_ACCOUNT_STATE,
+  }, {
+    name: 'earningsProfileCreatedTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getEarningsProfile(
+  runner: Database | Transaction,
+  args: {
+    earningsProfileAccountIdEq: string,
+  }
+): Promise<Array<GetEarningsProfileRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT EarningsProfile.accountId, EarningsProfile.stripeConnectedAccountId, EarningsProfile.stripeConnectedAccountState, EarningsProfile.createdTimeMs FROM EarningsProfile WHERE (EarningsProfile.accountId = @earningsProfileAccountIdEq)",
+    params: {
+      earningsProfileAccountIdEq: args.earningsProfileAccountIdEq,
+    },
+    types: {
+      earningsProfileAccountIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetEarningsProfileRow>();
+  for (let row of rows) {
+    resRows.push({
+      earningsProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      earningsProfileStripeConnectedAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      earningsProfileStripeConnectedAccountState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, STRIPE_CONNECTED_ACCOUNT_STATE),
+      earningsProfileCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+    });
+  }
+  return resRows;
+}
+
+export function insertTransactionStatementStatement(
+  args: {
+    statementId: string,
+    accountId?: string,
+    month?: string,
+    statement?: TransactionStatement,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT TransactionStatement (statementId, accountId, month, statement, createdTimeMs) VALUES (@statementId, @accountId, @month, @statement, @createdTimeMs)",
+    params: {
+      statementId: args.statementId,
+      accountId: args.accountId == null ? null : args.accountId,
+      month: args.month == null ? null : args.month,
+      statement: args.statement == null ? null : Buffer.from(serializeMessage(args.statement, TRANSACTION_STATEMENT).buffer),
+      createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
+    },
+    types: {
+      statementId: { type: "string" },
+      accountId: { type: "string" },
+      month: { type: "string" },
+      statement: { type: "bytes" },
+      createdTimeMs: { type: "float64" },
+    }
+  };
+}
+
+export function deleteTransactionStatementStatement(
+  args: {
+    transactionStatementStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE TransactionStatement WHERE (TransactionStatement.statementId = @transactionStatementStatementIdEq)",
+    params: {
+      transactionStatementStatementIdEq: args.transactionStatementStatementIdEq,
+    },
+    types: {
+      transactionStatementStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetTransactionStatementRow {
+  transactionStatementStatementId?: string,
+  transactionStatementAccountId?: string,
+  transactionStatementMonth?: string,
+  transactionStatementStatement?: TransactionStatement,
+  transactionStatementCreatedTimeMs?: number,
+}
+
+export let GET_TRANSACTION_STATEMENT_ROW: MessageDescriptor<GetTransactionStatementRow> = {
+  name: 'GetTransactionStatementRow',
+  fields: [{
+    name: 'transactionStatementStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementMonth',
+    index: 3,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementStatement',
+    index: 4,
+    messageType: TRANSACTION_STATEMENT,
+  }, {
+    name: 'transactionStatementCreatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getTransactionStatement(
+  runner: Database | Transaction,
+  args: {
+    transactionStatementStatementIdEq: string,
+  }
+): Promise<Array<GetTransactionStatementRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT TransactionStatement.statementId, TransactionStatement.accountId, TransactionStatement.month, TransactionStatement.statement, TransactionStatement.createdTimeMs FROM TransactionStatement WHERE (TransactionStatement.statementId = @transactionStatementStatementIdEq)",
+    params: {
+      transactionStatementStatementIdEq: args.transactionStatementStatementIdEq,
+    },
+    types: {
+      transactionStatementStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetTransactionStatementRow>();
+  for (let row of rows) {
+    resRows.push({
+      transactionStatementStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      transactionStatementAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      transactionStatementMonth: row.at(2).value == null ? undefined : row.at(2).value,
+      transactionStatementStatement: row.at(3).value == null ? undefined : deserializeMessage(row.at(3).value, TRANSACTION_STATEMENT),
+      transactionStatementCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+    });
+  }
+  return resRows;
+}
+
+export function insertPaymentStatement(
+  args: {
+    statementId: string,
+    accountId?: string,
+    state?: PaymentState,
+    stripeInvoiceId?: string,
+    stripeInvoiceUrl?: string,
+    updatedTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT Payment (statementId, accountId, state, stripeInvoiceId, stripeInvoiceUrl, updatedTimeMs, createdTimeMs) VALUES (@statementId, @accountId, @state, @stripeInvoiceId, @stripeInvoiceUrl, @updatedTimeMs, @createdTimeMs)",
+    params: {
+      statementId: args.statementId,
+      accountId: args.accountId == null ? null : args.accountId,
+      state: args.state == null ? null : Spanner.float(args.state),
+      stripeInvoiceId: args.stripeInvoiceId == null ? null : args.stripeInvoiceId,
+      stripeInvoiceUrl: args.stripeInvoiceUrl == null ? null : args.stripeInvoiceUrl,
+      updatedTimeMs: args.updatedTimeMs == null ? null : Spanner.float(args.updatedTimeMs),
+      createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
+    },
+    types: {
+      statementId: { type: "string" },
+      accountId: { type: "string" },
+      state: { type: "float64" },
+      stripeInvoiceId: { type: "string" },
+      stripeInvoiceUrl: { type: "string" },
+      updatedTimeMs: { type: "float64" },
+      createdTimeMs: { type: "float64" },
+    }
+  };
+}
+
+export function deletePaymentStatement(
+  args: {
+    paymentStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE Payment WHERE (Payment.statementId = @paymentStatementIdEq)",
+    params: {
+      paymentStatementIdEq: args.paymentStatementIdEq,
+    },
+    types: {
+      paymentStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetPaymentRow {
+  paymentStatementId?: string,
+  paymentAccountId?: string,
+  paymentState?: PaymentState,
+  paymentStripeInvoiceId?: string,
+  paymentStripeInvoiceUrl?: string,
+  paymentUpdatedTimeMs?: number,
+  paymentCreatedTimeMs?: number,
+}
+
+export let GET_PAYMENT_ROW: MessageDescriptor<GetPaymentRow> = {
+  name: 'GetPaymentRow',
+  fields: [{
+    name: 'paymentStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentState',
+    index: 3,
+    enumType: PAYMENT_STATE,
+  }, {
+    name: 'paymentStripeInvoiceId',
+    index: 4,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentStripeInvoiceUrl',
+    index: 5,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentUpdatedTimeMs',
+    index: 6,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentCreatedTimeMs',
+    index: 7,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPayment(
+  runner: Database | Transaction,
+  args: {
+    paymentStatementIdEq: string,
+  }
+): Promise<Array<GetPaymentRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT Payment.statementId, Payment.accountId, Payment.state, Payment.stripeInvoiceId, Payment.stripeInvoiceUrl, Payment.updatedTimeMs, Payment.createdTimeMs FROM Payment WHERE (Payment.statementId = @paymentStatementIdEq)",
+    params: {
+      paymentStatementIdEq: args.paymentStatementIdEq,
+    },
+    types: {
+      paymentStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPaymentRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      paymentState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYMENT_STATE),
+      paymentStripeInvoiceId: row.at(3).value == null ? undefined : row.at(3).value,
+      paymentStripeInvoiceUrl: row.at(4).value == null ? undefined : row.at(4).value,
+      paymentUpdatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
+      paymentCreatedTimeMs: row.at(6).value == null ? undefined : row.at(6).value.value,
+    });
+  }
+  return resRows;
+}
+
+export function insertPayoutStatement(
+  args: {
+    statementId: string,
+    accountId?: string,
+    state?: PayoutState,
+    stripeTransferId?: string,
+    updatedTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT Payout (statementId, accountId, state, stripeTransferId, updatedTimeMs, createdTimeMs) VALUES (@statementId, @accountId, @state, @stripeTransferId, @updatedTimeMs, @createdTimeMs)",
+    params: {
+      statementId: args.statementId,
+      accountId: args.accountId == null ? null : args.accountId,
+      state: args.state == null ? null : Spanner.float(args.state),
+      stripeTransferId: args.stripeTransferId == null ? null : args.stripeTransferId,
+      updatedTimeMs: args.updatedTimeMs == null ? null : Spanner.float(args.updatedTimeMs),
+      createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
+    },
+    types: {
+      statementId: { type: "string" },
+      accountId: { type: "string" },
+      state: { type: "float64" },
+      stripeTransferId: { type: "string" },
+      updatedTimeMs: { type: "float64" },
+      createdTimeMs: { type: "float64" },
+    }
+  };
+}
+
+export function deletePayoutStatement(
+  args: {
+    payoutStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE Payout WHERE (Payout.statementId = @payoutStatementIdEq)",
+    params: {
+      payoutStatementIdEq: args.payoutStatementIdEq,
+    },
+    types: {
+      payoutStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetPayoutRow {
+  payoutStatementId?: string,
+  payoutAccountId?: string,
+  payoutState?: PayoutState,
+  payoutStripeTransferId?: string,
+  payoutUpdatedTimeMs?: number,
+  payoutCreatedTimeMs?: number,
+}
+
+export let GET_PAYOUT_ROW: MessageDescriptor<GetPayoutRow> = {
+  name: 'GetPayoutRow',
+  fields: [{
+    name: 'payoutStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutState',
+    index: 3,
+    enumType: PAYOUT_STATE,
+  }, {
+    name: 'payoutStripeTransferId',
+    index: 4,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutUpdatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutCreatedTimeMs',
+    index: 6,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPayout(
+  runner: Database | Transaction,
+  args: {
+    payoutStatementIdEq: string,
+  }
+): Promise<Array<GetPayoutRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT Payout.statementId, Payout.accountId, Payout.state, Payout.stripeTransferId, Payout.updatedTimeMs, Payout.createdTimeMs FROM Payout WHERE (Payout.statementId = @payoutStatementIdEq)",
+    params: {
+      payoutStatementIdEq: args.payoutStatementIdEq,
+    },
+    types: {
+      payoutStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPayoutRow>();
+  for (let row of rows) {
+    resRows.push({
+      payoutStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      payoutState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYOUT_STATE),
+      payoutStripeTransferId: row.at(3).value == null ? undefined : row.at(3).value,
+      payoutUpdatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      payoutCreatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
+    });
+  }
+  return resRows;
+}
+
+export function insertStripePaymentCustomerCreatingTaskStatement(
+  args: {
+    accountId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT StripePaymentCustomerCreatingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      accountId: args.accountId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
       accountId: { type: "string" },
-      version: { type: "float64" },
       retryCount: { type: "float64" },
       executionTimeMs: { type: "timestamp" },
       createdTimeMs: { type: "timestamp" },
@@ -1439,187 +572,173 @@ export function insertBillingAccountStateSyncingTaskStatement(
   };
 }
 
-export function deleteBillingAccountStateSyncingTaskStatement(
-  billingAccountStateSyncingTaskAccountIdEq: string,
-  billingAccountStateSyncingTaskVersionEq: number,
+export function deleteStripePaymentCustomerCreatingTaskStatement(
+  args: {
+    stripePaymentCustomerCreatingTaskAccountIdEq: string,
+  }
 ): Statement {
   return {
-    sql: "DELETE BillingAccountStateSyncingTask WHERE (BillingAccountStateSyncingTask.accountId = @billingAccountStateSyncingTaskAccountIdEq AND BillingAccountStateSyncingTask.version = @billingAccountStateSyncingTaskVersionEq)",
+    sql: "DELETE StripePaymentCustomerCreatingTask WHERE (StripePaymentCustomerCreatingTask.accountId = @stripePaymentCustomerCreatingTaskAccountIdEq)",
     params: {
-      billingAccountStateSyncingTaskAccountIdEq: billingAccountStateSyncingTaskAccountIdEq,
-      billingAccountStateSyncingTaskVersionEq: Spanner.float(billingAccountStateSyncingTaskVersionEq),
+      stripePaymentCustomerCreatingTaskAccountIdEq: args.stripePaymentCustomerCreatingTaskAccountIdEq,
     },
     types: {
-      billingAccountStateSyncingTaskAccountIdEq: { type: "string" },
-      billingAccountStateSyncingTaskVersionEq: { type: "float64" },
+      stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetBillingAccountStateSyncingTaskRow {
-  billingAccountStateSyncingTaskAccountId: string,
-  billingAccountStateSyncingTaskVersion: number,
-  billingAccountStateSyncingTaskRetryCount: number,
-  billingAccountStateSyncingTaskExecutionTimeMs: number,
-  billingAccountStateSyncingTaskCreatedTimeMs: number,
+export interface GetStripePaymentCustomerCreatingTaskRow {
+  stripePaymentCustomerCreatingTaskAccountId?: string,
+  stripePaymentCustomerCreatingTaskRetryCount?: number,
+  stripePaymentCustomerCreatingTaskExecutionTimeMs?: number,
+  stripePaymentCustomerCreatingTaskCreatedTimeMs?: number,
 }
 
-export let GET_BILLING_ACCOUNT_STATE_SYNCING_TASK_ROW: MessageDescriptor<GetBillingAccountStateSyncingTaskRow> = {
-  name: 'GetBillingAccountStateSyncingTaskRow',
+export let GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_ROW: MessageDescriptor<GetStripePaymentCustomerCreatingTaskRow> = {
+  name: 'GetStripePaymentCustomerCreatingTaskRow',
   fields: [{
-    name: 'billingAccountStateSyncingTaskAccountId',
+    name: 'stripePaymentCustomerCreatingTaskAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingAccountStateSyncingTaskVersion',
+    name: 'stripePaymentCustomerCreatingTaskRetryCount',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingAccountStateSyncingTaskRetryCount',
+    name: 'stripePaymentCustomerCreatingTaskExecutionTimeMs',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingAccountStateSyncingTaskExecutionTimeMs',
+    name: 'stripePaymentCustomerCreatingTaskCreatedTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'billingAccountStateSyncingTaskCreatedTimeMs',
-    index: 5,
-    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingAccountStateSyncingTask(
+export async function getStripePaymentCustomerCreatingTask(
   runner: Database | Transaction,
-  billingAccountStateSyncingTaskAccountIdEq: string,
-  billingAccountStateSyncingTaskVersionEq: number,
-): Promise<Array<GetBillingAccountStateSyncingTaskRow>> {
+  args: {
+    stripePaymentCustomerCreatingTaskAccountIdEq: string,
+  }
+): Promise<Array<GetStripePaymentCustomerCreatingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingAccountStateSyncingTask.accountId, BillingAccountStateSyncingTask.version, BillingAccountStateSyncingTask.retryCount, BillingAccountStateSyncingTask.executionTimeMs, BillingAccountStateSyncingTask.createdTimeMs FROM BillingAccountStateSyncingTask WHERE (BillingAccountStateSyncingTask.accountId = @billingAccountStateSyncingTaskAccountIdEq AND BillingAccountStateSyncingTask.version = @billingAccountStateSyncingTaskVersionEq)",
+    sql: "SELECT StripePaymentCustomerCreatingTask.accountId, StripePaymentCustomerCreatingTask.retryCount, StripePaymentCustomerCreatingTask.executionTimeMs, StripePaymentCustomerCreatingTask.createdTimeMs FROM StripePaymentCustomerCreatingTask WHERE (StripePaymentCustomerCreatingTask.accountId = @stripePaymentCustomerCreatingTaskAccountIdEq)",
     params: {
-      billingAccountStateSyncingTaskAccountIdEq: billingAccountStateSyncingTaskAccountIdEq,
-      billingAccountStateSyncingTaskVersionEq: Spanner.float(billingAccountStateSyncingTaskVersionEq),
+      stripePaymentCustomerCreatingTaskAccountIdEq: args.stripePaymentCustomerCreatingTaskAccountIdEq,
     },
     types: {
-      billingAccountStateSyncingTaskAccountIdEq: { type: "string" },
-      billingAccountStateSyncingTaskVersionEq: { type: "float64" },
+      stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingAccountStateSyncingTaskRow>();
+  let resRows = new Array<GetStripePaymentCustomerCreatingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      billingAccountStateSyncingTaskAccountId: row.at(0).value,
-      billingAccountStateSyncingTaskVersion: row.at(1).value.value,
-      billingAccountStateSyncingTaskRetryCount: row.at(2).value.value,
-      billingAccountStateSyncingTaskExecutionTimeMs: row.at(3).value.valueOf(),
-      billingAccountStateSyncingTaskCreatedTimeMs: row.at(4).value.valueOf(),
+      stripePaymentCustomerCreatingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripePaymentCustomerCreatingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      stripePaymentCustomerCreatingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      stripePaymentCustomerCreatingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingBillingAccountStateSyncingTasksRow {
-  billingAccountStateSyncingTaskAccountId: string,
-  billingAccountStateSyncingTaskVersion: number,
+export interface ListPendingStripePaymentCustomerCreatingTasksRow {
+  stripePaymentCustomerCreatingTaskAccountId?: string,
 }
 
-export let LIST_PENDING_BILLING_ACCOUNT_STATE_SYNCING_TASKS_ROW: MessageDescriptor<ListPendingBillingAccountStateSyncingTasksRow> = {
-  name: 'ListPendingBillingAccountStateSyncingTasksRow',
+export let LIST_PENDING_STRIPE_PAYMENT_CUSTOMER_CREATING_TASKS_ROW: MessageDescriptor<ListPendingStripePaymentCustomerCreatingTasksRow> = {
+  name: 'ListPendingStripePaymentCustomerCreatingTasksRow',
   fields: [{
-    name: 'billingAccountStateSyncingTaskAccountId',
+    name: 'stripePaymentCustomerCreatingTaskAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'billingAccountStateSyncingTaskVersion',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function listPendingBillingAccountStateSyncingTasks(
+export async function listPendingStripePaymentCustomerCreatingTasks(
   runner: Database | Transaction,
-  billingAccountStateSyncingTaskExecutionTimeMsLe: number,
-): Promise<Array<ListPendingBillingAccountStateSyncingTasksRow>> {
+  args: {
+    stripePaymentCustomerCreatingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingStripePaymentCustomerCreatingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingAccountStateSyncingTask.accountId, BillingAccountStateSyncingTask.version FROM BillingAccountStateSyncingTask WHERE BillingAccountStateSyncingTask.executionTimeMs <= @billingAccountStateSyncingTaskExecutionTimeMsLe",
+    sql: "SELECT StripePaymentCustomerCreatingTask.accountId FROM StripePaymentCustomerCreatingTask WHERE StripePaymentCustomerCreatingTask.executionTimeMs <= @stripePaymentCustomerCreatingTaskExecutionTimeMsLe",
     params: {
-      billingAccountStateSyncingTaskExecutionTimeMsLe: new Date(billingAccountStateSyncingTaskExecutionTimeMsLe).toISOString(),
+      stripePaymentCustomerCreatingTaskExecutionTimeMsLe: args.stripePaymentCustomerCreatingTaskExecutionTimeMsLe == null ? null : new Date(args.stripePaymentCustomerCreatingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      billingAccountStateSyncingTaskExecutionTimeMsLe: { type: "timestamp" },
+      stripePaymentCustomerCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingBillingAccountStateSyncingTasksRow>();
+  let resRows = new Array<ListPendingStripePaymentCustomerCreatingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      billingAccountStateSyncingTaskAccountId: row.at(0).value,
-      billingAccountStateSyncingTaskVersion: row.at(1).value.value,
+      stripePaymentCustomerCreatingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
     });
   }
   return resRows;
 }
 
-export interface GetBillingAccountStateSyncingTaskMetadataRow {
-  billingAccountStateSyncingTaskRetryCount: number,
-  billingAccountStateSyncingTaskExecutionTimeMs: number,
+export interface GetStripePaymentCustomerCreatingTaskMetadataRow {
+  stripePaymentCustomerCreatingTaskRetryCount?: number,
+  stripePaymentCustomerCreatingTaskExecutionTimeMs?: number,
 }
 
-export let GET_BILLING_ACCOUNT_STATE_SYNCING_TASK_METADATA_ROW: MessageDescriptor<GetBillingAccountStateSyncingTaskMetadataRow> = {
-  name: 'GetBillingAccountStateSyncingTaskMetadataRow',
+export let GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetStripePaymentCustomerCreatingTaskMetadataRow> = {
+  name: 'GetStripePaymentCustomerCreatingTaskMetadataRow',
   fields: [{
-    name: 'billingAccountStateSyncingTaskRetryCount',
+    name: 'stripePaymentCustomerCreatingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingAccountStateSyncingTaskExecutionTimeMs',
+    name: 'stripePaymentCustomerCreatingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingAccountStateSyncingTaskMetadata(
+export async function getStripePaymentCustomerCreatingTaskMetadata(
   runner: Database | Transaction,
-  billingAccountStateSyncingTaskAccountIdEq: string,
-  billingAccountStateSyncingTaskVersionEq: number,
-): Promise<Array<GetBillingAccountStateSyncingTaskMetadataRow>> {
+  args: {
+    stripePaymentCustomerCreatingTaskAccountIdEq: string,
+  }
+): Promise<Array<GetStripePaymentCustomerCreatingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingAccountStateSyncingTask.retryCount, BillingAccountStateSyncingTask.executionTimeMs FROM BillingAccountStateSyncingTask WHERE (BillingAccountStateSyncingTask.accountId = @billingAccountStateSyncingTaskAccountIdEq AND BillingAccountStateSyncingTask.version = @billingAccountStateSyncingTaskVersionEq)",
+    sql: "SELECT StripePaymentCustomerCreatingTask.retryCount, StripePaymentCustomerCreatingTask.executionTimeMs FROM StripePaymentCustomerCreatingTask WHERE (StripePaymentCustomerCreatingTask.accountId = @stripePaymentCustomerCreatingTaskAccountIdEq)",
     params: {
-      billingAccountStateSyncingTaskAccountIdEq: billingAccountStateSyncingTaskAccountIdEq,
-      billingAccountStateSyncingTaskVersionEq: Spanner.float(billingAccountStateSyncingTaskVersionEq),
+      stripePaymentCustomerCreatingTaskAccountIdEq: args.stripePaymentCustomerCreatingTaskAccountIdEq,
     },
     types: {
-      billingAccountStateSyncingTaskAccountIdEq: { type: "string" },
-      billingAccountStateSyncingTaskVersionEq: { type: "float64" },
+      stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingAccountStateSyncingTaskMetadataRow>();
+  let resRows = new Array<GetStripePaymentCustomerCreatingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      billingAccountStateSyncingTaskRetryCount: row.at(0).value.value,
-      billingAccountStateSyncingTaskExecutionTimeMs: row.at(1).value.valueOf(),
+      stripePaymentCustomerCreatingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      stripePaymentCustomerCreatingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updateBillingAccountStateSyncingTaskMetadataStatement(
-  billingAccountStateSyncingTaskAccountIdEq: string,
-  billingAccountStateSyncingTaskVersionEq: number,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
+export function updateStripePaymentCustomerCreatingTaskMetadataStatement(
+  args: {
+    stripePaymentCustomerCreatingTaskAccountIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
 ): Statement {
   return {
-    sql: "UPDATE BillingAccountStateSyncingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingAccountStateSyncingTask.accountId = @billingAccountStateSyncingTaskAccountIdEq AND BillingAccountStateSyncingTask.version = @billingAccountStateSyncingTaskVersionEq)",
+    sql: "UPDATE StripePaymentCustomerCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (StripePaymentCustomerCreatingTask.accountId = @stripePaymentCustomerCreatingTaskAccountIdEq)",
     params: {
-      billingAccountStateSyncingTaskAccountIdEq: billingAccountStateSyncingTaskAccountIdEq,
-      billingAccountStateSyncingTaskVersionEq: Spanner.float(billingAccountStateSyncingTaskVersionEq),
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
+      stripePaymentCustomerCreatingTaskAccountIdEq: args.stripePaymentCustomerCreatingTaskAccountIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      billingAccountStateSyncingTaskAccountIdEq: { type: "string" },
-      billingAccountStateSyncingTaskVersionEq: { type: "float64" },
+      stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
@@ -1627,18 +746,20 @@ export function updateBillingAccountStateSyncingTaskMetadataStatement(
 }
 
 export function insertStripeConnectedAccountCreatingTaskStatement(
-  accountId: string,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
+  args: {
+    accountId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
 ): Statement {
   return {
     sql: "INSERT StripeConnectedAccountCreatingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
-      accountId: accountId,
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
+      accountId: args.accountId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
       accountId: { type: "string" },
@@ -1650,12 +771,14 @@ export function insertStripeConnectedAccountCreatingTaskStatement(
 }
 
 export function deleteStripeConnectedAccountCreatingTaskStatement(
-  stripeConnectedAccountCreatingTaskAccountIdEq: string,
+  args: {
+    stripeConnectedAccountCreatingTaskAccountIdEq: string,
+  }
 ): Statement {
   return {
     sql: "DELETE StripeConnectedAccountCreatingTask WHERE (StripeConnectedAccountCreatingTask.accountId = @stripeConnectedAccountCreatingTaskAccountIdEq)",
     params: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: stripeConnectedAccountCreatingTaskAccountIdEq,
+      stripeConnectedAccountCreatingTaskAccountIdEq: args.stripeConnectedAccountCreatingTaskAccountIdEq,
     },
     types: {
       stripeConnectedAccountCreatingTaskAccountIdEq: { type: "string" },
@@ -1664,10 +787,10 @@ export function deleteStripeConnectedAccountCreatingTaskStatement(
 }
 
 export interface GetStripeConnectedAccountCreatingTaskRow {
-  stripeConnectedAccountCreatingTaskAccountId: string,
-  stripeConnectedAccountCreatingTaskRetryCount: number,
-  stripeConnectedAccountCreatingTaskExecutionTimeMs: number,
-  stripeConnectedAccountCreatingTaskCreatedTimeMs: number,
+  stripeConnectedAccountCreatingTaskAccountId?: string,
+  stripeConnectedAccountCreatingTaskRetryCount?: number,
+  stripeConnectedAccountCreatingTaskExecutionTimeMs?: number,
+  stripeConnectedAccountCreatingTaskCreatedTimeMs?: number,
 }
 
 export let GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW: MessageDescriptor<GetStripeConnectedAccountCreatingTaskRow> = {
@@ -1693,12 +816,14 @@ export let GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW: MessageDescriptor<Get
 
 export async function getStripeConnectedAccountCreatingTask(
   runner: Database | Transaction,
-  stripeConnectedAccountCreatingTaskAccountIdEq: string,
+  args: {
+    stripeConnectedAccountCreatingTaskAccountIdEq: string,
+  }
 ): Promise<Array<GetStripeConnectedAccountCreatingTaskRow>> {
   let [rows] = await runner.run({
     sql: "SELECT StripeConnectedAccountCreatingTask.accountId, StripeConnectedAccountCreatingTask.retryCount, StripeConnectedAccountCreatingTask.executionTimeMs, StripeConnectedAccountCreatingTask.createdTimeMs FROM StripeConnectedAccountCreatingTask WHERE (StripeConnectedAccountCreatingTask.accountId = @stripeConnectedAccountCreatingTaskAccountIdEq)",
     params: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: stripeConnectedAccountCreatingTaskAccountIdEq,
+      stripeConnectedAccountCreatingTaskAccountIdEq: args.stripeConnectedAccountCreatingTaskAccountIdEq,
     },
     types: {
       stripeConnectedAccountCreatingTaskAccountIdEq: { type: "string" },
@@ -1707,17 +832,17 @@ export async function getStripeConnectedAccountCreatingTask(
   let resRows = new Array<GetStripeConnectedAccountCreatingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      stripeConnectedAccountCreatingTaskAccountId: row.at(0).value,
-      stripeConnectedAccountCreatingTaskRetryCount: row.at(1).value.value,
-      stripeConnectedAccountCreatingTaskExecutionTimeMs: row.at(2).value.valueOf(),
-      stripeConnectedAccountCreatingTaskCreatedTimeMs: row.at(3).value.valueOf(),
+      stripeConnectedAccountCreatingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripeConnectedAccountCreatingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      stripeConnectedAccountCreatingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      stripeConnectedAccountCreatingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
     });
   }
   return resRows;
 }
 
 export interface ListPendingStripeConnectedAccountCreatingTasksRow {
-  stripeConnectedAccountCreatingTaskAccountId: string,
+  stripeConnectedAccountCreatingTaskAccountId?: string,
 }
 
 export let LIST_PENDING_STRIPE_CONNECTED_ACCOUNT_CREATING_TASKS_ROW: MessageDescriptor<ListPendingStripeConnectedAccountCreatingTasksRow> = {
@@ -1731,12 +856,14 @@ export let LIST_PENDING_STRIPE_CONNECTED_ACCOUNT_CREATING_TASKS_ROW: MessageDesc
 
 export async function listPendingStripeConnectedAccountCreatingTasks(
   runner: Database | Transaction,
-  stripeConnectedAccountCreatingTaskExecutionTimeMsLe: number,
+  args: {
+    stripeConnectedAccountCreatingTaskExecutionTimeMsLe?: number,
+  }
 ): Promise<Array<ListPendingStripeConnectedAccountCreatingTasksRow>> {
   let [rows] = await runner.run({
     sql: "SELECT StripeConnectedAccountCreatingTask.accountId FROM StripeConnectedAccountCreatingTask WHERE StripeConnectedAccountCreatingTask.executionTimeMs <= @stripeConnectedAccountCreatingTaskExecutionTimeMsLe",
     params: {
-      stripeConnectedAccountCreatingTaskExecutionTimeMsLe: new Date(stripeConnectedAccountCreatingTaskExecutionTimeMsLe).toISOString(),
+      stripeConnectedAccountCreatingTaskExecutionTimeMsLe: args.stripeConnectedAccountCreatingTaskExecutionTimeMsLe == null ? null : new Date(args.stripeConnectedAccountCreatingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
       stripeConnectedAccountCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
@@ -1745,15 +872,15 @@ export async function listPendingStripeConnectedAccountCreatingTasks(
   let resRows = new Array<ListPendingStripeConnectedAccountCreatingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      stripeConnectedAccountCreatingTaskAccountId: row.at(0).value,
+      stripeConnectedAccountCreatingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
     });
   }
   return resRows;
 }
 
 export interface GetStripeConnectedAccountCreatingTaskMetadataRow {
-  stripeConnectedAccountCreatingTaskRetryCount: number,
-  stripeConnectedAccountCreatingTaskExecutionTimeMs: number,
+  stripeConnectedAccountCreatingTaskRetryCount?: number,
+  stripeConnectedAccountCreatingTaskExecutionTimeMs?: number,
 }
 
 export let GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetStripeConnectedAccountCreatingTaskMetadataRow> = {
@@ -1771,12 +898,14 @@ export let GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_METADATA_ROW: MessageDescr
 
 export async function getStripeConnectedAccountCreatingTaskMetadata(
   runner: Database | Transaction,
-  stripeConnectedAccountCreatingTaskAccountIdEq: string,
+  args: {
+    stripeConnectedAccountCreatingTaskAccountIdEq: string,
+  }
 ): Promise<Array<GetStripeConnectedAccountCreatingTaskMetadataRow>> {
   let [rows] = await runner.run({
     sql: "SELECT StripeConnectedAccountCreatingTask.retryCount, StripeConnectedAccountCreatingTask.executionTimeMs FROM StripeConnectedAccountCreatingTask WHERE (StripeConnectedAccountCreatingTask.accountId = @stripeConnectedAccountCreatingTaskAccountIdEq)",
     params: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: stripeConnectedAccountCreatingTaskAccountIdEq,
+      stripeConnectedAccountCreatingTaskAccountIdEq: args.stripeConnectedAccountCreatingTaskAccountIdEq,
     },
     types: {
       stripeConnectedAccountCreatingTaskAccountIdEq: { type: "string" },
@@ -1785,24 +914,26 @@ export async function getStripeConnectedAccountCreatingTaskMetadata(
   let resRows = new Array<GetStripeConnectedAccountCreatingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      stripeConnectedAccountCreatingTaskRetryCount: row.at(0).value.value,
-      stripeConnectedAccountCreatingTaskExecutionTimeMs: row.at(1).value.valueOf(),
+      stripeConnectedAccountCreatingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      stripeConnectedAccountCreatingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
 export function updateStripeConnectedAccountCreatingTaskMetadataStatement(
-  stripeConnectedAccountCreatingTaskAccountIdEq: string,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
+  args: {
+    stripeConnectedAccountCreatingTaskAccountIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
 ): Statement {
   return {
     sql: "UPDATE StripeConnectedAccountCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (StripeConnectedAccountCreatingTask.accountId = @stripeConnectedAccountCreatingTaskAccountIdEq)",
     params: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: stripeConnectedAccountCreatingTaskAccountIdEq,
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
+      stripeConnectedAccountCreatingTaskAccountIdEq: args.stripeConnectedAccountCreatingTaskAccountIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
       stripeConnectedAccountCreatingTaskAccountIdEq: { type: "string" },
@@ -1812,19 +943,21 @@ export function updateStripeConnectedAccountCreatingTaskMetadataStatement(
   };
 }
 
-export function insertSetupStripeConnectedAccountNotifyingTaskStatement(
-  accountId: string,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
+export function insertStripeConnectedAccountNeedsSetupNotifyingTaskStatement(
+  args: {
+    accountId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
 ): Statement {
   return {
-    sql: "INSERT SetupStripeConnectedAccountNotifyingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT StripeConnectedAccountNeedsSetupNotifyingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
-      accountId: accountId,
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
+      accountId: args.accountId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
       accountId: { type: "string" },
@@ -1835,163 +968,1217 @@ export function insertSetupStripeConnectedAccountNotifyingTaskStatement(
   };
 }
 
-export function deleteSetupStripeConnectedAccountNotifyingTaskStatement(
-  setupStripeConnectedAccountNotifyingTaskAccountIdEq: string,
+export function deleteStripeConnectedAccountNeedsSetupNotifyingTaskStatement(
+  args: {
+    stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: string,
+  }
 ): Statement {
   return {
-    sql: "DELETE SetupStripeConnectedAccountNotifyingTask WHERE (SetupStripeConnectedAccountNotifyingTask.accountId = @setupStripeConnectedAccountNotifyingTaskAccountIdEq)",
+    sql: "DELETE StripeConnectedAccountNeedsSetupNotifyingTask WHERE (StripeConnectedAccountNeedsSetupNotifyingTask.accountId = @stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq)",
     params: {
-      setupStripeConnectedAccountNotifyingTaskAccountIdEq: setupStripeConnectedAccountNotifyingTaskAccountIdEq,
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: args.stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq,
     },
     types: {
-      setupStripeConnectedAccountNotifyingTaskAccountIdEq: { type: "string" },
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetSetupStripeConnectedAccountNotifyingTaskRow {
-  setupStripeConnectedAccountNotifyingTaskAccountId: string,
-  setupStripeConnectedAccountNotifyingTaskRetryCount: number,
-  setupStripeConnectedAccountNotifyingTaskExecutionTimeMs: number,
-  setupStripeConnectedAccountNotifyingTaskCreatedTimeMs: number,
+export interface GetStripeConnectedAccountNeedsSetupNotifyingTaskRow {
+  stripeConnectedAccountNeedsSetupNotifyingTaskAccountId?: string,
+  stripeConnectedAccountNeedsSetupNotifyingTaskRetryCount?: number,
+  stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMs?: number,
+  stripeConnectedAccountNeedsSetupNotifyingTaskCreatedTimeMs?: number,
 }
 
-export let GET_SETUP_STRIPE_CONNECTED_ACCOUNT_NOTIFYING_TASK_ROW: MessageDescriptor<GetSetupStripeConnectedAccountNotifyingTaskRow> = {
-  name: 'GetSetupStripeConnectedAccountNotifyingTaskRow',
+export let GET_STRIPE_CONNECTED_ACCOUNT_NEEDS_SETUP_NOTIFYING_TASK_ROW: MessageDescriptor<GetStripeConnectedAccountNeedsSetupNotifyingTaskRow> = {
+  name: 'GetStripeConnectedAccountNeedsSetupNotifyingTaskRow',
   fields: [{
-    name: 'setupStripeConnectedAccountNotifyingTaskAccountId',
+    name: 'stripeConnectedAccountNeedsSetupNotifyingTaskAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'setupStripeConnectedAccountNotifyingTaskRetryCount',
+    name: 'stripeConnectedAccountNeedsSetupNotifyingTaskRetryCount',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'setupStripeConnectedAccountNotifyingTaskExecutionTimeMs',
+    name: 'stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMs',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'setupStripeConnectedAccountNotifyingTaskCreatedTimeMs',
+    name: 'stripeConnectedAccountNeedsSetupNotifyingTaskCreatedTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getSetupStripeConnectedAccountNotifyingTask(
+export async function getStripeConnectedAccountNeedsSetupNotifyingTask(
   runner: Database | Transaction,
-  setupStripeConnectedAccountNotifyingTaskAccountIdEq: string,
-): Promise<Array<GetSetupStripeConnectedAccountNotifyingTaskRow>> {
+  args: {
+    stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: string,
+  }
+): Promise<Array<GetStripeConnectedAccountNeedsSetupNotifyingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT SetupStripeConnectedAccountNotifyingTask.accountId, SetupStripeConnectedAccountNotifyingTask.retryCount, SetupStripeConnectedAccountNotifyingTask.executionTimeMs, SetupStripeConnectedAccountNotifyingTask.createdTimeMs FROM SetupStripeConnectedAccountNotifyingTask WHERE (SetupStripeConnectedAccountNotifyingTask.accountId = @setupStripeConnectedAccountNotifyingTaskAccountIdEq)",
+    sql: "SELECT StripeConnectedAccountNeedsSetupNotifyingTask.accountId, StripeConnectedAccountNeedsSetupNotifyingTask.retryCount, StripeConnectedAccountNeedsSetupNotifyingTask.executionTimeMs, StripeConnectedAccountNeedsSetupNotifyingTask.createdTimeMs FROM StripeConnectedAccountNeedsSetupNotifyingTask WHERE (StripeConnectedAccountNeedsSetupNotifyingTask.accountId = @stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq)",
     params: {
-      setupStripeConnectedAccountNotifyingTaskAccountIdEq: setupStripeConnectedAccountNotifyingTaskAccountIdEq,
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: args.stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq,
     },
     types: {
-      setupStripeConnectedAccountNotifyingTaskAccountIdEq: { type: "string" },
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetSetupStripeConnectedAccountNotifyingTaskRow>();
+  let resRows = new Array<GetStripeConnectedAccountNeedsSetupNotifyingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      setupStripeConnectedAccountNotifyingTaskAccountId: row.at(0).value,
-      setupStripeConnectedAccountNotifyingTaskRetryCount: row.at(1).value.value,
-      setupStripeConnectedAccountNotifyingTaskExecutionTimeMs: row.at(2).value.valueOf(),
-      setupStripeConnectedAccountNotifyingTaskCreatedTimeMs: row.at(3).value.valueOf(),
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripeConnectedAccountNeedsSetupNotifyingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      stripeConnectedAccountNeedsSetupNotifyingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingSetupStripeConnectedAccountNotifyingTasksRow {
-  setupStripeConnectedAccountNotifyingTaskAccountId: string,
+export interface ListPendingStripeConnectedAccountNeedsSetupNotifyingTasksRow {
+  stripeConnectedAccountNeedsSetupNotifyingTaskAccountId?: string,
 }
 
-export let LIST_PENDING_SETUP_STRIPE_CONNECTED_ACCOUNT_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingSetupStripeConnectedAccountNotifyingTasksRow> = {
-  name: 'ListPendingSetupStripeConnectedAccountNotifyingTasksRow',
+export let LIST_PENDING_STRIPE_CONNECTED_ACCOUNT_NEEDS_SETUP_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingStripeConnectedAccountNeedsSetupNotifyingTasksRow> = {
+  name: 'ListPendingStripeConnectedAccountNeedsSetupNotifyingTasksRow',
   fields: [{
-    name: 'setupStripeConnectedAccountNotifyingTaskAccountId',
+    name: 'stripeConnectedAccountNeedsSetupNotifyingTaskAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }],
 };
 
-export async function listPendingSetupStripeConnectedAccountNotifyingTasks(
+export async function listPendingStripeConnectedAccountNeedsSetupNotifyingTasks(
   runner: Database | Transaction,
-  setupStripeConnectedAccountNotifyingTaskExecutionTimeMsLe: number,
-): Promise<Array<ListPendingSetupStripeConnectedAccountNotifyingTasksRow>> {
+  args: {
+    stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingStripeConnectedAccountNeedsSetupNotifyingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT SetupStripeConnectedAccountNotifyingTask.accountId FROM SetupStripeConnectedAccountNotifyingTask WHERE SetupStripeConnectedAccountNotifyingTask.executionTimeMs <= @setupStripeConnectedAccountNotifyingTaskExecutionTimeMsLe",
+    sql: "SELECT StripeConnectedAccountNeedsSetupNotifyingTask.accountId FROM StripeConnectedAccountNeedsSetupNotifyingTask WHERE StripeConnectedAccountNeedsSetupNotifyingTask.executionTimeMs <= @stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMsLe",
     params: {
-      setupStripeConnectedAccountNotifyingTaskExecutionTimeMsLe: new Date(setupStripeConnectedAccountNotifyingTaskExecutionTimeMsLe).toISOString(),
+      stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMsLe: args.stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMsLe == null ? null : new Date(args.stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      setupStripeConnectedAccountNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
+      stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingSetupStripeConnectedAccountNotifyingTasksRow>();
+  let resRows = new Array<ListPendingStripeConnectedAccountNeedsSetupNotifyingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      setupStripeConnectedAccountNotifyingTaskAccountId: row.at(0).value,
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
     });
   }
   return resRows;
 }
 
-export interface GetSetupStripeConnectedAccountNotifyingTaskMetadataRow {
-  setupStripeConnectedAccountNotifyingTaskRetryCount: number,
-  setupStripeConnectedAccountNotifyingTaskExecutionTimeMs: number,
+export interface GetStripeConnectedAccountNeedsSetupNotifyingTaskMetadataRow {
+  stripeConnectedAccountNeedsSetupNotifyingTaskRetryCount?: number,
+  stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMs?: number,
 }
 
-export let GET_SETUP_STRIPE_CONNECTED_ACCOUNT_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetSetupStripeConnectedAccountNotifyingTaskMetadataRow> = {
-  name: 'GetSetupStripeConnectedAccountNotifyingTaskMetadataRow',
+export let GET_STRIPE_CONNECTED_ACCOUNT_NEEDS_SETUP_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetStripeConnectedAccountNeedsSetupNotifyingTaskMetadataRow> = {
+  name: 'GetStripeConnectedAccountNeedsSetupNotifyingTaskMetadataRow',
   fields: [{
-    name: 'setupStripeConnectedAccountNotifyingTaskRetryCount',
+    name: 'stripeConnectedAccountNeedsSetupNotifyingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'setupStripeConnectedAccountNotifyingTaskExecutionTimeMs',
+    name: 'stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getSetupStripeConnectedAccountNotifyingTaskMetadata(
+export async function getStripeConnectedAccountNeedsSetupNotifyingTaskMetadata(
   runner: Database | Transaction,
-  setupStripeConnectedAccountNotifyingTaskAccountIdEq: string,
-): Promise<Array<GetSetupStripeConnectedAccountNotifyingTaskMetadataRow>> {
+  args: {
+    stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: string,
+  }
+): Promise<Array<GetStripeConnectedAccountNeedsSetupNotifyingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT SetupStripeConnectedAccountNotifyingTask.retryCount, SetupStripeConnectedAccountNotifyingTask.executionTimeMs FROM SetupStripeConnectedAccountNotifyingTask WHERE (SetupStripeConnectedAccountNotifyingTask.accountId = @setupStripeConnectedAccountNotifyingTaskAccountIdEq)",
+    sql: "SELECT StripeConnectedAccountNeedsSetupNotifyingTask.retryCount, StripeConnectedAccountNeedsSetupNotifyingTask.executionTimeMs FROM StripeConnectedAccountNeedsSetupNotifyingTask WHERE (StripeConnectedAccountNeedsSetupNotifyingTask.accountId = @stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq)",
     params: {
-      setupStripeConnectedAccountNotifyingTaskAccountIdEq: setupStripeConnectedAccountNotifyingTaskAccountIdEq,
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: args.stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq,
     },
     types: {
-      setupStripeConnectedAccountNotifyingTaskAccountIdEq: { type: "string" },
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetSetupStripeConnectedAccountNotifyingTaskMetadataRow>();
+  let resRows = new Array<GetStripeConnectedAccountNeedsSetupNotifyingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      setupStripeConnectedAccountNotifyingTaskRetryCount: row.at(0).value.value,
-      setupStripeConnectedAccountNotifyingTaskExecutionTimeMs: row.at(1).value.valueOf(),
+      stripeConnectedAccountNeedsSetupNotifyingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      stripeConnectedAccountNeedsSetupNotifyingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updateSetupStripeConnectedAccountNotifyingTaskMetadataStatement(
-  setupStripeConnectedAccountNotifyingTaskAccountIdEq: string,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
+export function updateStripeConnectedAccountNeedsSetupNotifyingTaskMetadataStatement(
+  args: {
+    stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
 ): Statement {
   return {
-    sql: "UPDATE SetupStripeConnectedAccountNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (SetupStripeConnectedAccountNotifyingTask.accountId = @setupStripeConnectedAccountNotifyingTaskAccountIdEq)",
+    sql: "UPDATE StripeConnectedAccountNeedsSetupNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (StripeConnectedAccountNeedsSetupNotifyingTask.accountId = @stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq)",
     params: {
-      setupStripeConnectedAccountNotifyingTaskAccountIdEq: setupStripeConnectedAccountNotifyingTaskAccountIdEq,
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: args.stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      setupStripeConnectedAccountNotifyingTaskAccountIdEq: { type: "string" },
+      stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq: { type: "string" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function insertPaymentTaskStatement(
+  args: {
+    statementId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT PaymentTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      statementId: args.statementId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      statementId: { type: "string" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deletePaymentTaskStatement(
+  args: {
+    paymentTaskStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE PaymentTask WHERE (PaymentTask.statementId = @paymentTaskStatementIdEq)",
+    params: {
+      paymentTaskStatementIdEq: args.paymentTaskStatementIdEq,
+    },
+    types: {
+      paymentTaskStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetPaymentTaskRow {
+  paymentTaskStatementId?: string,
+  paymentTaskRetryCount?: number,
+  paymentTaskExecutionTimeMs?: number,
+  paymentTaskCreatedTimeMs?: number,
+}
+
+export let GET_PAYMENT_TASK_ROW: MessageDescriptor<GetPaymentTaskRow> = {
+  name: 'GetPaymentTaskRow',
+  fields: [{
+    name: 'paymentTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentTaskRetryCount',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentTaskExecutionTimeMs',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentTaskCreatedTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPaymentTask(
+  runner: Database | Transaction,
+  args: {
+    paymentTaskStatementIdEq: string,
+  }
+): Promise<Array<GetPaymentTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentTask.statementId, PaymentTask.retryCount, PaymentTask.executionTimeMs, PaymentTask.createdTimeMs FROM PaymentTask WHERE (PaymentTask.statementId = @paymentTaskStatementIdEq)",
+    params: {
+      paymentTaskStatementIdEq: args.paymentTaskStatementIdEq,
+    },
+    types: {
+      paymentTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPaymentTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      paymentTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      paymentTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingPaymentTasksRow {
+  paymentTaskStatementId?: string,
+}
+
+export let LIST_PENDING_PAYMENT_TASKS_ROW: MessageDescriptor<ListPendingPaymentTasksRow> = {
+  name: 'ListPendingPaymentTasksRow',
+  fields: [{
+    name: 'paymentTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }],
+};
+
+export async function listPendingPaymentTasks(
+  runner: Database | Transaction,
+  args: {
+    paymentTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingPaymentTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentTask.statementId FROM PaymentTask WHERE PaymentTask.executionTimeMs <= @paymentTaskExecutionTimeMsLe",
+    params: {
+      paymentTaskExecutionTimeMsLe: args.paymentTaskExecutionTimeMsLe == null ? null : new Date(args.paymentTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      paymentTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingPaymentTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetPaymentTaskMetadataRow {
+  paymentTaskRetryCount?: number,
+  paymentTaskExecutionTimeMs?: number,
+}
+
+export let GET_PAYMENT_TASK_METADATA_ROW: MessageDescriptor<GetPaymentTaskMetadataRow> = {
+  name: 'GetPaymentTaskMetadataRow',
+  fields: [{
+    name: 'paymentTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPaymentTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    paymentTaskStatementIdEq: string,
+  }
+): Promise<Array<GetPaymentTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentTask.retryCount, PaymentTask.executionTimeMs FROM PaymentTask WHERE (PaymentTask.statementId = @paymentTaskStatementIdEq)",
+    params: {
+      paymentTaskStatementIdEq: args.paymentTaskStatementIdEq,
+    },
+    types: {
+      paymentTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPaymentTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      paymentTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updatePaymentTaskMetadataStatement(
+  args: {
+    paymentTaskStatementIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE PaymentTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentTask.statementId = @paymentTaskStatementIdEq)",
+    params: {
+      paymentTaskStatementIdEq: args.paymentTaskStatementIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      paymentTaskStatementIdEq: { type: "string" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function insertPaymentMethodNeedsUpdateNotifyingTaskStatement(
+  args: {
+    statementId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT PaymentMethodNeedsUpdateNotifyingTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      statementId: args.statementId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      statementId: { type: "string" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deletePaymentMethodNeedsUpdateNotifyingTaskStatement(
+  args: {
+    paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE PaymentMethodNeedsUpdateNotifyingTask WHERE (PaymentMethodNeedsUpdateNotifyingTask.statementId = @paymentMethodNeedsUpdateNotifyingTaskStatementIdEq)",
+    params: {
+      paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: args.paymentMethodNeedsUpdateNotifyingTaskStatementIdEq,
+    },
+    types: {
+      paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetPaymentMethodNeedsUpdateNotifyingTaskRow {
+  paymentMethodNeedsUpdateNotifyingTaskStatementId?: string,
+  paymentMethodNeedsUpdateNotifyingTaskRetryCount?: number,
+  paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs?: number,
+  paymentMethodNeedsUpdateNotifyingTaskCreatedTimeMs?: number,
+}
+
+export let GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW: MessageDescriptor<GetPaymentMethodNeedsUpdateNotifyingTaskRow> = {
+  name: 'GetPaymentMethodNeedsUpdateNotifyingTaskRow',
+  fields: [{
+    name: 'paymentMethodNeedsUpdateNotifyingTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentMethodNeedsUpdateNotifyingTaskRetryCount',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentMethodNeedsUpdateNotifyingTaskCreatedTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPaymentMethodNeedsUpdateNotifyingTask(
+  runner: Database | Transaction,
+  args: {
+    paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: string,
+  }
+): Promise<Array<GetPaymentMethodNeedsUpdateNotifyingTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentMethodNeedsUpdateNotifyingTask.statementId, PaymentMethodNeedsUpdateNotifyingTask.retryCount, PaymentMethodNeedsUpdateNotifyingTask.executionTimeMs, PaymentMethodNeedsUpdateNotifyingTask.createdTimeMs FROM PaymentMethodNeedsUpdateNotifyingTask WHERE (PaymentMethodNeedsUpdateNotifyingTask.statementId = @paymentMethodNeedsUpdateNotifyingTaskStatementIdEq)",
+    params: {
+      paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: args.paymentMethodNeedsUpdateNotifyingTaskStatementIdEq,
+    },
+    types: {
+      paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPaymentMethodNeedsUpdateNotifyingTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentMethodNeedsUpdateNotifyingTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentMethodNeedsUpdateNotifyingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      paymentMethodNeedsUpdateNotifyingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingPaymentMethodNeedsUpdateNotifyingTasksRow {
+  paymentMethodNeedsUpdateNotifyingTaskStatementId?: string,
+}
+
+export let LIST_PENDING_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingPaymentMethodNeedsUpdateNotifyingTasksRow> = {
+  name: 'ListPendingPaymentMethodNeedsUpdateNotifyingTasksRow',
+  fields: [{
+    name: 'paymentMethodNeedsUpdateNotifyingTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }],
+};
+
+export async function listPendingPaymentMethodNeedsUpdateNotifyingTasks(
+  runner: Database | Transaction,
+  args: {
+    paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingPaymentMethodNeedsUpdateNotifyingTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentMethodNeedsUpdateNotifyingTask.statementId FROM PaymentMethodNeedsUpdateNotifyingTask WHERE PaymentMethodNeedsUpdateNotifyingTask.executionTimeMs <= @paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMsLe",
+    params: {
+      paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMsLe: args.paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMsLe == null ? null : new Date(args.paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingPaymentMethodNeedsUpdateNotifyingTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentMethodNeedsUpdateNotifyingTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetPaymentMethodNeedsUpdateNotifyingTaskMetadataRow {
+  paymentMethodNeedsUpdateNotifyingTaskRetryCount?: number,
+  paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs?: number,
+}
+
+export let GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetPaymentMethodNeedsUpdateNotifyingTaskMetadataRow> = {
+  name: 'GetPaymentMethodNeedsUpdateNotifyingTaskMetadataRow',
+  fields: [{
+    name: 'paymentMethodNeedsUpdateNotifyingTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPaymentMethodNeedsUpdateNotifyingTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: string,
+  }
+): Promise<Array<GetPaymentMethodNeedsUpdateNotifyingTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentMethodNeedsUpdateNotifyingTask.retryCount, PaymentMethodNeedsUpdateNotifyingTask.executionTimeMs FROM PaymentMethodNeedsUpdateNotifyingTask WHERE (PaymentMethodNeedsUpdateNotifyingTask.statementId = @paymentMethodNeedsUpdateNotifyingTaskStatementIdEq)",
+    params: {
+      paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: args.paymentMethodNeedsUpdateNotifyingTaskStatementIdEq,
+    },
+    types: {
+      paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPaymentMethodNeedsUpdateNotifyingTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentMethodNeedsUpdateNotifyingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updatePaymentMethodNeedsUpdateNotifyingTaskMetadataStatement(
+  args: {
+    paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE PaymentMethodNeedsUpdateNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentMethodNeedsUpdateNotifyingTask.statementId = @paymentMethodNeedsUpdateNotifyingTaskStatementIdEq)",
+    params: {
+      paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: args.paymentMethodNeedsUpdateNotifyingTaskStatementIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: { type: "string" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function insertBillingProfileSuspendingDueToPastDueTaskStatement(
+  args: {
+    statementId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT BillingProfileSuspendingDueToPastDueTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      statementId: args.statementId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      statementId: { type: "string" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deleteBillingProfileSuspendingDueToPastDueTaskStatement(
+  args: {
+    billingProfileSuspendingDueToPastDueTaskStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE BillingProfileSuspendingDueToPastDueTask WHERE (BillingProfileSuspendingDueToPastDueTask.statementId = @billingProfileSuspendingDueToPastDueTaskStatementIdEq)",
+    params: {
+      billingProfileSuspendingDueToPastDueTaskStatementIdEq: args.billingProfileSuspendingDueToPastDueTaskStatementIdEq,
+    },
+    types: {
+      billingProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetBillingProfileSuspendingDueToPastDueTaskRow {
+  billingProfileSuspendingDueToPastDueTaskStatementId?: string,
+  billingProfileSuspendingDueToPastDueTaskRetryCount?: number,
+  billingProfileSuspendingDueToPastDueTaskExecutionTimeMs?: number,
+  billingProfileSuspendingDueToPastDueTaskCreatedTimeMs?: number,
+}
+
+export let GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW: MessageDescriptor<GetBillingProfileSuspendingDueToPastDueTaskRow> = {
+  name: 'GetBillingProfileSuspendingDueToPastDueTaskRow',
+  fields: [{
+    name: 'billingProfileSuspendingDueToPastDueTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'billingProfileSuspendingDueToPastDueTaskRetryCount',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileSuspendingDueToPastDueTaskExecutionTimeMs',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileSuspendingDueToPastDueTaskCreatedTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getBillingProfileSuspendingDueToPastDueTask(
+  runner: Database | Transaction,
+  args: {
+    billingProfileSuspendingDueToPastDueTaskStatementIdEq: string,
+  }
+): Promise<Array<GetBillingProfileSuspendingDueToPastDueTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileSuspendingDueToPastDueTask.statementId, BillingProfileSuspendingDueToPastDueTask.retryCount, BillingProfileSuspendingDueToPastDueTask.executionTimeMs, BillingProfileSuspendingDueToPastDueTask.createdTimeMs FROM BillingProfileSuspendingDueToPastDueTask WHERE (BillingProfileSuspendingDueToPastDueTask.statementId = @billingProfileSuspendingDueToPastDueTaskStatementIdEq)",
+    params: {
+      billingProfileSuspendingDueToPastDueTaskStatementIdEq: args.billingProfileSuspendingDueToPastDueTaskStatementIdEq,
+    },
+    types: {
+      billingProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetBillingProfileSuspendingDueToPastDueTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileSuspendingDueToPastDueTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      billingProfileSuspendingDueToPastDueTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      billingProfileSuspendingDueToPastDueTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingBillingProfileSuspendingDueToPastDueTasksRow {
+  billingProfileSuspendingDueToPastDueTaskStatementId?: string,
+}
+
+export let LIST_PENDING_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASKS_ROW: MessageDescriptor<ListPendingBillingProfileSuspendingDueToPastDueTasksRow> = {
+  name: 'ListPendingBillingProfileSuspendingDueToPastDueTasksRow',
+  fields: [{
+    name: 'billingProfileSuspendingDueToPastDueTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }],
+};
+
+export async function listPendingBillingProfileSuspendingDueToPastDueTasks(
+  runner: Database | Transaction,
+  args: {
+    billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingBillingProfileSuspendingDueToPastDueTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileSuspendingDueToPastDueTask.statementId FROM BillingProfileSuspendingDueToPastDueTask WHERE BillingProfileSuspendingDueToPastDueTask.executionTimeMs <= @billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe",
+    params: {
+      billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: args.billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe == null ? null : new Date(args.billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingBillingProfileSuspendingDueToPastDueTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileSuspendingDueToPastDueTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetBillingProfileSuspendingDueToPastDueTaskMetadataRow {
+  billingProfileSuspendingDueToPastDueTaskRetryCount?: number,
+  billingProfileSuspendingDueToPastDueTaskExecutionTimeMs?: number,
+}
+
+export let GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_METADATA_ROW: MessageDescriptor<GetBillingProfileSuspendingDueToPastDueTaskMetadataRow> = {
+  name: 'GetBillingProfileSuspendingDueToPastDueTaskMetadataRow',
+  fields: [{
+    name: 'billingProfileSuspendingDueToPastDueTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileSuspendingDueToPastDueTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getBillingProfileSuspendingDueToPastDueTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    billingProfileSuspendingDueToPastDueTaskStatementIdEq: string,
+  }
+): Promise<Array<GetBillingProfileSuspendingDueToPastDueTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileSuspendingDueToPastDueTask.retryCount, BillingProfileSuspendingDueToPastDueTask.executionTimeMs FROM BillingProfileSuspendingDueToPastDueTask WHERE (BillingProfileSuspendingDueToPastDueTask.statementId = @billingProfileSuspendingDueToPastDueTaskStatementIdEq)",
+    params: {
+      billingProfileSuspendingDueToPastDueTaskStatementIdEq: args.billingProfileSuspendingDueToPastDueTaskStatementIdEq,
+    },
+    types: {
+      billingProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetBillingProfileSuspendingDueToPastDueTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileSuspendingDueToPastDueTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updateBillingProfileSuspendingDueToPastDueTaskMetadataStatement(
+  args: {
+    billingProfileSuspendingDueToPastDueTaskStatementIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE BillingProfileSuspendingDueToPastDueTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingProfileSuspendingDueToPastDueTask.statementId = @billingProfileSuspendingDueToPastDueTaskStatementIdEq)",
+    params: {
+      billingProfileSuspendingDueToPastDueTaskStatementIdEq: args.billingProfileSuspendingDueToPastDueTaskStatementIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      billingProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function insertBillingProfileSuspensionNotifyingTaskStatement(
+  args: {
+    accountId: string,
+    version: number,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT BillingProfileSuspensionNotifyingTask (accountId, version, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @version, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      accountId: args.accountId,
+      version: Spanner.float(args.version),
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      accountId: { type: "string" },
+      version: { type: "float64" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deleteBillingProfileSuspensionNotifyingTaskStatement(
+  args: {
+    billingProfileSuspensionNotifyingTaskAccountIdEq: string,
+    billingProfileSuspensionNotifyingTaskVersionEq: number,
+  }
+): Statement {
+  return {
+    sql: "DELETE BillingProfileSuspensionNotifyingTask WHERE (BillingProfileSuspensionNotifyingTask.accountId = @billingProfileSuspensionNotifyingTaskAccountIdEq AND BillingProfileSuspensionNotifyingTask.version = @billingProfileSuspensionNotifyingTaskVersionEq)",
+    params: {
+      billingProfileSuspensionNotifyingTaskAccountIdEq: args.billingProfileSuspensionNotifyingTaskAccountIdEq,
+      billingProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.billingProfileSuspensionNotifyingTaskVersionEq),
+    },
+    types: {
+      billingProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
+      billingProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
+    }
+  };
+}
+
+export interface GetBillingProfileSuspensionNotifyingTaskRow {
+  billingProfileSuspensionNotifyingTaskAccountId?: string,
+  billingProfileSuspensionNotifyingTaskVersion?: number,
+  billingProfileSuspensionNotifyingTaskRetryCount?: number,
+  billingProfileSuspensionNotifyingTaskExecutionTimeMs?: number,
+  billingProfileSuspensionNotifyingTaskCreatedTimeMs?: number,
+}
+
+export let GET_BILLING_PROFILE_SUSPENSION_NOTIFYING_TASK_ROW: MessageDescriptor<GetBillingProfileSuspensionNotifyingTaskRow> = {
+  name: 'GetBillingProfileSuspensionNotifyingTaskRow',
+  fields: [{
+    name: 'billingProfileSuspensionNotifyingTaskAccountId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'billingProfileSuspensionNotifyingTaskVersion',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileSuspensionNotifyingTaskRetryCount',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileSuspensionNotifyingTaskExecutionTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileSuspensionNotifyingTaskCreatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getBillingProfileSuspensionNotifyingTask(
+  runner: Database | Transaction,
+  args: {
+    billingProfileSuspensionNotifyingTaskAccountIdEq: string,
+    billingProfileSuspensionNotifyingTaskVersionEq: number,
+  }
+): Promise<Array<GetBillingProfileSuspensionNotifyingTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileSuspensionNotifyingTask.accountId, BillingProfileSuspensionNotifyingTask.version, BillingProfileSuspensionNotifyingTask.retryCount, BillingProfileSuspensionNotifyingTask.executionTimeMs, BillingProfileSuspensionNotifyingTask.createdTimeMs FROM BillingProfileSuspensionNotifyingTask WHERE (BillingProfileSuspensionNotifyingTask.accountId = @billingProfileSuspensionNotifyingTaskAccountIdEq AND BillingProfileSuspensionNotifyingTask.version = @billingProfileSuspensionNotifyingTaskVersionEq)",
+    params: {
+      billingProfileSuspensionNotifyingTaskAccountIdEq: args.billingProfileSuspensionNotifyingTaskAccountIdEq,
+      billingProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.billingProfileSuspensionNotifyingTaskVersionEq),
+    },
+    types: {
+      billingProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
+      billingProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
+    }
+  });
+  let resRows = new Array<GetBillingProfileSuspensionNotifyingTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileSuspensionNotifyingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      billingProfileSuspensionNotifyingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
+      billingProfileSuspensionNotifyingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      billingProfileSuspensionNotifyingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      billingProfileSuspensionNotifyingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingBillingProfileSuspensionNotifyingTasksRow {
+  billingProfileSuspensionNotifyingTaskAccountId?: string,
+  billingProfileSuspensionNotifyingTaskVersion?: number,
+}
+
+export let LIST_PENDING_BILLING_PROFILE_SUSPENSION_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingBillingProfileSuspensionNotifyingTasksRow> = {
+  name: 'ListPendingBillingProfileSuspensionNotifyingTasksRow',
+  fields: [{
+    name: 'billingProfileSuspensionNotifyingTaskAccountId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'billingProfileSuspensionNotifyingTaskVersion',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function listPendingBillingProfileSuspensionNotifyingTasks(
+  runner: Database | Transaction,
+  args: {
+    billingProfileSuspensionNotifyingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingBillingProfileSuspensionNotifyingTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileSuspensionNotifyingTask.accountId, BillingProfileSuspensionNotifyingTask.version FROM BillingProfileSuspensionNotifyingTask WHERE BillingProfileSuspensionNotifyingTask.executionTimeMs <= @billingProfileSuspensionNotifyingTaskExecutionTimeMsLe",
+    params: {
+      billingProfileSuspensionNotifyingTaskExecutionTimeMsLe: args.billingProfileSuspensionNotifyingTaskExecutionTimeMsLe == null ? null : new Date(args.billingProfileSuspensionNotifyingTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      billingProfileSuspensionNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingBillingProfileSuspensionNotifyingTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileSuspensionNotifyingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      billingProfileSuspensionNotifyingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetBillingProfileSuspensionNotifyingTaskMetadataRow {
+  billingProfileSuspensionNotifyingTaskRetryCount?: number,
+  billingProfileSuspensionNotifyingTaskExecutionTimeMs?: number,
+}
+
+export let GET_BILLING_PROFILE_SUSPENSION_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetBillingProfileSuspensionNotifyingTaskMetadataRow> = {
+  name: 'GetBillingProfileSuspensionNotifyingTaskMetadataRow',
+  fields: [{
+    name: 'billingProfileSuspensionNotifyingTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileSuspensionNotifyingTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getBillingProfileSuspensionNotifyingTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    billingProfileSuspensionNotifyingTaskAccountIdEq: string,
+    billingProfileSuspensionNotifyingTaskVersionEq: number,
+  }
+): Promise<Array<GetBillingProfileSuspensionNotifyingTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileSuspensionNotifyingTask.retryCount, BillingProfileSuspensionNotifyingTask.executionTimeMs FROM BillingProfileSuspensionNotifyingTask WHERE (BillingProfileSuspensionNotifyingTask.accountId = @billingProfileSuspensionNotifyingTaskAccountIdEq AND BillingProfileSuspensionNotifyingTask.version = @billingProfileSuspensionNotifyingTaskVersionEq)",
+    params: {
+      billingProfileSuspensionNotifyingTaskAccountIdEq: args.billingProfileSuspensionNotifyingTaskAccountIdEq,
+      billingProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.billingProfileSuspensionNotifyingTaskVersionEq),
+    },
+    types: {
+      billingProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
+      billingProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
+    }
+  });
+  let resRows = new Array<GetBillingProfileSuspensionNotifyingTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileSuspensionNotifyingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      billingProfileSuspensionNotifyingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updateBillingProfileSuspensionNotifyingTaskMetadataStatement(
+  args: {
+    billingProfileSuspensionNotifyingTaskAccountIdEq: string,
+    billingProfileSuspensionNotifyingTaskVersionEq: number,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE BillingProfileSuspensionNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingProfileSuspensionNotifyingTask.accountId = @billingProfileSuspensionNotifyingTaskAccountIdEq AND BillingProfileSuspensionNotifyingTask.version = @billingProfileSuspensionNotifyingTaskVersionEq)",
+    params: {
+      billingProfileSuspensionNotifyingTaskAccountIdEq: args.billingProfileSuspensionNotifyingTaskAccountIdEq,
+      billingProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.billingProfileSuspensionNotifyingTaskVersionEq),
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      billingProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
+      billingProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function insertBillingProfileStateSyncingTaskStatement(
+  args: {
+    accountId: string,
+    version: number,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT BillingProfileStateSyncingTask (accountId, version, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @version, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      accountId: args.accountId,
+      version: Spanner.float(args.version),
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      accountId: { type: "string" },
+      version: { type: "float64" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deleteBillingProfileStateSyncingTaskStatement(
+  args: {
+    billingProfileStateSyncingTaskAccountIdEq: string,
+    billingProfileStateSyncingTaskVersionEq: number,
+  }
+): Statement {
+  return {
+    sql: "DELETE BillingProfileStateSyncingTask WHERE (BillingProfileStateSyncingTask.accountId = @billingProfileStateSyncingTaskAccountIdEq AND BillingProfileStateSyncingTask.version = @billingProfileStateSyncingTaskVersionEq)",
+    params: {
+      billingProfileStateSyncingTaskAccountIdEq: args.billingProfileStateSyncingTaskAccountIdEq,
+      billingProfileStateSyncingTaskVersionEq: Spanner.float(args.billingProfileStateSyncingTaskVersionEq),
+    },
+    types: {
+      billingProfileStateSyncingTaskAccountIdEq: { type: "string" },
+      billingProfileStateSyncingTaskVersionEq: { type: "float64" },
+    }
+  };
+}
+
+export interface GetBillingProfileStateSyncingTaskRow {
+  billingProfileStateSyncingTaskAccountId?: string,
+  billingProfileStateSyncingTaskVersion?: number,
+  billingProfileStateSyncingTaskRetryCount?: number,
+  billingProfileStateSyncingTaskExecutionTimeMs?: number,
+  billingProfileStateSyncingTaskCreatedTimeMs?: number,
+}
+
+export let GET_BILLING_PROFILE_STATE_SYNCING_TASK_ROW: MessageDescriptor<GetBillingProfileStateSyncingTaskRow> = {
+  name: 'GetBillingProfileStateSyncingTaskRow',
+  fields: [{
+    name: 'billingProfileStateSyncingTaskAccountId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'billingProfileStateSyncingTaskVersion',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileStateSyncingTaskRetryCount',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileStateSyncingTaskExecutionTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileStateSyncingTaskCreatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getBillingProfileStateSyncingTask(
+  runner: Database | Transaction,
+  args: {
+    billingProfileStateSyncingTaskAccountIdEq: string,
+    billingProfileStateSyncingTaskVersionEq: number,
+  }
+): Promise<Array<GetBillingProfileStateSyncingTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileStateSyncingTask.accountId, BillingProfileStateSyncingTask.version, BillingProfileStateSyncingTask.retryCount, BillingProfileStateSyncingTask.executionTimeMs, BillingProfileStateSyncingTask.createdTimeMs FROM BillingProfileStateSyncingTask WHERE (BillingProfileStateSyncingTask.accountId = @billingProfileStateSyncingTaskAccountIdEq AND BillingProfileStateSyncingTask.version = @billingProfileStateSyncingTaskVersionEq)",
+    params: {
+      billingProfileStateSyncingTaskAccountIdEq: args.billingProfileStateSyncingTaskAccountIdEq,
+      billingProfileStateSyncingTaskVersionEq: Spanner.float(args.billingProfileStateSyncingTaskVersionEq),
+    },
+    types: {
+      billingProfileStateSyncingTaskAccountIdEq: { type: "string" },
+      billingProfileStateSyncingTaskVersionEq: { type: "float64" },
+    }
+  });
+  let resRows = new Array<GetBillingProfileStateSyncingTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileStateSyncingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      billingProfileStateSyncingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
+      billingProfileStateSyncingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      billingProfileStateSyncingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      billingProfileStateSyncingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingBillingProfileStateSyncingTasksRow {
+  billingProfileStateSyncingTaskAccountId?: string,
+  billingProfileStateSyncingTaskVersion?: number,
+}
+
+export let LIST_PENDING_BILLING_PROFILE_STATE_SYNCING_TASKS_ROW: MessageDescriptor<ListPendingBillingProfileStateSyncingTasksRow> = {
+  name: 'ListPendingBillingProfileStateSyncingTasksRow',
+  fields: [{
+    name: 'billingProfileStateSyncingTaskAccountId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'billingProfileStateSyncingTaskVersion',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function listPendingBillingProfileStateSyncingTasks(
+  runner: Database | Transaction,
+  args: {
+    billingProfileStateSyncingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingBillingProfileStateSyncingTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileStateSyncingTask.accountId, BillingProfileStateSyncingTask.version FROM BillingProfileStateSyncingTask WHERE BillingProfileStateSyncingTask.executionTimeMs <= @billingProfileStateSyncingTaskExecutionTimeMsLe",
+    params: {
+      billingProfileStateSyncingTaskExecutionTimeMsLe: args.billingProfileStateSyncingTaskExecutionTimeMsLe == null ? null : new Date(args.billingProfileStateSyncingTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      billingProfileStateSyncingTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingBillingProfileStateSyncingTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileStateSyncingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      billingProfileStateSyncingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetBillingProfileStateSyncingTaskMetadataRow {
+  billingProfileStateSyncingTaskRetryCount?: number,
+  billingProfileStateSyncingTaskExecutionTimeMs?: number,
+}
+
+export let GET_BILLING_PROFILE_STATE_SYNCING_TASK_METADATA_ROW: MessageDescriptor<GetBillingProfileStateSyncingTaskMetadataRow> = {
+  name: 'GetBillingProfileStateSyncingTaskMetadataRow',
+  fields: [{
+    name: 'billingProfileStateSyncingTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileStateSyncingTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getBillingProfileStateSyncingTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    billingProfileStateSyncingTaskAccountIdEq: string,
+    billingProfileStateSyncingTaskVersionEq: number,
+  }
+): Promise<Array<GetBillingProfileStateSyncingTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT BillingProfileStateSyncingTask.retryCount, BillingProfileStateSyncingTask.executionTimeMs FROM BillingProfileStateSyncingTask WHERE (BillingProfileStateSyncingTask.accountId = @billingProfileStateSyncingTaskAccountIdEq AND BillingProfileStateSyncingTask.version = @billingProfileStateSyncingTaskVersionEq)",
+    params: {
+      billingProfileStateSyncingTaskAccountIdEq: args.billingProfileStateSyncingTaskAccountIdEq,
+      billingProfileStateSyncingTaskVersionEq: Spanner.float(args.billingProfileStateSyncingTaskVersionEq),
+    },
+    types: {
+      billingProfileStateSyncingTaskAccountIdEq: { type: "string" },
+      billingProfileStateSyncingTaskVersionEq: { type: "float64" },
+    }
+  });
+  let resRows = new Array<GetBillingProfileStateSyncingTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      billingProfileStateSyncingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      billingProfileStateSyncingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updateBillingProfileStateSyncingTaskMetadataStatement(
+  args: {
+    billingProfileStateSyncingTaskAccountIdEq: string,
+    billingProfileStateSyncingTaskVersionEq: number,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE BillingProfileStateSyncingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingProfileStateSyncingTask.accountId = @billingProfileStateSyncingTaskAccountIdEq AND BillingProfileStateSyncingTask.version = @billingProfileStateSyncingTaskVersionEq)",
+    params: {
+      billingProfileStateSyncingTaskAccountIdEq: args.billingProfileStateSyncingTaskAccountIdEq,
+      billingProfileStateSyncingTaskVersionEq: Spanner.float(args.billingProfileStateSyncingTaskVersionEq),
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      billingProfileStateSyncingTaskAccountIdEq: { type: "string" },
+      billingProfileStateSyncingTaskVersionEq: { type: "float64" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
@@ -1999,21 +2186,23 @@ export function updateSetupStripeConnectedAccountNotifyingTaskMetadataStatement(
 }
 
 export function insertPayoutTaskStatement(
-  earningsId: string,
-  retryCount: number,
-  executionTimeMs: number,
-  createdTimeMs: number,
+  args: {
+    statementId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
 ): Statement {
   return {
-    sql: "INSERT PayoutTask (earningsId, retryCount, executionTimeMs, createdTimeMs) VALUES (@earningsId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT PayoutTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
-      earningsId: earningsId,
-      retryCount: Spanner.float(retryCount),
-      executionTimeMs: new Date(executionTimeMs).toISOString(),
-      createdTimeMs: new Date(createdTimeMs).toISOString(),
+      statementId: args.statementId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
-      earningsId: { type: "string" },
+      statementId: { type: "string" },
       retryCount: { type: "float64" },
       executionTimeMs: { type: "timestamp" },
       createdTimeMs: { type: "timestamp" },
@@ -2022,30 +2211,32 @@ export function insertPayoutTaskStatement(
 }
 
 export function deletePayoutTaskStatement(
-  payoutTaskEarningsIdEq: string,
+  args: {
+    payoutTaskStatementIdEq: string,
+  }
 ): Statement {
   return {
-    sql: "DELETE PayoutTask WHERE (PayoutTask.earningsId = @payoutTaskEarningsIdEq)",
+    sql: "DELETE PayoutTask WHERE (PayoutTask.statementId = @payoutTaskStatementIdEq)",
     params: {
-      payoutTaskEarningsIdEq: payoutTaskEarningsIdEq,
+      payoutTaskStatementIdEq: args.payoutTaskStatementIdEq,
     },
     types: {
-      payoutTaskEarningsIdEq: { type: "string" },
+      payoutTaskStatementIdEq: { type: "string" },
     }
   };
 }
 
 export interface GetPayoutTaskRow {
-  payoutTaskEarningsId: string,
-  payoutTaskRetryCount: number,
-  payoutTaskExecutionTimeMs: number,
-  payoutTaskCreatedTimeMs: number,
+  payoutTaskStatementId?: string,
+  payoutTaskRetryCount?: number,
+  payoutTaskExecutionTimeMs?: number,
+  payoutTaskCreatedTimeMs?: number,
 }
 
 export let GET_PAYOUT_TASK_ROW: MessageDescriptor<GetPayoutTaskRow> = {
   name: 'GetPayoutTaskRow',
   fields: [{
-    name: 'payoutTaskEarningsId',
+    name: 'payoutTaskStatementId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
@@ -2065,37 +2256,39 @@ export let GET_PAYOUT_TASK_ROW: MessageDescriptor<GetPayoutTaskRow> = {
 
 export async function getPayoutTask(
   runner: Database | Transaction,
-  payoutTaskEarningsIdEq: string,
+  args: {
+    payoutTaskStatementIdEq: string,
+  }
 ): Promise<Array<GetPayoutTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PayoutTask.earningsId, PayoutTask.retryCount, PayoutTask.executionTimeMs, PayoutTask.createdTimeMs FROM PayoutTask WHERE (PayoutTask.earningsId = @payoutTaskEarningsIdEq)",
+    sql: "SELECT PayoutTask.statementId, PayoutTask.retryCount, PayoutTask.executionTimeMs, PayoutTask.createdTimeMs FROM PayoutTask WHERE (PayoutTask.statementId = @payoutTaskStatementIdEq)",
     params: {
-      payoutTaskEarningsIdEq: payoutTaskEarningsIdEq,
+      payoutTaskStatementIdEq: args.payoutTaskStatementIdEq,
     },
     types: {
-      payoutTaskEarningsIdEq: { type: "string" },
+      payoutTaskStatementIdEq: { type: "string" },
     }
   });
   let resRows = new Array<GetPayoutTaskRow>();
   for (let row of rows) {
     resRows.push({
-      payoutTaskEarningsId: row.at(0).value,
-      payoutTaskRetryCount: row.at(1).value.value,
-      payoutTaskExecutionTimeMs: row.at(2).value.valueOf(),
-      payoutTaskCreatedTimeMs: row.at(3).value.valueOf(),
+      payoutTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      payoutTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      payoutTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
     });
   }
   return resRows;
 }
 
 export interface ListPendingPayoutTasksRow {
-  payoutTaskEarningsId: string,
+  payoutTaskStatementId?: string,
 }
 
 export let LIST_PENDING_PAYOUT_TASKS_ROW: MessageDescriptor<ListPendingPayoutTasksRow> = {
   name: 'ListPendingPayoutTasksRow',
   fields: [{
-    name: 'payoutTaskEarningsId',
+    name: 'payoutTaskStatementId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }],
@@ -2103,12 +2296,14 @@ export let LIST_PENDING_PAYOUT_TASKS_ROW: MessageDescriptor<ListPendingPayoutTas
 
 export async function listPendingPayoutTasks(
   runner: Database | Transaction,
-  payoutTaskExecutionTimeMsLe: number,
+  args: {
+    payoutTaskExecutionTimeMsLe?: number,
+  }
 ): Promise<Array<ListPendingPayoutTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PayoutTask.earningsId FROM PayoutTask WHERE PayoutTask.executionTimeMs <= @payoutTaskExecutionTimeMsLe",
+    sql: "SELECT PayoutTask.statementId FROM PayoutTask WHERE PayoutTask.executionTimeMs <= @payoutTaskExecutionTimeMsLe",
     params: {
-      payoutTaskExecutionTimeMsLe: new Date(payoutTaskExecutionTimeMsLe).toISOString(),
+      payoutTaskExecutionTimeMsLe: args.payoutTaskExecutionTimeMsLe == null ? null : new Date(args.payoutTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
       payoutTaskExecutionTimeMsLe: { type: "timestamp" },
@@ -2117,15 +2312,15 @@ export async function listPendingPayoutTasks(
   let resRows = new Array<ListPendingPayoutTasksRow>();
   for (let row of rows) {
     resRows.push({
-      payoutTaskEarningsId: row.at(0).value,
+      payoutTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
     });
   }
   return resRows;
 }
 
 export interface GetPayoutTaskMetadataRow {
-  payoutTaskRetryCount: number,
-  payoutTaskExecutionTimeMs: number,
+  payoutTaskRetryCount?: number,
+  payoutTaskExecutionTimeMs?: number,
 }
 
 export let GET_PAYOUT_TASK_METADATA_ROW: MessageDescriptor<GetPayoutTaskMetadataRow> = {
@@ -2143,346 +2338,693 @@ export let GET_PAYOUT_TASK_METADATA_ROW: MessageDescriptor<GetPayoutTaskMetadata
 
 export async function getPayoutTaskMetadata(
   runner: Database | Transaction,
-  payoutTaskEarningsIdEq: string,
+  args: {
+    payoutTaskStatementIdEq: string,
+  }
 ): Promise<Array<GetPayoutTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PayoutTask.retryCount, PayoutTask.executionTimeMs FROM PayoutTask WHERE (PayoutTask.earningsId = @payoutTaskEarningsIdEq)",
+    sql: "SELECT PayoutTask.retryCount, PayoutTask.executionTimeMs FROM PayoutTask WHERE (PayoutTask.statementId = @payoutTaskStatementIdEq)",
     params: {
-      payoutTaskEarningsIdEq: payoutTaskEarningsIdEq,
+      payoutTaskStatementIdEq: args.payoutTaskStatementIdEq,
     },
     types: {
-      payoutTaskEarningsIdEq: { type: "string" },
+      payoutTaskStatementIdEq: { type: "string" },
     }
   });
   let resRows = new Array<GetPayoutTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      payoutTaskRetryCount: row.at(0).value.value,
-      payoutTaskExecutionTimeMs: row.at(1).value.valueOf(),
+      payoutTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      payoutTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
 export function updatePayoutTaskMetadataStatement(
-  payoutTaskEarningsIdEq: string,
-  setRetryCount: number,
-  setExecutionTimeMs: number,
+  args: {
+    payoutTaskStatementIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
 ): Statement {
   return {
-    sql: "UPDATE PayoutTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PayoutTask.earningsId = @payoutTaskEarningsIdEq)",
+    sql: "UPDATE PayoutTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PayoutTask.statementId = @payoutTaskStatementIdEq)",
     params: {
-      payoutTaskEarningsIdEq: payoutTaskEarningsIdEq,
-      setRetryCount: Spanner.float(setRetryCount),
-      setExecutionTimeMs: new Date(setExecutionTimeMs).toISOString(),
+      payoutTaskStatementIdEq: args.payoutTaskStatementIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      payoutTaskEarningsIdEq: { type: "string" },
+      payoutTaskStatementIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
   };
 }
 
-export interface GetBillingAccountFromBillingRow {
-  aData: BillingAccount,
+export function updateBillingProfileStateStatement(
+  args: {
+    billingProfileAccountIdEq: string,
+    setStateInfo?: BillingProfileStateInfo,
+  }
+): Statement {
+  return {
+    sql: "UPDATE BillingProfile SET stateInfo = @setStateInfo WHERE (BillingProfile.accountId = @billingProfileAccountIdEq)",
+    params: {
+      billingProfileAccountIdEq: args.billingProfileAccountIdEq,
+      setStateInfo: args.setStateInfo == null ? null : Buffer.from(serializeMessage(args.setStateInfo, BILLING_PROFILE_STATE_INFO).buffer),
+    },
+    types: {
+      billingProfileAccountIdEq: { type: "string" },
+      setStateInfo: { type: "bytes" },
+    }
+  };
 }
 
-export let GET_BILLING_ACCOUNT_FROM_BILLING_ROW: MessageDescriptor<GetBillingAccountFromBillingRow> = {
-  name: 'GetBillingAccountFromBillingRow',
+export function updateBillingProfilePaymentCustomerStatement(
+  args: {
+    billingProfileAccountIdEq: string,
+    setStripePaymentCustomerId?: string,
+  }
+): Statement {
+  return {
+    sql: "UPDATE BillingProfile SET stripePaymentCustomerId = @setStripePaymentCustomerId WHERE (BillingProfile.accountId = @billingProfileAccountIdEq)",
+    params: {
+      billingProfileAccountIdEq: args.billingProfileAccountIdEq,
+      setStripePaymentCustomerId: args.setStripePaymentCustomerId == null ? null : args.setStripePaymentCustomerId,
+    },
+    types: {
+      billingProfileAccountIdEq: { type: "string" },
+      setStripePaymentCustomerId: { type: "string" },
+    }
+  };
+}
+
+export function updateEarningsProfileConnectedAccountStatement(
+  args: {
+    earningsProfileAccountIdEq: string,
+    setStripeConnectedAccountId?: string,
+    setStripeConnectedAccountState?: StripeConnectedAccountState,
+  }
+): Statement {
+  return {
+    sql: "UPDATE EarningsProfile SET stripeConnectedAccountId = @setStripeConnectedAccountId, stripeConnectedAccountState = @setStripeConnectedAccountState WHERE (EarningsProfile.accountId = @earningsProfileAccountIdEq)",
+    params: {
+      earningsProfileAccountIdEq: args.earningsProfileAccountIdEq,
+      setStripeConnectedAccountId: args.setStripeConnectedAccountId == null ? null : args.setStripeConnectedAccountId,
+      setStripeConnectedAccountState: args.setStripeConnectedAccountState == null ? null : Spanner.float(args.setStripeConnectedAccountState),
+    },
+    types: {
+      earningsProfileAccountIdEq: { type: "string" },
+      setStripeConnectedAccountId: { type: "string" },
+      setStripeConnectedAccountState: { type: "float64" },
+    }
+  };
+}
+
+export function updateEarningsProfileConnectedAccountStateStatement(
+  args: {
+    earningsProfileAccountIdEq: string,
+    setStripeConnectedAccountState?: StripeConnectedAccountState,
+  }
+): Statement {
+  return {
+    sql: "UPDATE EarningsProfile SET stripeConnectedAccountState = @setStripeConnectedAccountState WHERE (EarningsProfile.accountId = @earningsProfileAccountIdEq)",
+    params: {
+      earningsProfileAccountIdEq: args.earningsProfileAccountIdEq,
+      setStripeConnectedAccountState: args.setStripeConnectedAccountState == null ? null : Spanner.float(args.setStripeConnectedAccountState),
+    },
+    types: {
+      earningsProfileAccountIdEq: { type: "string" },
+      setStripeConnectedAccountState: { type: "float64" },
+    }
+  };
+}
+
+export function updatePaymentStateStatement(
+  args: {
+    paymentStatementIdEq: string,
+    setState?: PaymentState,
+    setUpdatedTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE Payment SET state = @setState, updatedTimeMs = @setUpdatedTimeMs WHERE (Payment.statementId = @paymentStatementIdEq)",
+    params: {
+      paymentStatementIdEq: args.paymentStatementIdEq,
+      setState: args.setState == null ? null : Spanner.float(args.setState),
+      setUpdatedTimeMs: args.setUpdatedTimeMs == null ? null : Spanner.float(args.setUpdatedTimeMs),
+    },
+    types: {
+      paymentStatementIdEq: { type: "string" },
+      setState: { type: "float64" },
+      setUpdatedTimeMs: { type: "float64" },
+    }
+  };
+}
+
+export function updatePaymentStateAndStripeInvoiceStatement(
+  args: {
+    paymentStatementIdEq: string,
+    setState?: PaymentState,
+    setStripeInvoiceId?: string,
+    setStripeInvoiceUrl?: string,
+    setUpdatedTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE Payment SET state = @setState, stripeInvoiceId = @setStripeInvoiceId, stripeInvoiceUrl = @setStripeInvoiceUrl, updatedTimeMs = @setUpdatedTimeMs WHERE (Payment.statementId = @paymentStatementIdEq)",
+    params: {
+      paymentStatementIdEq: args.paymentStatementIdEq,
+      setState: args.setState == null ? null : Spanner.float(args.setState),
+      setStripeInvoiceId: args.setStripeInvoiceId == null ? null : args.setStripeInvoiceId,
+      setStripeInvoiceUrl: args.setStripeInvoiceUrl == null ? null : args.setStripeInvoiceUrl,
+      setUpdatedTimeMs: args.setUpdatedTimeMs == null ? null : Spanner.float(args.setUpdatedTimeMs),
+    },
+    types: {
+      paymentStatementIdEq: { type: "string" },
+      setState: { type: "float64" },
+      setStripeInvoiceId: { type: "string" },
+      setStripeInvoiceUrl: { type: "string" },
+      setUpdatedTimeMs: { type: "float64" },
+    }
+  };
+}
+
+export function updatePayoutStateStatement(
+  args: {
+    payoutStatementIdEq: string,
+    setState?: PayoutState,
+    setUpdatedTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE Payout SET state = @setState, updatedTimeMs = @setUpdatedTimeMs WHERE (Payout.statementId = @payoutStatementIdEq)",
+    params: {
+      payoutStatementIdEq: args.payoutStatementIdEq,
+      setState: args.setState == null ? null : Spanner.float(args.setState),
+      setUpdatedTimeMs: args.setUpdatedTimeMs == null ? null : Spanner.float(args.setUpdatedTimeMs),
+    },
+    types: {
+      payoutStatementIdEq: { type: "string" },
+      setState: { type: "float64" },
+      setUpdatedTimeMs: { type: "float64" },
+    }
+  };
+}
+
+export function updatePayoutStateAndStripeTransferStatement(
+  args: {
+    payoutStatementIdEq: string,
+    setState?: PayoutState,
+    setStripeTransferId?: string,
+    setUpdatedTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE Payout SET state = @setState, stripeTransferId = @setStripeTransferId, updatedTimeMs = @setUpdatedTimeMs WHERE (Payout.statementId = @payoutStatementIdEq)",
+    params: {
+      payoutStatementIdEq: args.payoutStatementIdEq,
+      setState: args.setState == null ? null : Spanner.float(args.setState),
+      setStripeTransferId: args.setStripeTransferId == null ? null : args.setStripeTransferId,
+      setUpdatedTimeMs: args.setUpdatedTimeMs == null ? null : Spanner.float(args.setUpdatedTimeMs),
+    },
+    types: {
+      payoutStatementIdEq: { type: "string" },
+      setState: { type: "float64" },
+      setStripeTransferId: { type: "string" },
+      setUpdatedTimeMs: { type: "float64" },
+    }
+  };
+}
+
+export interface GetBillingProfileFromStatementRow {
+  billingProfileAccountId?: string,
+  billingProfileStripePaymentCustomerId?: string,
+  billingProfileStateInfo?: BillingProfileStateInfo,
+  billingProfilePaymentAfterMs?: number,
+  billingProfileCreatedTimeMs?: number,
+}
+
+export let GET_BILLING_PROFILE_FROM_STATEMENT_ROW: MessageDescriptor<GetBillingProfileFromStatementRow> = {
+  name: 'GetBillingProfileFromStatementRow',
   fields: [{
-    name: 'aData',
+    name: 'billingProfileAccountId',
     index: 1,
-    messageType: BILLING_ACCOUNT,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'billingProfileStripePaymentCustomerId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'billingProfileStateInfo',
+    index: 3,
+    messageType: BILLING_PROFILE_STATE_INFO,
+  }, {
+    name: 'billingProfilePaymentAfterMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'billingProfileCreatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingAccountFromBilling(
+export async function getBillingProfileFromStatement(
   runner: Database | Transaction,
-  bBillingIdEq: string,
-): Promise<Array<GetBillingAccountFromBillingRow>> {
+  args: {
+    transactionStatementStatementIdEq: string,
+  }
+): Promise<Array<GetBillingProfileFromStatementRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT a.data FROM Billing AS b INNER JOIN BillingAccount AS a ON b.accountId = a.accountId WHERE b.billingId = @bBillingIdEq",
+    sql: "SELECT b.accountId, b.stripePaymentCustomerId, b.stateInfo, b.paymentAfterMs, b.createdTimeMs FROM TransactionStatement AS t INNER JOIN BillingProfile AS b ON t.accountId = b.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
     params: {
-      bBillingIdEq: bBillingIdEq,
+      transactionStatementStatementIdEq: args.transactionStatementStatementIdEq,
     },
     types: {
-      bBillingIdEq: { type: "string" },
+      transactionStatementStatementIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingAccountFromBillingRow>();
+  let resRows = new Array<GetBillingProfileFromStatementRow>();
   for (let row of rows) {
     resRows.push({
-      aData: deserializeMessage(row.at(0).value, BILLING_ACCOUNT),
+      billingProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      billingProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
+      billingProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, BILLING_PROFILE_STATE_INFO),
+      billingProfilePaymentAfterMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      billingProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
     });
   }
   return resRows;
 }
 
-export interface GetBillingByMonthRow {
-  billingData: Billing,
+export interface GetEarningsProfileFromStatementRow {
+  earningsProfileAccountId?: string,
+  earningsProfileStripeConnectedAccountId?: string,
+  earningsProfileStripeConnectedAccountState?: StripeConnectedAccountState,
+  earningsProfileCreatedTimeMs?: number,
 }
 
-export let GET_BILLING_BY_MONTH_ROW: MessageDescriptor<GetBillingByMonthRow> = {
-  name: 'GetBillingByMonthRow',
+export let GET_EARNINGS_PROFILE_FROM_STATEMENT_ROW: MessageDescriptor<GetEarningsProfileFromStatementRow> = {
+  name: 'GetEarningsProfileFromStatementRow',
   fields: [{
-    name: 'billingData',
+    name: 'earningsProfileAccountId',
     index: 1,
-    messageType: BILLING,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'earningsProfileStripeConnectedAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'earningsProfileStripeConnectedAccountState',
+    index: 3,
+    enumType: STRIPE_CONNECTED_ACCOUNT_STATE,
+  }, {
+    name: 'earningsProfileCreatedTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingByMonth(
+export async function getEarningsProfileFromStatement(
   runner: Database | Transaction,
-  billingAccountIdEq: string,
-  billingMonthEq: string,
-): Promise<Array<GetBillingByMonthRow>> {
+  args: {
+    transactionStatementStatementIdEq: string,
+  }
+): Promise<Array<GetEarningsProfileFromStatementRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT Billing.data FROM Billing WHERE (Billing.accountId = @billingAccountIdEq AND Billing.month = @billingMonthEq)",
+    sql: "SELECT e.accountId, e.stripeConnectedAccountId, e.stripeConnectedAccountState, e.createdTimeMs FROM TransactionStatement AS t INNER JOIN EarningsProfile AS e ON t.accountId = e.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
     params: {
-      billingAccountIdEq: billingAccountIdEq,
-      billingMonthEq: billingMonthEq,
+      transactionStatementStatementIdEq: args.transactionStatementStatementIdEq,
     },
     types: {
-      billingAccountIdEq: { type: "string" },
-      billingMonthEq: { type: "string" },
+      transactionStatementStatementIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingByMonthRow>();
+  let resRows = new Array<GetEarningsProfileFromStatementRow>();
   for (let row of rows) {
     resRows.push({
-      billingData: deserializeMessage(row.at(0).value, BILLING),
+      earningsProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      earningsProfileStripeConnectedAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      earningsProfileStripeConnectedAccountState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, STRIPE_CONNECTED_ACCOUNT_STATE),
+      earningsProfileCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
     });
   }
   return resRows;
 }
 
-export interface ListBillingsRow {
-  billingData: Billing,
+export interface GetTransactionStatementByMonthRow {
+  transactionStatementStatementId?: string,
+  transactionStatementAccountId?: string,
+  transactionStatementMonth?: string,
+  transactionStatementStatement?: TransactionStatement,
+  transactionStatementCreatedTimeMs?: number,
 }
 
-export let LIST_BILLINGS_ROW: MessageDescriptor<ListBillingsRow> = {
-  name: 'ListBillingsRow',
+export let GET_TRANSACTION_STATEMENT_BY_MONTH_ROW: MessageDescriptor<GetTransactionStatementByMonthRow> = {
+  name: 'GetTransactionStatementByMonthRow',
   fields: [{
-    name: 'billingData',
+    name: 'transactionStatementStatementId',
     index: 1,
-    messageType: BILLING,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementMonth',
+    index: 3,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementStatement',
+    index: 4,
+    messageType: TRANSACTION_STATEMENT,
+  }, {
+    name: 'transactionStatementCreatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function listBillings(
+export async function getTransactionStatementByMonth(
   runner: Database | Transaction,
-  billingAccountIdEq: string,
-  billingMonthGe: string,
-  billingMonthLe: string,
-): Promise<Array<ListBillingsRow>> {
+  args: {
+    transactionStatementAccountIdEq?: string,
+    transactionStatementMonthEq?: string,
+  }
+): Promise<Array<GetTransactionStatementByMonthRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT Billing.data FROM Billing WHERE (Billing.accountId = @billingAccountIdEq AND Billing.month >= @billingMonthGe AND Billing.month <= @billingMonthLe) ORDER BY Billing.month DESC",
+    sql: "SELECT TransactionStatement.statementId, TransactionStatement.accountId, TransactionStatement.month, TransactionStatement.statement, TransactionStatement.createdTimeMs FROM TransactionStatement WHERE (TransactionStatement.accountId = @transactionStatementAccountIdEq AND TransactionStatement.month = @transactionStatementMonthEq)",
     params: {
-      billingAccountIdEq: billingAccountIdEq,
-      billingMonthGe: billingMonthGe,
-      billingMonthLe: billingMonthLe,
+      transactionStatementAccountIdEq: args.transactionStatementAccountIdEq == null ? null : args.transactionStatementAccountIdEq,
+      transactionStatementMonthEq: args.transactionStatementMonthEq == null ? null : args.transactionStatementMonthEq,
     },
     types: {
-      billingAccountIdEq: { type: "string" },
-      billingMonthGe: { type: "string" },
-      billingMonthLe: { type: "string" },
+      transactionStatementAccountIdEq: { type: "string" },
+      transactionStatementMonthEq: { type: "string" },
     }
   });
-  let resRows = new Array<ListBillingsRow>();
+  let resRows = new Array<GetTransactionStatementByMonthRow>();
   for (let row of rows) {
     resRows.push({
-      billingData: deserializeMessage(row.at(0).value, BILLING),
+      transactionStatementStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      transactionStatementAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      transactionStatementMonth: row.at(2).value == null ? undefined : row.at(2).value,
+      transactionStatementStatement: row.at(3).value == null ? undefined : deserializeMessage(row.at(3).value, TRANSACTION_STATEMENT),
+      transactionStatementCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
     });
   }
   return resRows;
 }
 
-export interface ListBillingsByStateRow {
-  billingData: Billing,
+export interface ListTransactionStatementsRow {
+  transactionStatementStatementId?: string,
+  transactionStatementAccountId?: string,
+  transactionStatementMonth?: string,
+  transactionStatementStatement?: TransactionStatement,
+  transactionStatementCreatedTimeMs?: number,
+  paymentStatementId?: string,
+  paymentAccountId?: string,
+  paymentState?: PaymentState,
+  paymentStripeInvoiceId?: string,
+  paymentStripeInvoiceUrl?: string,
+  paymentUpdatedTimeMs?: number,
+  paymentCreatedTimeMs?: number,
+  payoutStatementId?: string,
+  payoutAccountId?: string,
+  payoutState?: PayoutState,
+  payoutStripeTransferId?: string,
+  payoutUpdatedTimeMs?: number,
+  payoutCreatedTimeMs?: number,
 }
 
-export let LIST_BILLINGS_BY_STATE_ROW: MessageDescriptor<ListBillingsByStateRow> = {
-  name: 'ListBillingsByStateRow',
+export let LIST_TRANSACTION_STATEMENTS_ROW: MessageDescriptor<ListTransactionStatementsRow> = {
+  name: 'ListTransactionStatementsRow',
   fields: [{
-    name: 'billingData',
+    name: 'transactionStatementStatementId',
     index: 1,
-    messageType: BILLING,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementMonth',
+    index: 3,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementStatement',
+    index: 4,
+    messageType: TRANSACTION_STATEMENT,
+  }, {
+    name: 'transactionStatementCreatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentStatementId',
+    index: 6,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentAccountId',
+    index: 7,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentState',
+    index: 8,
+    enumType: PAYMENT_STATE,
+  }, {
+    name: 'paymentStripeInvoiceId',
+    index: 9,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentStripeInvoiceUrl',
+    index: 10,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentUpdatedTimeMs',
+    index: 11,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentCreatedTimeMs',
+    index: 12,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutStatementId',
+    index: 13,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutAccountId',
+    index: 14,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutState',
+    index: 15,
+    enumType: PAYOUT_STATE,
+  }, {
+    name: 'payoutStripeTransferId',
+    index: 16,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutUpdatedTimeMs',
+    index: 17,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutCreatedTimeMs',
+    index: 18,
+    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function listBillingsByState(
+export async function listTransactionStatements(
   runner: Database | Transaction,
-  billingAccountIdEq: string,
-  billingStateEq: PaymentState,
-): Promise<Array<ListBillingsByStateRow>> {
+  args: {
+    transactionStatementAccountIdEq?: string,
+    transactionStatementMonthGe?: string,
+    transactionStatementMonthLe?: string,
+  }
+): Promise<Array<ListTransactionStatementsRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT Billing.data FROM Billing WHERE (Billing.accountId = @billingAccountIdEq AND Billing.state = @billingStateEq)",
+    sql: "SELECT t.statementId, t.accountId, t.month, t.statement, t.createdTimeMs, pa.statementId, pa.accountId, pa.state, pa.stripeInvoiceId, pa.stripeInvoiceUrl, pa.updatedTimeMs, pa.createdTimeMs, po.statementId, po.accountId, po.state, po.stripeTransferId, po.updatedTimeMs, po.createdTimeMs FROM TransactionStatement AS t LEFT JOIN Payment AS pa ON t.statementId = pa.statementId LEFT JOIN Payout AS po ON t.statementId = po.statementId WHERE (t.accountId = @transactionStatementAccountIdEq AND t.month >= @transactionStatementMonthGe AND t.month <= @transactionStatementMonthLe) ORDER BY t.month DESC",
     params: {
-      billingAccountIdEq: billingAccountIdEq,
-      billingStateEq: Spanner.float(billingStateEq),
+      transactionStatementAccountIdEq: args.transactionStatementAccountIdEq == null ? null : args.transactionStatementAccountIdEq,
+      transactionStatementMonthGe: args.transactionStatementMonthGe == null ? null : args.transactionStatementMonthGe,
+      transactionStatementMonthLe: args.transactionStatementMonthLe == null ? null : args.transactionStatementMonthLe,
     },
     types: {
-      billingAccountIdEq: { type: "string" },
-      billingStateEq: { type: "float64" },
+      transactionStatementAccountIdEq: { type: "string" },
+      transactionStatementMonthGe: { type: "string" },
+      transactionStatementMonthLe: { type: "string" },
     }
   });
-  let resRows = new Array<ListBillingsByStateRow>();
+  let resRows = new Array<ListTransactionStatementsRow>();
   for (let row of rows) {
     resRows.push({
-      billingData: deserializeMessage(row.at(0).value, BILLING),
+      transactionStatementStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      transactionStatementAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      transactionStatementMonth: row.at(2).value == null ? undefined : row.at(2).value,
+      transactionStatementStatement: row.at(3).value == null ? undefined : deserializeMessage(row.at(3).value, TRANSACTION_STATEMENT),
+      transactionStatementCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      paymentStatementId: row.at(5).value == null ? undefined : row.at(5).value,
+      paymentAccountId: row.at(6).value == null ? undefined : row.at(6).value,
+      paymentState: row.at(7).value == null ? undefined : toEnumFromNumber(row.at(7).value.value, PAYMENT_STATE),
+      paymentStripeInvoiceId: row.at(8).value == null ? undefined : row.at(8).value,
+      paymentStripeInvoiceUrl: row.at(9).value == null ? undefined : row.at(9).value,
+      paymentUpdatedTimeMs: row.at(10).value == null ? undefined : row.at(10).value.value,
+      paymentCreatedTimeMs: row.at(11).value == null ? undefined : row.at(11).value.value,
+      payoutStatementId: row.at(12).value == null ? undefined : row.at(12).value,
+      payoutAccountId: row.at(13).value == null ? undefined : row.at(13).value,
+      payoutState: row.at(14).value == null ? undefined : toEnumFromNumber(row.at(14).value.value, PAYOUT_STATE),
+      payoutStripeTransferId: row.at(15).value == null ? undefined : row.at(15).value,
+      payoutUpdatedTimeMs: row.at(16).value == null ? undefined : row.at(16).value.value,
+      payoutCreatedTimeMs: row.at(17).value == null ? undefined : row.at(17).value.value,
     });
   }
   return resRows;
 }
 
-export interface GetEarningsAccountFromEarningsRow {
-  aData: EarningsAccount,
+export interface ListPaymentsByStateRow {
+  paymentStatementId?: string,
+  paymentAccountId?: string,
+  paymentState?: PaymentState,
+  paymentStripeInvoiceId?: string,
+  paymentStripeInvoiceUrl?: string,
+  paymentUpdatedTimeMs?: number,
+  paymentCreatedTimeMs?: number,
 }
 
-export let GET_EARNINGS_ACCOUNT_FROM_EARNINGS_ROW: MessageDescriptor<GetEarningsAccountFromEarningsRow> = {
-  name: 'GetEarningsAccountFromEarningsRow',
+export let LIST_PAYMENTS_BY_STATE_ROW: MessageDescriptor<ListPaymentsByStateRow> = {
+  name: 'ListPaymentsByStateRow',
   fields: [{
-    name: 'aData',
+    name: 'paymentStatementId',
     index: 1,
-    messageType: EARNINGS_ACCOUNT,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentState',
+    index: 3,
+    enumType: PAYMENT_STATE,
+  }, {
+    name: 'paymentStripeInvoiceId',
+    index: 4,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentStripeInvoiceUrl',
+    index: 5,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentUpdatedTimeMs',
+    index: 6,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentCreatedTimeMs',
+    index: 7,
+    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getEarningsAccountFromEarnings(
+export async function listPaymentsByState(
   runner: Database | Transaction,
-  eEarningsIdEq: string,
-): Promise<Array<GetEarningsAccountFromEarningsRow>> {
+  args: {
+    paymentAccountIdEq?: string,
+    paymentStateEq?: PaymentState,
+  }
+): Promise<Array<ListPaymentsByStateRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT a.data FROM Earnings AS e INNER JOIN EarningsAccount AS a ON e.accountId = a.accountId WHERE e.earningsId = @eEarningsIdEq",
+    sql: "SELECT Payment.statementId, Payment.accountId, Payment.state, Payment.stripeInvoiceId, Payment.stripeInvoiceUrl, Payment.updatedTimeMs, Payment.createdTimeMs FROM Payment WHERE (Payment.accountId = @paymentAccountIdEq AND Payment.state = @paymentStateEq) ORDER BY Payment.createdTimeMs DESC",
     params: {
-      eEarningsIdEq: eEarningsIdEq,
+      paymentAccountIdEq: args.paymentAccountIdEq == null ? null : args.paymentAccountIdEq,
+      paymentStateEq: args.paymentStateEq == null ? null : Spanner.float(args.paymentStateEq),
     },
     types: {
-      eEarningsIdEq: { type: "string" },
+      paymentAccountIdEq: { type: "string" },
+      paymentStateEq: { type: "float64" },
     }
   });
-  let resRows = new Array<GetEarningsAccountFromEarningsRow>();
+  let resRows = new Array<ListPaymentsByStateRow>();
   for (let row of rows) {
     resRows.push({
-      aData: deserializeMessage(row.at(0).value, EARNINGS_ACCOUNT),
+      paymentStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      paymentState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYMENT_STATE),
+      paymentStripeInvoiceId: row.at(3).value == null ? undefined : row.at(3).value,
+      paymentStripeInvoiceUrl: row.at(4).value == null ? undefined : row.at(4).value,
+      paymentUpdatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
+      paymentCreatedTimeMs: row.at(6).value == null ? undefined : row.at(6).value.value,
     });
   }
   return resRows;
 }
 
-export interface GetEarningsByMonthRow {
-  earningsData: Earnings,
+export interface ListPayoutsByStateRow {
+  payoutStatementId?: string,
+  payoutAccountId?: string,
+  payoutState?: PayoutState,
+  payoutStripeTransferId?: string,
+  payoutUpdatedTimeMs?: number,
+  payoutCreatedTimeMs?: number,
 }
 
-export let GET_EARNINGS_BY_MONTH_ROW: MessageDescriptor<GetEarningsByMonthRow> = {
-  name: 'GetEarningsByMonthRow',
+export let LIST_PAYOUTS_BY_STATE_ROW: MessageDescriptor<ListPayoutsByStateRow> = {
+  name: 'ListPayoutsByStateRow',
   fields: [{
-    name: 'earningsData',
+    name: 'payoutStatementId',
     index: 1,
-    messageType: EARNINGS,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutState',
+    index: 3,
+    enumType: PAYOUT_STATE,
+  }, {
+    name: 'payoutStripeTransferId',
+    index: 4,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutUpdatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutCreatedTimeMs',
+    index: 6,
+    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getEarningsByMonth(
+export async function listPayoutsByState(
   runner: Database | Transaction,
-  earningsAccountIdEq: string,
-  earningsMonthEq: string,
-): Promise<Array<GetEarningsByMonthRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT Earnings.data FROM Earnings WHERE (Earnings.accountId = @earningsAccountIdEq AND Earnings.month = @earningsMonthEq)",
-    params: {
-      earningsAccountIdEq: earningsAccountIdEq,
-      earningsMonthEq: earningsMonthEq,
-    },
-    types: {
-      earningsAccountIdEq: { type: "string" },
-      earningsMonthEq: { type: "string" },
-    }
-  });
-  let resRows = new Array<GetEarningsByMonthRow>();
-  for (let row of rows) {
-    resRows.push({
-      earningsData: deserializeMessage(row.at(0).value, EARNINGS),
-    });
+  args: {
+    payoutAccountIdEq?: string,
+    payoutStateEq?: PayoutState,
   }
-  return resRows;
-}
-
-export interface ListEarningsRow {
-  earningsData: Earnings,
-}
-
-export let LIST_EARNINGS_ROW: MessageDescriptor<ListEarningsRow> = {
-  name: 'ListEarningsRow',
-  fields: [{
-    name: 'earningsData',
-    index: 1,
-    messageType: EARNINGS,
-  }],
-};
-
-export async function listEarnings(
-  runner: Database | Transaction,
-  earningsAccountIdEq: string,
-  earningsMonthGe: string,
-  earningsMonthLe: string,
-): Promise<Array<ListEarningsRow>> {
+): Promise<Array<ListPayoutsByStateRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT Earnings.data FROM Earnings WHERE (Earnings.accountId = @earningsAccountIdEq AND Earnings.month >= @earningsMonthGe AND Earnings.month <= @earningsMonthLe) ORDER BY Earnings.month DESC",
+    sql: "SELECT Payout.statementId, Payout.accountId, Payout.state, Payout.stripeTransferId, Payout.updatedTimeMs, Payout.createdTimeMs FROM Payout WHERE (Payout.accountId = @payoutAccountIdEq AND Payout.state = @payoutStateEq) ORDER BY Payout.createdTimeMs DESC",
     params: {
-      earningsAccountIdEq: earningsAccountIdEq,
-      earningsMonthGe: earningsMonthGe,
-      earningsMonthLe: earningsMonthLe,
+      payoutAccountIdEq: args.payoutAccountIdEq == null ? null : args.payoutAccountIdEq,
+      payoutStateEq: args.payoutStateEq == null ? null : Spanner.float(args.payoutStateEq),
     },
     types: {
-      earningsAccountIdEq: { type: "string" },
-      earningsMonthGe: { type: "string" },
-      earningsMonthLe: { type: "string" },
+      payoutAccountIdEq: { type: "string" },
+      payoutStateEq: { type: "float64" },
     }
   });
-  let resRows = new Array<ListEarningsRow>();
+  let resRows = new Array<ListPayoutsByStateRow>();
   for (let row of rows) {
     resRows.push({
-      earningsData: deserializeMessage(row.at(0).value, EARNINGS),
-    });
-  }
-  return resRows;
-}
-
-export interface ListEarningsByStateRow {
-  earningsData: Earnings,
-}
-
-export let LIST_EARNINGS_BY_STATE_ROW: MessageDescriptor<ListEarningsByStateRow> = {
-  name: 'ListEarningsByStateRow',
-  fields: [{
-    name: 'earningsData',
-    index: 1,
-    messageType: EARNINGS,
-  }],
-};
-
-export async function listEarningsByState(
-  runner: Database | Transaction,
-  earningsAccountIdEq: string,
-  earningsStateEq: PayoutState,
-): Promise<Array<ListEarningsByStateRow>> {
-  let [rows] = await runner.run({
-    sql: "SELECT Earnings.data FROM Earnings WHERE (Earnings.accountId = @earningsAccountIdEq AND Earnings.state = @earningsStateEq)",
-    params: {
-      earningsAccountIdEq: earningsAccountIdEq,
-      earningsStateEq: Spanner.float(earningsStateEq),
-    },
-    types: {
-      earningsAccountIdEq: { type: "string" },
-      earningsStateEq: { type: "float64" },
-    }
-  });
-  let resRows = new Array<ListEarningsByStateRow>();
-  for (let row of rows) {
-    resRows.push({
-      earningsData: deserializeMessage(row.at(0).value, EARNINGS),
+      payoutStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      payoutState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYOUT_STATE),
+      payoutStripeTransferId: row.at(3).value == null ? undefined : row.at(3).value,
+      payoutUpdatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      payoutCreatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
     });
   }
   return resRows;

@@ -1,17 +1,18 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { listPendingStripeCustomerCreatingTasks } from "../db/sql";
+import { listPendingStripePaymentCustomerCreatingTasks } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { ListStripeCustomerCreatingTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { ListStripePaymentCustomerCreatingTasksHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ListStripeCustomerCreatingTasksRequestBody,
-  ListStripeCustomerCreatingTasksResponse,
-  ProcessStripeCustomerCreatingTaskRequestBody,
+  ListStripePaymentCustomerCreatingTasksRequestBody,
+  ListStripePaymentCustomerCreatingTasksResponse,
+  ProcessStripePaymentCustomerCreatingTaskRequestBody,
 } from "@phading/commerce_service_interface/node/interface";
 
-export class ListStripeCustomerCreatingTasksHandler extends ListStripeCustomerCreatingTasksHandlerInterface {
-  public static create(): ListStripeCustomerCreatingTasksHandler {
-    return new ListStripeCustomerCreatingTasksHandler(SPANNER_DATABASE, () =>
-      Date.now(),
+export class ListStripePaymentCustomerCreatingTasksHandler extends ListStripePaymentCustomerCreatingTasksHandlerInterface {
+  public static create(): ListStripePaymentCustomerCreatingTasksHandler {
+    return new ListStripePaymentCustomerCreatingTasksHandler(
+      SPANNER_DATABASE,
+      () => Date.now(),
     );
   }
 
@@ -24,16 +25,16 @@ export class ListStripeCustomerCreatingTasksHandler extends ListStripeCustomerCr
 
   public async handle(
     loggingPrefix: string,
-    body: ListStripeCustomerCreatingTasksRequestBody,
-  ): Promise<ListStripeCustomerCreatingTasksResponse> {
-    let rows = await listPendingStripeCustomerCreatingTasks(
+    body: ListStripePaymentCustomerCreatingTasksRequestBody,
+  ): Promise<ListStripePaymentCustomerCreatingTasksResponse> {
+    let rows = await listPendingStripePaymentCustomerCreatingTasks(
       this.database,
-      this.getNow(),
+      { stripePaymentCustomerCreatingTaskExecutionTimeMsLe: this.getNow() },
     );
     return {
       tasks: rows.map(
-        (row): ProcessStripeCustomerCreatingTaskRequestBody => ({
-          accountId: row.stripeCustomerCreatingTaskAccountId,
+        (row): ProcessStripePaymentCustomerCreatingTaskRequestBody => ({
+          accountId: row.stripePaymentCustomerCreatingTaskAccountId,
         }),
       ),
     };

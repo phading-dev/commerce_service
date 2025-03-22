@@ -2,25 +2,28 @@ import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PaymentState } from "../db/schema";
 import {
-  GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
-  GET_BILLING_ROW,
+  GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
+  GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
+  GET_PAYMENT_ROW,
   GET_PAYMENT_TASK_METADATA_ROW,
-  GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
-  deleteBillingAccountStatement,
-  deleteBillingAccountSuspendingDueToPastDueTaskStatement,
-  deleteBillingStatement,
+  deleteBillingProfileStatement,
+  deleteBillingProfileSuspendingDueToPastDueTaskStatement,
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deletePaymentStatement,
   deletePaymentTaskStatement,
-  deleteUpdatePaymentMethodNotifyingTaskStatement,
-  getBilling,
-  getBillingAccountSuspendingDueToPastDueTask,
+  deleteTransactionStatementStatement,
+  getBillingProfileSuspendingDueToPastDueTask,
+  getPayment,
+  getPaymentMethodNeedsUpdateNotifyingTask,
   getPaymentTaskMetadata,
-  getUpdatePaymentMethodNotifyingTask,
-  insertBillingAccountStatement,
-  insertBillingStatement,
+  insertBillingProfileStatement,
+  insertPaymentStatement,
   insertPaymentTaskStatement,
+  insertTransactionStatementStatement,
   listPendingPaymentTasks,
 } from "../db/sql";
 import { ProcessPaymentTaskHandler } from "./process_payment_task_handler";
+import { AmountType } from "@phading/price/amount_type";
 import { newBadRequestError } from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -36,14 +39,55 @@ import { TEST_RUNNER } from "@selfage/test_runner";
 
 let ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
+async function insertPayment(): Promise<void> {
+  await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+    await transaction.batchUpdate([
+      insertBillingProfileStatement({
+        accountId: "account1",
+        stripePaymentCustomerId: "stripeCustomer1",
+      }),
+      insertTransactionStatementStatement({
+        statementId: "statement1",
+        accountId: "account1",
+        month: "2021-01",
+        statement: {
+          currency: "USD",
+          totalAmount: 1200,
+          totalAmountType: AmountType.DEBIT,
+        },
+      }),
+      insertPaymentStatement({
+        statementId: "statement1",
+        accountId: "account1",
+        state: PaymentState.PROCESSING,
+      }),
+      insertPaymentTaskStatement({
+        statementId: "statement1",
+        retryCount: 0,
+        executionTimeMs: 100,
+      }),
+    ]);
+    await transaction.commit();
+  });
+}
+
 async function cleanupAll(): Promise<void> {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      deleteBillingAccountStatement("account1"),
-      deleteBillingStatement("billing1"),
-      deletePaymentTaskStatement("billing1"),
-      deleteUpdatePaymentMethodNotifyingTaskStatement("billing1"),
-      deleteBillingAccountSuspendingDueToPastDueTaskStatement("billing1"),
+      deleteBillingProfileStatement({ billingProfileAccountIdEq: "account1" }),
+      deleteTransactionStatementStatement({
+        transactionStatementStatementIdEq: "statement1",
+      }),
+      deletePaymentStatement({ paymentStatementIdEq: "statement1" }),
+      deletePaymentTaskStatement({
+        paymentTaskStatementIdEq: "statement1",
+      }),
+      deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+        paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+      }),
+      deleteBillingProfileSuspendingDueToPastDueTaskStatement({
+        billingProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+      }),
     ]);
     await transaction.commit();
   });
@@ -56,24 +100,7 @@ TEST_RUNNER.run({
       name: "Success",
       execute: async () => {
         // Prepare
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            insertBillingAccountStatement({
-              accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
-            }),
-            insertBillingStatement({
-              billingId: "billing1",
-              accountId: "account1",
-              state: PaymentState.PROCESSING,
-              month: "2021-01",
-              totalAmount: 1200,
-              currency: "USD",
-            }),
-            insertPaymentTaskStatement("billing1", 0, 100, 100),
-          ]);
-          await transaction.commit();
-        });
+        await insertPayment();
         let stripeCustomerIdCaptured: string;
         let createInvoiceParamsCaptured: any;
         let createInvoiceOptionCaptured: any;
@@ -136,7 +163,7 @@ TEST_RUNNER.run({
         );
 
         // Execute
-        await handler.processTask("", { billingId: "billing1" });
+        await handler.processTask("", { statementId: "statement1" });
 
         // Verify
         assertThat(
@@ -155,9 +182,9 @@ TEST_RUNNER.run({
           "createInvoiceParams.description",
         );
         assertThat(
-          createInvoiceParamsCaptured.metadata.billingId,
-          eq("billing1"),
-          "createInvoiceParams.metadata.billingId",
+          createInvoiceParamsCaptured.metadata.statementId,
+          eq("statement1"),
+          "createInvoiceParams.metadata.statementId",
         );
         assertThat(
           createInvoiceParamsCaptured.currency,
@@ -166,7 +193,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           createInvoiceOptionCaptured.idempotencyKey,
-          eq("billing1"),
+          eq("statement1"),
           "createInvoiceOption.idempotencyKey",
         );
         assertThat(
@@ -176,7 +203,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           addLinesParamsCaptured.lines[0].description,
-          eq("Total usage"),
+          eq("Total"),
           "addLinesParams.lines[0].description",
         );
         assertThat(
@@ -186,7 +213,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           addLinesOptionCaptured.idempotencyKey,
-          eq("billing1"),
+          eq("statement1"),
           "addLinesOption.idempotencyKey",
         );
         assertThat(
@@ -201,32 +228,32 @@ TEST_RUNNER.run({
         );
         assertThat(
           finalizeInvoiceOptionCaptured.idempotencyKey,
-          eq("billing1"),
+          eq("statement1"),
           "finalizeInvoiceOption.idempotencyKey",
         );
         assertThat(
-          await getBilling(SPANNER_DATABASE, "billing1"),
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingData: {
-                  billingId: "billing1",
-                  accountId: "account1",
-                  state: PaymentState.CHARGING,
-                  month: "2021-01",
-                  totalAmount: 1200,
-                  currency: "USD",
-                  stripeInvoiceId: "invoice1",
-                  stripeInvoiceUrl: "https://stripe.invoice.url",
-                },
+                paymentStatementId: "statement1",
+                paymentAccountId: "account1",
+                paymentState: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+                paymentStripeInvoiceId: "invoice1",
+                paymentStripeInvoiceUrl: "https://stripe.invoice.url",
+                paymentUpdatedTimeMs: 1000,
               },
-              GET_BILLING_ROW,
+              GET_PAYMENT_ROW,
             ),
           ]),
-          "billing",
+          "payment",
         );
         assertThat(
-          await listPendingPaymentTasks(SPANNER_DATABASE, ONE_YEAR_MS),
+          await listPendingPaymentTasks(SPANNER_DATABASE, {
+            paymentTaskExecutionTimeMsLe: ONE_YEAR_MS,
+          }),
           isArray([]),
           "tasks",
         );
@@ -239,24 +266,7 @@ TEST_RUNNER.run({
       name: "CreateInvoiceFailed",
       execute: async () => {
         // Prepare
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            insertBillingAccountStatement({
-              accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
-            }),
-            insertBillingStatement({
-              billingId: "billing1",
-              accountId: "account1",
-              state: PaymentState.PROCESSING,
-              month: "2021-01",
-              totalAmount: 1200,
-              currency: "USD",
-            }),
-            insertPaymentTaskStatement("billing1", 0, 100, 100),
-          ]);
-          await transaction.commit();
-        });
+        await insertPayment();
         let stripeClientMock: any = {
           customers: {
             retrieve: async () => {
@@ -281,29 +291,26 @@ TEST_RUNNER.run({
 
         // Execute
         let error = await assertReject(
-          handler.processTask("", { billingId: "billing1" }),
+          handler.processTask("", { statementId: "statement1" }),
         );
 
         // Verify
         assertThat(error, eqError(new Error("Fake error")), "error");
         assertThat(
-          await getBilling(SPANNER_DATABASE, "billing1"),
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingData: {
-                  billingId: "billing1",
-                  accountId: "account1",
-                  state: PaymentState.PROCESSING,
-                  month: "2021-01",
-                  totalAmount: 1200,
-                  currency: "USD",
-                },
+                paymentStatementId: "statement1",
+                paymentAccountId: "account1",
+                paymentState: PaymentState.PROCESSING,
               },
-              GET_BILLING_ROW,
+              GET_PAYMENT_ROW,
             ),
           ]),
-          "billing",
+          "payment",
         );
       },
       tearDown: async () => {
@@ -314,24 +321,7 @@ TEST_RUNNER.run({
       name: "MissingDefaultPaymentMethodAndReportFailure",
       execute: async () => {
         // Prepare
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            insertBillingAccountStatement({
-              accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
-            }),
-            insertBillingStatement({
-              billingId: "billing1",
-              accountId: "account1",
-              state: PaymentState.PROCESSING,
-              month: "2021-01",
-              totalAmount: 1200,
-              currency: "USD",
-            }),
-            insertPaymentTaskStatement("billing1", 0, 100, 100),
-          ]);
-          await transaction.commit();
-        });
+        await insertPayment();
         let stripeClientMock: any = {
           customers: {
             retrieve: async () => {
@@ -350,68 +340,66 @@ TEST_RUNNER.run({
         );
 
         // Execute
-        await handler.processTask("", { billingId: "billing1" });
+        await handler.processTask("", { statementId: "statement1" });
 
         // Verify
         assertThat(
-          await getBilling(SPANNER_DATABASE, "billing1"),
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingData: {
-                  billingId: "billing1",
-                  accountId: "account1",
-                  state: PaymentState.FAILED,
-                  month: "2021-01",
-                  totalAmount: 1200,
-                  currency: "USD",
-                },
+                paymentStatementId: "statement1",
+                paymentAccountId: "account1",
+                paymentState: PaymentState.FAILED,
+                paymentUpdatedTimeMs: 1000,
               },
-              GET_BILLING_ROW,
+              GET_PAYMENT_ROW,
             ),
           ]),
-          "billing",
+          "payment",
         );
         assertThat(
-          await listPendingPaymentTasks(SPANNER_DATABASE, ONE_YEAR_MS),
+          await listPendingPaymentTasks(SPANNER_DATABASE, {
+            paymentTaskExecutionTimeMsLe: ONE_YEAR_MS,
+          }),
           isArray([]),
           "tasks",
         );
         assertThat(
-          await getUpdatePaymentMethodNotifyingTask(
-            SPANNER_DATABASE,
-            "billing1",
-          ),
+          await getPaymentMethodNeedsUpdateNotifyingTask(SPANNER_DATABASE, {
+            paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                updatePaymentMethodNotifyingTaskBillingId: "billing1",
-                updatePaymentMethodNotifyingTaskRetryCount: 0,
-                updatePaymentMethodNotifyingTaskExecutionTimeMs: 1000,
-                updatePaymentMethodNotifyingTaskCreatedTimeMs: 1000,
+                paymentMethodNeedsUpdateNotifyingTaskStatementId: "statement1",
+                paymentMethodNeedsUpdateNotifyingTaskRetryCount: 0,
+                paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: 1000,
+                paymentMethodNeedsUpdateNotifyingTaskCreatedTimeMs: 1000,
               },
-              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
+              GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
             ),
           ]),
           "updatePaymentMethodNotifyingTasks",
         );
         assertThat(
-          await getBillingAccountSuspendingDueToPastDueTask(
-            SPANNER_DATABASE,
-            "billing1",
-          ),
+          await getBillingProfileSuspendingDueToPastDueTask(SPANNER_DATABASE, {
+            billingProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingAccountSuspendingDueToPastDueTaskBillingId: "billing1",
-                billingAccountSuspendingDueToPastDueTaskRetryCount: 0,
-                billingAccountSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
-                billingAccountSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
+                billingProfileSuspendingDueToPastDueTaskStatementId: "statement1",
+                billingProfileSuspendingDueToPastDueTaskRetryCount: 0,
+                billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
+                billingProfileSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
               },
-              GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
+              GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
             ),
           ]),
-          "billingAccountSuspendingDueToPastDueTasks",
+          "billingProfileSuspendingDueToPastDueTasks",
         );
       },
       tearDown: async () => {
@@ -419,22 +407,14 @@ TEST_RUNNER.run({
       },
     },
     {
-      name: "BillingNotInProcessingState",
+      name: "PaymentNotInProcessingState",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountStatement({
-              accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
-            }),
-            insertBillingStatement({
-              billingId: "billing1",
-              accountId: "account1",
+            insertPaymentStatement({
+              statementId: "statement1",
               state: PaymentState.FAILED,
-              month: "2021-01",
-              totalAmount: 1200,
-              currency: "USD",
             }),
           ]);
           await transaction.commit();
@@ -448,14 +428,14 @@ TEST_RUNNER.run({
 
         // Execute
         let error = await assertReject(
-          handler.processTask("", { billingId: "billing1" }),
+          handler.processTask("", { statementId: "statement1" }),
         );
 
         // Verify
         assertThat(
           error,
           eqHttpError(
-            newBadRequestError("Billing billing1 is not in PROCESSING state"),
+            newBadRequestError("Payment statement1 is not in PROCESSING state"),
           ),
           "error",
         );
@@ -470,7 +450,11 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertPaymentTaskStatement("billing1", 0, 100, 100),
+            insertPaymentTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -481,11 +465,13 @@ TEST_RUNNER.run({
         );
 
         // Execute
-        await handler.claimTask("", { billingId: "billing1" });
+        await handler.claimTask("", { statementId: "statement1" });
 
         // Verify
         assertThat(
-          await getPaymentTaskMetadata(SPANNER_DATABASE, "billing1"),
+          await getPaymentTaskMetadata(SPANNER_DATABASE, {
+            paymentTaskStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {

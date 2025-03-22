@@ -2,10 +2,16 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
-  GET_BILLING_ROW,
-  deleteBillingStatement,
-  getBilling,
-  insertBillingStatement,
+  GET_PAYMENT_ROW,
+  deleteBillingProfileSuspendingDueToPastDueTaskStatement,
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deletePaymentStatement,
+  getPayment,
+  insertBillingProfileSuspendingDueToPastDueTaskStatement,
+  insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  insertPaymentStatement,
+  listPendingBillingProfileSuspendingDueToPastDueTasks,
+  listPendingPaymentMethodNeedsUpdateNotifyingTasks,
 } from "../../db/sql";
 import { MarkPaymentDoneHandler } from "./mark_payment_done_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -23,11 +29,22 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingStatement({
+            insertPaymentStatement({
               accountId: "account1",
-              billingId: "billing1",
-              state: PaymentState.CHARGING,
-              month: "2024-10",
+              statementId: "statement1",
+              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+            }),
+            insertBillingProfileSuspendingDueToPastDueTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 1000,
+              createdTimeMs: 1000,
+            }),
+            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 1000,
+              createdTimeMs: 1000,
             }),
           ]);
           await transaction.commit();
@@ -57,7 +74,7 @@ TEST_RUNNER.run({
               invoiceIdCaptured = invoiceId;
               return {
                 metadata: {
-                  billingId: "billing1",
+                  statementId: "statement1",
                 },
               };
             },
@@ -67,6 +84,7 @@ TEST_RUNNER.run({
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           "secret1",
+          () => 1000,
         );
 
         // Execute
@@ -78,26 +96,55 @@ TEST_RUNNER.run({
         assertThat(secretCaptured, eq("secret1"), "secret");
         assertThat(invoiceIdCaptured, eq("invoice1"), "invoiceId");
         assertThat(
-          await getBilling(SPANNER_DATABASE, "billing1"),
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingData: {
-                  accountId: "account1",
-                  billingId: "billing1",
-                  state: PaymentState.PAID,
-                  month: "2024-10",
-                },
+                paymentAccountId: "account1",
+                paymentStatementId: "statement1",
+                paymentState: PaymentState.PAID,
+                paymentUpdatedTimeMs: 1000,
               },
-              GET_BILLING_ROW,
+              GET_PAYMENT_ROW,
             ),
           ]),
-          "billing",
+          "payment",
+        );
+        assertThat(
+          await listPendingBillingProfileSuspendingDueToPastDueTasks(
+            SPANNER_DATABASE,
+            {
+              billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: 1000000,
+            },
+          ),
+          isArray([]),
+          "billingProfileSuspendingDueToPastDueTasks",
+        );
+        assertThat(
+          await listPendingPaymentMethodNeedsUpdateNotifyingTasks(
+            SPANNER_DATABASE,
+            {
+              paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMsLe: 1000000,
+            },
+          ),
+          isArray([]),
+          "paymentMethodNeedsUpdateNotifyingTasks",
         );
       },
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([deleteBillingStatement("billing1")]);
+          await transaction.batchUpdate([
+            deletePaymentStatement({ paymentStatementIdEq: "statement1" }),
+            deleteBillingProfileSuspendingDueToPastDueTaskStatement({
+              billingProfileSuspendingDueToPastDueTaskStatementIdEq:
+                "statement1",
+            }),
+            deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+              paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+            }),
+          ]);
           await transaction.commit();
         });
       },

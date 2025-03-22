@@ -4,16 +4,16 @@ import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { URL_BUILDER } from "../common/url_builder";
 import {
-  deleteSetupStripeConnectedAccountNotifyingTaskStatement,
-  getSetupStripeConnectedAccountNotifyingTaskMetadata,
-  updateSetupStripeConnectedAccountNotifyingTaskMetadataStatement,
+  deleteStripeConnectedAccountNeedsSetupNotifyingTaskStatement,
+  getStripeConnectedAccountNeedsSetupNotifyingTaskMetadata,
+  updateStripeConnectedAccountNeedsSetupNotifyingTaskMetadataStatement,
 } from "../db/sql";
 import { ENV_VARS } from "../env_vars";
 import { Database } from "@google-cloud/spanner";
-import { ProcessSetupStripeConnectedAccountNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessSetupStripeConnectedAccountNotifyingTaskRequestBody,
-  ProcessSetupStripeConnectedAccountNotifyingTaskResponse,
+  ProcessStripeConnectedAccountNeedsSetupNotifyingTaskRequestBody,
+  ProcessStripeConnectedAccountNeedsSetupNotifyingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
@@ -21,9 +21,9 @@ import { newBadRequestError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessSetupStripeConnectedAccountNotifyingTaskHandler extends ProcessSetupStripeConnectedAccountNotifyingTaskHandlerInterface {
-  public static create(): ProcessSetupStripeConnectedAccountNotifyingTaskHandler {
-    return new ProcessSetupStripeConnectedAccountNotifyingTaskHandler(
+export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandlerInterface {
+  public static create(): ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler {
+    return new ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler(
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       SENDGRID_CLIENT,
@@ -32,7 +32,11 @@ export class ProcessSetupStripeConnectedAccountNotifyingTaskHandler extends Proc
     );
   }
 
-  private taskHandler: ProcessTaskHandlerWrapper;
+  private taskHandler = ProcessTaskHandlerWrapper.create(
+    this.descriptor,
+    5 * 60 * 1000,
+    24 * 60 * 60 * 1000,
+  );
 
   public constructor(
     private database: Database,
@@ -42,18 +46,13 @@ export class ProcessSetupStripeConnectedAccountNotifyingTaskHandler extends Proc
     private getNow: () => number,
   ) {
     super();
-    this.taskHandler = ProcessTaskHandlerWrapper.create(
-      this.descriptor,
-      5 * 60 * 1000,
-      24 * 60 * 60 * 1000,
-    );
   }
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessSetupStripeConnectedAccountNotifyingTaskRequestBody,
-  ): Promise<ProcessSetupStripeConnectedAccountNotifyingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Setup stripe connected account notifying task for earnings account ${body.accountId}:`;
+    body: ProcessStripeConnectedAccountNeedsSetupNotifyingTaskRequestBody,
+  ): Promise<ProcessStripeConnectedAccountNeedsSetupNotifyingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Stripe connected account needs setup notifying task for earnings profile ${body.accountId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -64,26 +63,32 @@ export class ProcessSetupStripeConnectedAccountNotifyingTaskHandler extends Proc
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessSetupStripeConnectedAccountNotifyingTaskRequestBody,
+    body: ProcessStripeConnectedAccountNeedsSetupNotifyingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getSetupStripeConnectedAccountNotifyingTaskMetadata(
+      let rows = await getStripeConnectedAccountNeedsSetupNotifyingTaskMetadata(
         transaction,
-        body.accountId,
+        {
+          stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq:
+            body.accountId,
+        },
       );
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updateSetupStripeConnectedAccountNotifyingTaskMetadataStatement(
-          body.accountId,
-          task.setupStripeConnectedAccountNotifyingTaskRetryCount + 1,
-          this.getNow() +
+        updateStripeConnectedAccountNeedsSetupNotifyingTaskMetadataStatement({
+          stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq:
+            body.accountId,
+          setRetryCount:
+            task.stripeConnectedAccountNeedsSetupNotifyingTaskRetryCount + 1,
+          setExecutionTimeMs:
+            this.getNow() +
             this.taskHandler.getBackoffTime(
-              task.setupStripeConnectedAccountNotifyingTaskRetryCount,
+              task.stripeConnectedAccountNeedsSetupNotifyingTaskRetryCount,
             ),
-        ),
+        }),
       ]);
       await transaction.commit();
     });
@@ -91,19 +96,19 @@ export class ProcessSetupStripeConnectedAccountNotifyingTaskHandler extends Proc
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessSetupStripeConnectedAccountNotifyingTaskRequestBody,
+    body: ProcessStripeConnectedAccountNeedsSetupNotifyingTaskRequestBody,
   ): Promise<void> {
-    let accountResponse = await this.serviceClient.send(
+    let contactResponse = await this.serviceClient.send(
       newGetAccountContactRequest({
         accountId: body.accountId,
       }),
     );
     await this.sendgridClient.send({
-      to: accountResponse.contactEmail,
+      to: contactResponse.contactEmail,
       from: ENV_VARS.fromEmailAddress,
       templateId: LOCALIZATION.setupStripeConnectedAccountEmailTemplateId,
       dynamicTemplateData: {
-        name: accountResponse.naturalName,
+        name: contactResponse.naturalName,
         completeSetupUrl: this.urlBuilder.build({
           main: {
             accountId: body.accountId,
@@ -116,7 +121,10 @@ export class ProcessSetupStripeConnectedAccountNotifyingTaskHandler extends Proc
     });
     await this.database.runTransactionAsync(async (transaction) => {
       await transaction.batchUpdate([
-        deleteSetupStripeConnectedAccountNotifyingTaskStatement(body.accountId),
+        deleteStripeConnectedAccountNeedsSetupNotifyingTaskStatement({
+          stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq:
+            body.accountId,
+        }),
       ]);
       await transaction.commit();
     });

@@ -2,20 +2,20 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
-  GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
-  GET_BILLING_ROW,
-  GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_METADATA_ROW,
-  GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
-  deleteBillingAccountSuspendingDueToPastDueTaskStatement,
-  deleteBillingStatement,
-  deleteUpdatePaymentMethodNotifyingTaskStatement,
-  getBilling,
-  getBillingAccountSuspendingDueToPastDueTask,
-  getUpdatePaymentMethodNotifyingTask,
-  getUpdatePaymentMethodNotifyingTaskMetadata,
-  insertBillingStatement,
-  insertUpdatePaymentMethodNotifyingTaskStatement,
-  listPendingBillingAccountSuspendingDueToPastDueTasks,
+  GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
+  GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_METADATA_ROW,
+  GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
+  GET_PAYMENT_ROW,
+  deleteBillingProfileSuspendingDueToPastDueTaskStatement,
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deletePaymentStatement,
+  getBillingProfileSuspendingDueToPastDueTask,
+  getPayment,
+  getPaymentMethodNeedsUpdateNotifyingTask,
+  getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
+  insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  insertPaymentStatement,
+  listPendingBillingProfileSuspendingDueToPastDueTasks,
 } from "../../db/sql";
 import { MarkPaymentFailedHandler } from "./mark_payment_failed_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -29,9 +29,13 @@ let FUTURE_TIME_MS = 364 * 24 * 60 * 60 * 1000;
 async function cleanupAll() {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      deleteBillingStatement("billing1"),
-      deleteUpdatePaymentMethodNotifyingTaskStatement("billing1"),
-      deleteBillingAccountSuspendingDueToPastDueTaskStatement("billing1"),
+      deletePaymentStatement({ paymentStatementIdEq: "statement1" }),
+      deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+        paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+      }),
+      deleteBillingProfileSuspendingDueToPastDueTaskStatement({
+        billingProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+      }),
     ]);
     await transaction.commit();
   });
@@ -46,11 +50,10 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingStatement({
+            insertPaymentStatement({
               accountId: "account1",
-              billingId: "billing1",
-              state: PaymentState.CHARGING,
-              month: "2024-10",
+              statementId: "statement1",
+              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
             }),
           ]);
           await transaction.commit();
@@ -80,7 +83,7 @@ TEST_RUNNER.run({
               invoiceIdCaptured = invoiceId;
               return {
                 metadata: {
-                  billingId: "billing1",
+                  statementId: "statement1",
                 },
               };
             },
@@ -102,54 +105,53 @@ TEST_RUNNER.run({
         assertThat(secretCaptured, eq("secret1"), "secret");
         assertThat(invoiceIdCaptured, eq("invoice1"), "invoiceId");
         assertThat(
-          await getBilling(SPANNER_DATABASE, "billing1"),
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingData: {
-                  accountId: "account1",
-                  billingId: "billing1",
-                  state: PaymentState.FAILED,
-                  month: "2024-10",
-                },
+                paymentAccountId: "account1",
+                paymentStatementId: "statement1",
+                paymentState: PaymentState.FAILED,
+                paymentUpdatedTimeMs: 1000,
               },
-              GET_BILLING_ROW,
+              GET_PAYMENT_ROW,
             ),
           ]),
           "billing",
         );
         assertThat(
-          await getUpdatePaymentMethodNotifyingTask(
-            SPANNER_DATABASE,
-            "billing1",
-          ),
+          await getPaymentMethodNeedsUpdateNotifyingTask(SPANNER_DATABASE, {
+            paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                updatePaymentMethodNotifyingTaskBillingId: "billing1",
-                updatePaymentMethodNotifyingTaskRetryCount: 0,
-                updatePaymentMethodNotifyingTaskExecutionTimeMs: 1000,
-                updatePaymentMethodNotifyingTaskCreatedTimeMs: 1000,
+                paymentMethodNeedsUpdateNotifyingTaskStatementId: "statement1",
+                paymentMethodNeedsUpdateNotifyingTaskRetryCount: 0,
+                paymentMethodNeedsUpdateNotifyingTaskCreatedTimeMs: 1000,
+                paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: 1000,
               },
-              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
+              GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
             ),
           ]),
           "notifyingTasks",
         );
         assertThat(
-          await getBillingAccountSuspendingDueToPastDueTask(
-            SPANNER_DATABASE,
-            "billing1",
-          ),
+          await getBillingProfileSuspendingDueToPastDueTask(SPANNER_DATABASE, {
+            billingProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingAccountSuspendingDueToPastDueTaskBillingId: "billing1",
-                billingAccountSuspendingDueToPastDueTaskRetryCount: 0,
-                billingAccountSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
-                billingAccountSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
+                billingProfileSuspendingDueToPastDueTaskStatementId:
+                  "statement1",
+                billingProfileSuspendingDueToPastDueTaskRetryCount: 0,
+                billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
+                billingProfileSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
               },
-              GET_BILLING_ACCOUNT_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
+              GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
             ),
           ]),
           "accountSuspendingTasks",
@@ -165,11 +167,10 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingStatement({
+            insertPaymentStatement({
               accountId: "account1",
-              billingId: "billing1",
+              statementId: "statement1",
               state: PaymentState.FAILED,
-              month: "2024-10",
             }),
           ]);
           await transaction.commit();
@@ -191,7 +192,7 @@ TEST_RUNNER.run({
             retrieve: async (invoiceId: string) => {
               return {
                 metadata: {
-                  billingId: "billing1",
+                  statementId: "statement1",
                 },
               };
             },
@@ -209,44 +210,45 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getBilling(SPANNER_DATABASE, "billing1"),
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingData: {
-                  accountId: "account1",
-                  billingId: "billing1",
-                  state: PaymentState.FAILED,
-                  month: "2024-10",
-                },
+                paymentAccountId: "account1",
+                paymentStatementId: "statement1",
+                paymentState: PaymentState.FAILED,
               },
-              GET_BILLING_ROW,
+              GET_PAYMENT_ROW,
             ),
           ]),
           "billing",
         );
         assertThat(
-          await getUpdatePaymentMethodNotifyingTask(
-            SPANNER_DATABASE,
-            "billing1",
-          ),
+          await getPaymentMethodNeedsUpdateNotifyingTask(SPANNER_DATABASE, {
+            paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                updatePaymentMethodNotifyingTaskBillingId: "billing1",
-                updatePaymentMethodNotifyingTaskRetryCount: 0,
-                updatePaymentMethodNotifyingTaskExecutionTimeMs: 1000,
-                updatePaymentMethodNotifyingTaskCreatedTimeMs: 1000,
+                paymentMethodNeedsUpdateNotifyingTaskStatementId: "statement1",
+                paymentMethodNeedsUpdateNotifyingTaskRetryCount: 0,
+                paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: 1000,
+                paymentMethodNeedsUpdateNotifyingTaskCreatedTimeMs: 1000,
               },
-              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_ROW,
+              GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
             ),
           ]),
           "notifyingTasks",
         );
         assertThat(
-          await listPendingBillingAccountSuspendingDueToPastDueTasks(
+          await listPendingBillingProfileSuspendingDueToPastDueTasks(
             SPANNER_DATABASE,
-            FUTURE_TIME_MS,
+            {
+              billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe:
+                FUTURE_TIME_MS,
+            },
           ),
           isArray([]),
           "accountSuspendingTasks",
@@ -262,18 +264,17 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingStatement({
+            insertPaymentStatement({
               accountId: "account1",
-              billingId: "billing1",
+              statementId: "statement1",
               state: PaymentState.FAILED,
-              month: "2024-10",
             }),
-            insertUpdatePaymentMethodNotifyingTaskStatement(
-              "billing1",
-              0,
-              100,
-              100,
-            ),
+            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -294,7 +295,7 @@ TEST_RUNNER.run({
             retrieve: async (invoiceId: string) => {
               return {
                 metadata: {
-                  billingId: "billing1",
+                  statementId: "statement1",
                 },
               };
             },
@@ -312,17 +313,19 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getUpdatePaymentMethodNotifyingTaskMetadata(
+          await getPaymentMethodNeedsUpdateNotifyingTaskMetadata(
             SPANNER_DATABASE,
-            "billing1",
+            {
+              paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+            },
           ),
           isArray([
             eqMessage(
               {
-                updatePaymentMethodNotifyingTaskRetryCount: 0,
-                updatePaymentMethodNotifyingTaskExecutionTimeMs: 100,
+                paymentMethodNeedsUpdateNotifyingTaskRetryCount: 0,
+                paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: 100,
               },
-              GET_UPDATE_PAYMENT_METHOD_NOTIFYING_TASK_METADATA_ROW,
+              GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_METADATA_ROW,
             ),
           ]),
           "notifyingTasks",

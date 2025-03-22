@@ -2,19 +2,22 @@ import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PayoutState } from "../db/schema";
 import {
-  GET_EARNINGS_ROW,
+  GET_PAYOUT_ROW,
   GET_PAYOUT_TASK_METADATA_ROW,
-  deleteEarningsAccountStatement,
-  deleteEarningsStatement,
+  deleteEarningsProfileStatement,
+  deletePayoutStatement,
   deletePayoutTaskStatement,
-  getEarnings,
+  deleteTransactionStatementStatement,
+  getPayout,
   getPayoutTaskMetadata,
-  insertEarningsAccountStatement,
-  insertEarningsStatement,
+  insertEarningsProfileStatement,
+  insertPayoutStatement,
   insertPayoutTaskStatement,
+  insertTransactionStatementStatement,
   listPendingPayoutTasks,
 } from "../db/sql";
 import { ProcessPayoutTaskHandler } from "./process_payout_task_handler";
+import { AmountType } from "@phading/price/amount_type";
 import { newBadRequestError } from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -28,12 +31,48 @@ import {
 } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
+async function insertPayout(): Promise<void> {
+  await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+    await transaction.batchUpdate([
+      insertEarningsProfileStatement({
+        accountId: "account1",
+        stripeConnectedAccountId: "stripConnectedAccount1",
+      }),
+      insertTransactionStatementStatement({
+        statementId: "statement1",
+        accountId: "account1",
+        statement: {
+          currency: "USD",
+          totalAmount: 1200,
+          totalAmountType: AmountType.CREDIT,
+        },
+      }),
+      insertPayoutStatement({
+        statementId: "statement1",
+        accountId: "account1",
+        state: PayoutState.PROCESSING,
+      }),
+      insertPayoutTaskStatement({
+        statementId: "statement1",
+        retryCount: 0,
+        executionTimeMs: 100,
+      }),
+    ]);
+    await transaction.commit();
+  });
+}
+
 async function cleanupAll(): Promise<void> {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      deleteEarningsAccountStatement("account1"),
-      deleteEarningsStatement("earnings1"),
-      deletePayoutTaskStatement("earnings1"),
+      deleteEarningsProfileStatement({
+        earningsProfileAccountIdEq: "account1",
+      }),
+      deleteTransactionStatementStatement({
+        transactionStatementStatementIdEq: "statement1",
+      }),
+      deletePayoutStatement({ payoutStatementIdEq: "statement1" }),
+      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement1" }),
     ]);
     await transaction.commit();
   });
@@ -46,24 +85,7 @@ TEST_RUNNER.run({
       name: "ProcessTask",
       execute: async () => {
         // Prepare
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            insertEarningsAccountStatement({
-              accountId: "account1",
-              stripeConnectedAccountId: "stripConnectedAccount1",
-            }),
-            insertEarningsStatement({
-              accountId: "account1",
-              earningsId: "earnings1",
-              state: PayoutState.PROCESSING,
-              month: "2021-01",
-              totalAmount: 1200,
-              currency: "USD",
-            }),
-            insertPayoutTaskStatement("earnings1", 0, 100, 100),
-          ]);
-          await transaction.commit();
-        });
+        await insertPayout();
         let stripeConnectedAccountIdCaptured: string;
         let createTransferParamsCaptured: any;
         let optionCaptured: any;
@@ -90,7 +112,7 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.processTask("", {
-          earningsId: "earnings1",
+          statementId: "statement1",
         });
 
         // Verify
@@ -116,31 +138,31 @@ TEST_RUNNER.run({
         );
         assertThat(
           optionCaptured.idempotencyKey,
-          eq("earnings1"),
+          eq("statement1"),
           "option.idempotencyKey",
         );
         assertThat(
-          await getEarnings(SPANNER_DATABASE, "earnings1"),
+          await getPayout(SPANNER_DATABASE, {
+            payoutStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                earningsData: {
-                  accountId: "account1",
-                  earningsId: "earnings1",
-                  state: PayoutState.PAID,
-                  month: "2021-01",
-                  totalAmount: 1200,
-                  currency: "USD",
-                  stripeTransferId: "transfer1",
-                },
+                payoutStatementId: "statement1",
+                payoutAccountId: "account1",
+                payoutState: PayoutState.PAID,
+                payoutStripeTransferId: "transfer1",
+                payoutUpdatedTimeMs: 1000,
               },
-              GET_EARNINGS_ROW,
+              GET_PAYOUT_ROW,
             ),
           ]),
-          "earnings",
+          "payout",
         );
         assertThat(
-          await listPendingPayoutTasks(SPANNER_DATABASE, 1000000),
+          await listPendingPayoutTasks(SPANNER_DATABASE, {
+            payoutTaskExecutionTimeMsLe: 1000000,
+          }),
           isArray([]),
           "payoutTasks",
         );
@@ -153,24 +175,7 @@ TEST_RUNNER.run({
       name: "PayoutFailed",
       execute: async () => {
         // Prepare
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            insertEarningsAccountStatement({
-              accountId: "account1",
-              stripeConnectedAccountId: "stripConnectedAccount1",
-            }),
-            insertEarningsStatement({
-              accountId: "account1",
-              earningsId: "earnings1",
-              state: PayoutState.PROCESSING,
-              month: "2021-01",
-              totalAmount: 1200,
-              currency: "USD",
-            }),
-            insertPayoutTaskStatement("earnings1", 0, 100, 100),
-          ]);
-          await transaction.commit();
-        });
+        await insertPayout();
         let stripeClientMock: any = {
           accounts: {
             retrieve: async () => {
@@ -192,30 +197,27 @@ TEST_RUNNER.run({
         // Execute
         let error = await assertReject(
           handler.processTask("", {
-            earningsId: "earnings1",
+            statementId: "statement1",
           }),
         );
 
         // Verify
         assertThat(error, eqError(new Error("Fake error")), "error");
         assertThat(
-          await getEarnings(SPANNER_DATABASE, "earnings1"),
+          await getPayout(SPANNER_DATABASE, {
+            payoutStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                earningsData: {
-                  accountId: "account1",
-                  earningsId: "earnings1",
-                  state: PayoutState.PROCESSING,
-                  month: "2021-01",
-                  totalAmount: 1200,
-                  currency: "USD",
-                },
+                payoutStatementId: "statement1",
+                payoutAccountId: "account1",
+                payoutState: PayoutState.PROCESSING,
               },
-              GET_EARNINGS_ROW,
+              GET_PAYOUT_ROW,
             ),
           ]),
-          "earnings",
+          "payout",
         );
       },
       tearDown: async () => {
@@ -226,24 +228,7 @@ TEST_RUNNER.run({
       name: "PayoutNotEnabledAndReportFailure",
       execute: async () => {
         // Prepare
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            insertEarningsAccountStatement({
-              accountId: "account1",
-              stripeConnectedAccountId: "stripConnectedAccount1",
-            }),
-            insertEarningsStatement({
-              accountId: "account1",
-              earningsId: "earnings1",
-              state: PayoutState.PROCESSING,
-              month: "2021-01",
-              totalAmount: 1200,
-              currency: "USD",
-            }),
-            insertPayoutTaskStatement("earnings1", 0, 100, 100),
-          ]);
-          await transaction.commit();
-        });
+        await insertPayout();
         let stripeClientMock: any = {
           accounts: {
             retrieve: async () => {
@@ -259,31 +244,31 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.processTask("", {
-          earningsId: "earnings1",
+          statementId: "statement1",
         });
 
         // Verify
         assertThat(
-          await getEarnings(SPANNER_DATABASE, "earnings1"),
+          await getPayout(SPANNER_DATABASE, {
+            payoutStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                earningsData: {
-                  accountId: "account1",
-                  earningsId: "earnings1",
-                  state: PayoutState.FAILED,
-                  month: "2021-01",
-                  totalAmount: 1200,
-                  currency: "USD",
-                },
+                payoutStatementId: "statement1",
+                payoutAccountId: "account1",
+                payoutState: PayoutState.FAILED,
+                payoutUpdatedTimeMs: 1000,
               },
-              GET_EARNINGS_ROW,
+              GET_PAYOUT_ROW,
             ),
           ]),
-          "earnings",
+          "payout",
         );
         assertThat(
-          await listPendingPayoutTasks(SPANNER_DATABASE, 1000000),
+          await listPendingPayoutTasks(SPANNER_DATABASE, {
+            payoutTaskExecutionTimeMsLe: 1000000,
+          }),
           isArray([]),
           "payoutTasks",
         );
@@ -293,22 +278,14 @@ TEST_RUNNER.run({
       },
     },
     {
-      name: "EarningsNotInProcessingState",
+      name: "PayoutNotInProcessingState",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
-              accountId: "account1",
-              stripeConnectedAccountId: "stripConnectedAccount1",
-            }),
-            insertEarningsStatement({
-              accountId: "account1",
-              earningsId: "earnings1",
+            insertPayoutStatement({
+              statementId: "statement1",
               state: PayoutState.PAID,
-              month: "2021-01",
-              totalAmount: 1200,
-              currency: "USD",
             }),
           ]);
           await transaction.commit();
@@ -323,7 +300,7 @@ TEST_RUNNER.run({
         // Execute
         let error = await assertReject(
           handler.processTask("", {
-            earningsId: "earnings1",
+            statementId: "statement1",
           }),
         );
 
@@ -331,9 +308,7 @@ TEST_RUNNER.run({
         assertThat(
           error,
           eqHttpError(
-            newBadRequestError(
-              "Earnings earnings1 is not in PROCESSING state.",
-            ),
+            newBadRequestError("Payout statement1 is not in PROCESSING state."),
           ),
           "error",
         );
@@ -348,7 +323,11 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertPayoutTaskStatement("earnings1", 0, 100, 100),
+            insertPayoutTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -360,12 +339,14 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.claimTask("", {
-          earningsId: "earnings1",
+          statementId: "statement1",
         });
 
         // Verify
         assertThat(
-          await getPayoutTaskMetadata(SPANNER_DATABASE, "earnings1"),
+          await getPayoutTaskMetadata(SPANNER_DATABASE, {
+            payoutTaskStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {

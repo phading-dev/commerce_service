@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
-import { getBillingAccount } from "../../db/sql";
+import { getBillingProfile } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { GetPrimaryPaymentMethodHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
 import {
@@ -10,7 +10,7 @@ import {
   GetPrimaryPaymentMethodResponse,
 } from "@phading/commerce_service_interface/web/billing/interface";
 import { CARD_BRAND } from "@phading/commerce_service_interface/web/billing/payment_method_masked";
-import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
+import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newInternalServerErrorError } from "@selfage/http_error";
 import { parseEnum } from "@selfage/message/parser";
 import { NodeServiceClient } from "@selfage/node_service_client";
@@ -39,7 +39,7 @@ export class GetPrimaryPaymentMethodHandler extends GetPrimaryPaymentMethodHandl
     sessionStr: string,
   ): Promise<GetPrimaryPaymentMethodResponse> {
     let { accountId, capabilities } = await this.serviceClient.send(
-      newExchangeSessionAndCheckCapabilityRequest({
+      newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanBeBilled: true,
@@ -51,23 +51,24 @@ export class GetPrimaryPaymentMethodHandler extends GetPrimaryPaymentMethodHandl
         `Account ${accountId} cannot get primary payment method.`,
       );
     }
-    let rows = await getBillingAccount(this.database, accountId);
+    let rows = await getBillingProfile(this.database, {
+      billingProfileAccountIdEq: accountId,
+    });
     if (rows.length === 0) {
       throw newInternalServerErrorError(
         `Billing account ${accountId} is not found.`,
       );
     }
-    let account = rows[0].billingAccountData;
-
+    let row = rows[0];
     let stripeCustomer = await this.stripeClient.val.customers.retrieve(
-      account.stripeCustomerId,
+      row.billingProfileStripePaymentCustomerId,
     );
     let primaryPaymentMethodId = (stripeCustomer as Stripe.Customer)
       .invoice_settings.default_payment_method as string;
     // If not found, an error is thrown.
     let paymentMethod =
       await this.stripeClient.val.customers.retrievePaymentMethod(
-        account.stripeCustomerId,
+        row.billingProfileStripePaymentCustomerId,
         primaryPaymentMethodId,
       );
     return {

@@ -2,21 +2,23 @@ import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { StripeConnectedAccountState } from "../db/schema";
 import {
-  GET_EARNINGS_ACCOUNT_ROW,
+  GET_EARNINGS_PROFILE_ROW,
   GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_METADATA_ROW,
-  deleteEarningsAccountStatement,
-  deleteSetupStripeConnectedAccountNotifyingTaskStatement,
+  deleteEarningsProfileStatement,
   deleteStripeConnectedAccountCreatingTaskStatement,
-  getEarningsAccount,
+  deleteStripeConnectedAccountNeedsSetupNotifyingTaskStatement,
+  getEarningsProfile,
   getStripeConnectedAccountCreatingTaskMetadata,
-  insertEarningsAccountStatement,
+  insertEarningsProfileStatement,
   insertStripeConnectedAccountCreatingTaskStatement,
-  listPendingSetupStripeConnectedAccountNotifyingTasks,
   listPendingStripeConnectedAccountCreatingTasks,
 } from "../db/sql";
 import { ProcessStripeConnectedAccountCreatingTaskHandler } from "./process_stripe_connected_account_creating_task_handler";
 import { GetAccountContactResponse } from "@phading/user_service_interface/node/interface";
-import { newInternalServerErrorError } from "@selfage/http_error";
+import {
+  newBadRequestError,
+  newInternalServerErrorError,
+} from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
@@ -39,15 +41,15 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
+            insertEarningsProfileStatement({
               accountId: "account1",
             }),
-            insertStripeConnectedAccountCreatingTaskStatement(
-              "account1",
-              0,
-              100,
-              100,
-            ),
+            insertStripeConnectedAccountCreatingTaskStatement({
+              accountId: "account1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -93,26 +95,26 @@ TEST_RUNNER.run({
           "options.idempotencyKey",
         );
         assertThat(
-          await getEarningsAccount(SPANNER_DATABASE, "account1"),
+          await getEarningsProfile(SPANNER_DATABASE, {
+            earningsProfileAccountIdEq: "account1",
+          }),
           isArray([
             eqMessage(
               {
-                earningsAccountData: {
-                  accountId: "account1",
-                  stripeConnectedAccountId: "stripeAccount1",
-                  stripeConnectedAccountState:
-                    StripeConnectedAccountState.ONBOARDING,
-                },
+                earningsProfileAccountId: "account1",
+                earningsProfileStripeConnectedAccountId: "stripeAccount1",
+                earningsProfileStripeConnectedAccountState:
+                  StripeConnectedAccountState.ONBOARDING,
               },
-              GET_EARNINGS_ACCOUNT_ROW,
+              GET_EARNINGS_PROFILE_ROW,
             ),
           ]),
-          "earningsAccount",
+          "profile",
         );
         assertThat(
           await listPendingStripeConnectedAccountCreatingTasks(
             SPANNER_DATABASE,
-            1000000,
+            { stripeConnectedAccountCreatingTaskExecutionTimeMsLe: 1000000 },
           ),
           isArray([]),
           "stripeConnectedAccountCreatingTasks",
@@ -121,9 +123,16 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
-            deleteSetupStripeConnectedAccountNotifyingTaskStatement("account1"),
-            deleteStripeConnectedAccountCreatingTaskStatement("account1"),
+            deleteEarningsProfileStatement({
+              earningsProfileAccountIdEq: "account1",
+            }),
+            deleteStripeConnectedAccountNeedsSetupNotifyingTaskStatement({
+              stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq:
+                "account1",
+            }),
+            deleteStripeConnectedAccountCreatingTaskStatement({
+              stripeConnectedAccountCreatingTaskAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });
@@ -135,18 +144,12 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
+            insertEarningsProfileStatement({
               accountId: "account1",
               stripeConnectedAccountId: "stripeAccount1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDING,
             }),
-            insertStripeConnectedAccountCreatingTaskStatement(
-              "account1",
-              0,
-              100,
-              100,
-            ),
           ]);
           await transaction.commit();
         });
@@ -172,33 +175,29 @@ TEST_RUNNER.run({
         );
 
         // Execute
-        await handler.processTask("", {
-          accountId: "account1",
-        });
+        let error = await assertReject(
+          handler.processTask("", {
+            accountId: "account1",
+          }),
+        );
 
         // Verify
         assertThat(
-          await listPendingSetupStripeConnectedAccountNotifyingTasks(
-            SPANNER_DATABASE,
-            1000000,
+          error,
+          eqHttpError(
+            newBadRequestError(
+              "Earnings profile account1 already has a stripe connected account id stripeAccount1.",
+            ),
           ),
-          isArray([]),
-          "SetupStripeConnectedAccountNotifyingTasks",
-        );
-        assertThat(
-          await listPendingStripeConnectedAccountCreatingTasks(
-            SPANNER_DATABASE,
-            1000000,
-          ),
-          isArray([]),
-          "StripeConnectedAccountCreatingTasks",
+          "error",
         );
       },
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
-            deleteStripeConnectedAccountCreatingTaskStatement("account1"),
+            deleteEarningsProfileStatement({
+              earningsProfileAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });
@@ -210,18 +209,12 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
+            insertEarningsProfileStatement({
               accountId: "account1",
               stripeConnectedAccountId: "stripeAccount1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDING,
             }),
-            insertStripeConnectedAccountCreatingTaskStatement(
-              "account1",
-              0,
-              100,
-              100,
-            ),
           ]);
           await transaction.commit();
         });
@@ -258,7 +251,7 @@ TEST_RUNNER.run({
           error,
           eqHttpError(
             newInternalServerErrorError(
-              "Earnings account account1 already has a stripe connected account id stripeAccount1 which is different from the new one stripeAccount2.",
+              "Earnings profile account1 already has a stripe connected account id stripeAccount1 which is different from the new one stripeAccount2.",
             ),
           ),
           "error",
@@ -267,8 +260,9 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
-            deleteStripeConnectedAccountCreatingTaskStatement("account1"),
+            deleteEarningsProfileStatement({
+              earningsProfileAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });
@@ -280,15 +274,15 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
+            insertEarningsProfileStatement({
               accountId: "account1",
             }),
-            insertStripeConnectedAccountCreatingTaskStatement(
-              "account1",
-              0,
-              100,
-              100,
-            ),
+            insertStripeConnectedAccountCreatingTaskStatement({
+              accountId: "account1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -324,8 +318,12 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
-            deleteStripeConnectedAccountCreatingTaskStatement("account1"),
+            deleteEarningsProfileStatement({
+              earningsProfileAccountIdEq: "account1",
+            }),
+            deleteStripeConnectedAccountCreatingTaskStatement({
+              stripeConnectedAccountCreatingTaskAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });
@@ -337,12 +335,12 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertStripeConnectedAccountCreatingTaskStatement(
-              "account1",
-              0,
-              100,
-              100,
-            ),
+            insertStripeConnectedAccountCreatingTaskStatement({
+              accountId: "account1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -362,7 +360,7 @@ TEST_RUNNER.run({
         assertThat(
           await getStripeConnectedAccountCreatingTaskMetadata(
             SPANNER_DATABASE,
-            "account1",
+            { stripeConnectedAccountCreatingTaskAccountIdEq: "account1" },
           ),
           isArray([
             eqMessage(
@@ -379,7 +377,9 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteStripeConnectedAccountCreatingTaskStatement("account1"),
+            deleteStripeConnectedAccountCreatingTaskStatement({
+              stripeConnectedAccountCreatingTaskAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });

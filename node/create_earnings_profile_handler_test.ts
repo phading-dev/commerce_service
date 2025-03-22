@@ -1,26 +1,26 @@
 import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
-  GET_EARNINGS_ACCOUNT_ROW,
+  GET_EARNINGS_PROFILE_ROW,
   GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW,
-  deleteEarningsAccountStatement,
+  deleteEarningsProfileStatement,
   deleteStripeConnectedAccountCreatingTaskStatement,
-  getEarningsAccount,
+  getEarningsProfile,
   getStripeConnectedAccountCreatingTask,
 } from "../db/sql";
-import { CreateEarningsAccountHandler } from "./create_earnings_account_handler";
+import { CreateEarningsProfileHandler } from "./create_earnings_profile_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { assertThat, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "CreateEarningsAccountHandlerTest",
+  name: "CreateEarningsProfileHandlerTest",
   cases: [
     {
       name: "Success",
       execute: async () => {
         // Prepare
-        let handler = new CreateEarningsAccountHandler(
+        let handler = new CreateEarningsProfileHandler(
           SPANNER_DATABASE,
           () => 1000,
         );
@@ -30,24 +30,24 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getEarningsAccount(SPANNER_DATABASE, "account1"),
+          await getEarningsProfile(SPANNER_DATABASE, {
+            earningsProfileAccountIdEq: "account1",
+          }),
           isArray([
             eqMessage(
               {
-                earningsAccountData: {
-                  accountId: "account1",
-                },
+                earningsProfileAccountId: "account1",
+                earningsProfileCreatedTimeMs: 1000,
               },
-              GET_EARNINGS_ACCOUNT_ROW,
+              GET_EARNINGS_PROFILE_ROW,
             ),
           ]),
           "account",
         );
         assertThat(
-          await getStripeConnectedAccountCreatingTask(
-            SPANNER_DATABASE,
-            "account1",
-          ),
+          await getStripeConnectedAccountCreatingTask(SPANNER_DATABASE, {
+            stripeConnectedAccountCreatingTaskAccountIdEq: "account1",
+          }),
           isArray([
             eqMessage(
               {
@@ -70,8 +70,12 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsAccountStatement("account1"),
-            deleteStripeConnectedAccountCreatingTaskStatement("account1"),
+            deleteEarningsProfileStatement({
+              earningsProfileAccountIdEq: "account1",
+            }),
+            deleteStripeConnectedAccountCreatingTaskStatement({
+              stripeConnectedAccountCreatingTaskAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });

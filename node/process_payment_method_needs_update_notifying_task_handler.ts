@@ -5,17 +5,17 @@ import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { URL_BUILDER } from "../common/url_builder";
 import {
-  deleteUpdatePaymentMethodNotifyingTaskStatement,
-  getBilling,
-  getUpdatePaymentMethodNotifyingTaskMetadata,
-  updateUpdatePaymentMethodNotifyingTaskMetadataStatement,
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
+  getTransactionStatement,
+  updatePaymentMethodNeedsUpdateNotifyingTaskMetadataStatement,
 } from "../db/sql";
 import { ENV_VARS } from "../env_vars";
 import { Database } from "@google-cloud/spanner";
-import { ProcessUpdatePaymentMethodNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { ProcessPaymentMethodNeedsUpdateNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessUpdatePaymentMethodNotifyingTaskRequestBody,
-  ProcessUpdatePaymentMethodNotifyingTaskResponse,
+  ProcessPaymentMethodNeedsUpdateNotifyingTaskRequestBody,
+  ProcessPaymentMethodNeedsUpdateNotifyingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
@@ -26,9 +26,9 @@ import {
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessUpdatePaymentMethodNotifyingTaskHandler extends ProcessUpdatePaymentMethodNotifyingTaskHandlerInterface {
-  public static create(): ProcessUpdatePaymentMethodNotifyingTaskHandler {
-    return new ProcessUpdatePaymentMethodNotifyingTaskHandler(
+export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends ProcessPaymentMethodNeedsUpdateNotifyingTaskHandlerInterface {
+  public static create(): ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler {
+    return new ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler(
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       SENDGRID_CLIENT,
@@ -37,7 +37,11 @@ export class ProcessUpdatePaymentMethodNotifyingTaskHandler extends ProcessUpdat
     );
   }
 
-  private taskHandler: ProcessTaskHandlerWrapper;
+  private taskHandler = ProcessTaskHandlerWrapper.create(
+    this.descriptor,
+    5 * 60 * 1000,
+    24 * 60 * 60 * 1000,
+  );
 
   public constructor(
     private database: Database,
@@ -47,18 +51,13 @@ export class ProcessUpdatePaymentMethodNotifyingTaskHandler extends ProcessUpdat
     private getNow: () => number,
   ) {
     super();
-    this.taskHandler = ProcessTaskHandlerWrapper.create(
-      this.descriptor,
-      5 * 60 * 1000,
-      24 * 60 * 60 * 1000,
-    );
   }
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessUpdatePaymentMethodNotifyingTaskRequestBody,
-  ): Promise<ProcessUpdatePaymentMethodNotifyingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Update payment method notifying task for billing ${body.billingId}:`;
+    body: ProcessPaymentMethodNeedsUpdateNotifyingTaskRequestBody,
+  ): Promise<ProcessPaymentMethodNeedsUpdateNotifyingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Update payment method notifying task for statement ${body.statementId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -69,26 +68,30 @@ export class ProcessUpdatePaymentMethodNotifyingTaskHandler extends ProcessUpdat
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessUpdatePaymentMethodNotifyingTaskRequestBody,
+    body: ProcessPaymentMethodNeedsUpdateNotifyingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getUpdatePaymentMethodNotifyingTaskMetadata(
+      let rows = await getPaymentMethodNeedsUpdateNotifyingTaskMetadata(
         transaction,
-        body.billingId,
+        {
+          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: body.statementId,
+        },
       );
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updateUpdatePaymentMethodNotifyingTaskMetadataStatement(
-          body.billingId,
-          task.updatePaymentMethodNotifyingTaskRetryCount + 1,
-          this.getNow() +
+        updatePaymentMethodNeedsUpdateNotifyingTaskMetadataStatement({
+          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: body.statementId,
+          setRetryCount:
+            task.paymentMethodNeedsUpdateNotifyingTaskRetryCount + 1,
+          setExecutionTimeMs:
+            this.getNow() +
             this.taskHandler.getBackoffTime(
-              task.updatePaymentMethodNotifyingTaskRetryCount,
+              task.paymentMethodNeedsUpdateNotifyingTaskRetryCount,
             ),
-        ),
+        }),
       ]);
       await transaction.commit();
     });
@@ -96,29 +99,33 @@ export class ProcessUpdatePaymentMethodNotifyingTaskHandler extends ProcessUpdat
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessUpdatePaymentMethodNotifyingTaskRequestBody,
+    body: ProcessPaymentMethodNeedsUpdateNotifyingTaskRequestBody,
   ): Promise<void> {
-    let billingRows = await getBilling(this.database, body.billingId);
-    if (billingRows.length === 0) {
+    let statementRows = await getTransactionStatement(this.database, {
+      transactionStatementStatementIdEq: body.statementId,
+    });
+    if (statementRows.length === 0) {
       throw newInternalServerErrorError(
-        `${loggingPrefix} Billing ${body.billingId} is not found.`,
+        `${loggingPrefix} Statement ${body.statementId} is not found.`,
       );
     }
-    let billing = billingRows[0].billingData;
+    let transactionStatement = statementRows[0];
     let { naturalName, contactEmail } = await this.serviceClient.send(
-      newGetAccountContactRequest({ accountId: billing.accountId }),
+      newGetAccountContactRequest({
+        accountId: transactionStatement.transactionStatementAccountId,
+      }),
     );
     await this.sendgridClient.send({
       to: contactEmail,
       from: ENV_VARS.fromEmailAddress,
       templateId: LOCALIZATION.updatePaymentMethodEmailTemplateId,
       dynamicTemplateData: {
-        month: billing.month,
+        month: transactionStatement.transactionStatementMonth,
         name: naturalName,
         gradePeriodDays: GRACE_PERIOD_DAYS,
         updatePaymentMethodUrl: this.urlBuilder.build({
           main: {
-            accountId: billing.accountId,
+            accountId: transactionStatement.transactionStatementAccountId,
             account: {
               billing: {},
             },
@@ -128,7 +135,9 @@ export class ProcessUpdatePaymentMethodNotifyingTaskHandler extends ProcessUpdat
     });
     await this.database.runTransactionAsync(async (transaction) => {
       await transaction.batchUpdate([
-        deleteUpdatePaymentMethodNotifyingTaskStatement(body.billingId),
+        deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: body.statementId,
+        }),
       ]);
       await transaction.commit();
     });

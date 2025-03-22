@@ -2,11 +2,11 @@ import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PayoutState, StripeConnectedAccountState } from "../../db/schema";
 import {
-  getEarningsAccount,
+  getEarningsProfile,
   insertPayoutTaskStatement,
-  listEarningsByState,
-  updateEarningsAccountStatement,
-  updateEarningsStatement,
+  listPayoutsByState,
+  updateEarningsProfileConnectedAccountStateStatement,
+  updatePayoutStateStatement,
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { Statement } from "@google-cloud/spanner/build/src/transaction";
@@ -15,7 +15,7 @@ import {
   SetConnectedAccountOnboardedRequestBody,
   SetConnectedAccountOnboardedResponse,
 } from "@phading/commerce_service_interface/web/earnings/interface";
-import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
+import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import {
   newInternalServerErrorError,
   newUnauthorizedError,
@@ -45,46 +45,58 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
     sessionStr: string,
   ): Promise<SetConnectedAccountOnboardedResponse> {
     let { accountId, capabilities } = await this.serviceClient.send(
-      newExchangeSessionAndCheckCapabilityRequest({
+      newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanEarn: true,
         },
       }),
     );
-    if (accountId !== body.accountId) {
-      throw newUnauthorizedError(
-        `Account ${body.accountId} cannot be updated by logged-in account ${accountId}.`,
-      );
-    }
     if (!capabilities.canEarn) {
       throw newUnauthorizedError(
-        `Account ${accountId} cannot set connected account onboarded.`,
+        `Account ${accountId} is not allowed to set connected account onboarded.`,
+      );
+    }
+    if (accountId !== body.accountId) {
+      throw newUnauthorizedError(
+        `Earnings profile ${body.accountId} cannot be updated by the logged-in account ${accountId}.`,
       );
     }
     await this.database.runTransactionAsync(async (transaction) => {
-      let [accountRows, earningsRows] = await Promise.all([
-        getEarningsAccount(transaction, accountId),
-        listEarningsByState(transaction, accountId, PayoutState.FAILED),
+      let [profileRows, payoutRows] = await Promise.all([
+        getEarningsProfile(transaction, {
+          earningsProfileAccountIdEq: accountId,
+        }),
+        listPayoutsByState(transaction, {
+          payoutAccountIdEq: accountId,
+          payoutStateEq: PayoutState.FAILED,
+        }),
       ]);
-      if (accountRows.length === 0) {
+      if (profileRows.length === 0) {
         throw newInternalServerErrorError(
           `Earnings account ${accountId} is not found.`,
         );
       }
-      let account = accountRows[0].earningsAccountData;
-      account.stripeConnectedAccountState =
-        StripeConnectedAccountState.ONBOARDED;
       let statements: Array<Statement> = [
-        updateEarningsAccountStatement(account),
+        updateEarningsProfileConnectedAccountStateStatement({
+          earningsProfileAccountIdEq: accountId,
+          setStripeConnectedAccountState: StripeConnectedAccountState.ONBOARDED,
+        }),
       ];
       let now = this.getNow();
-      earningsRows.forEach((row) => {
-        let earnings = row.earningsData;
-        earnings.state = PayoutState.PROCESSING;
+      payoutRows.forEach((payout) => {
         statements.push(
-          updateEarningsStatement(earnings),
-          insertPayoutTaskStatement(earnings.earningsId, 0, now, now),
+          updatePayoutStateStatement({
+            payoutStatementIdEq: payout.payoutStatementId,
+            setState: PayoutState.PROCESSING,
+            setUpdatedTimeMs: now,
+          }),
+          insertPayoutTaskStatement({
+            statementId: payout.payoutStatementId,
+            retryCount: 0,
+            executionTimeMs: now,
+            createdTimeMs: now,
+          }),
         );
       });
       await transaction.batchUpdate(statements);

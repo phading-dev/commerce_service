@@ -1,13 +1,14 @@
 import { EnumDescriptor, PrimitiveType, MessageDescriptor } from '@selfage/message/descriptor';
-import { ProductType, PRODUCT_TYPE } from '@phading/price/price';
+import { ProductID, PRODUCT_I_D } from '@phading/price/price';
+import { AmountType, AMOUNT_TYPE } from '@phading/price/amount_type';
 
-export enum BillingAccountState {
+export enum BillingProfileState {
   HEALTHY = 1,
   SUSPENDED = 2,
 }
 
-export let BILLING_ACCOUNT_STATE: EnumDescriptor<BillingAccountState> = {
-  name: 'BillingAccountState',
+export let BILLING_PROFILE_STATE: EnumDescriptor<BillingProfileState> = {
+  name: 'BillingProfileState',
   values: [{
     name: 'HEALTHY',
     value: 1,
@@ -17,14 +18,14 @@ export let BILLING_ACCOUNT_STATE: EnumDescriptor<BillingAccountState> = {
   }]
 }
 
-export interface BillingAccountStateInfo {
+export interface BillingProfileStateInfo {
   version?: number,
-  state?: BillingAccountState,
+  state?: BillingProfileState,
   updatedTimeMs?: number,
 }
 
-export let BILLING_ACCOUNT_STATE_INFO: MessageDescriptor<BillingAccountStateInfo> = {
-  name: 'BillingAccountStateInfo',
+export let BILLING_PROFILE_STATE_INFO: MessageDescriptor<BillingProfileStateInfo> = {
+  name: 'BillingProfileStateInfo',
   fields: [{
     name: 'version',
     index: 1,
@@ -32,145 +33,11 @@ export let BILLING_ACCOUNT_STATE_INFO: MessageDescriptor<BillingAccountStateInfo
   }, {
     name: 'state',
     index: 2,
-    enumType: BILLING_ACCOUNT_STATE,
+    enumType: BILLING_PROFILE_STATE,
   }, {
     name: 'updatedTimeMs',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export interface BillingAccount {
-  accountId?: string,
-  stripeCustomerId?: string,
-  stateInfo?: BillingAccountStateInfo,
-  paymentAfterMs?: number,
-}
-
-export let BILLING_ACCOUNT: MessageDescriptor<BillingAccount> = {
-  name: 'BillingAccount',
-  fields: [{
-    name: 'accountId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'stripeCustomerId',
-    index: 2,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'stateInfo',
-    index: 3,
-    messageType: BILLING_ACCOUNT_STATE_INFO,
-  }, {
-    name: 'paymentAfterMs',
-    index: 4,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export enum PaymentState {
-  PROCESSING = 1,
-  CHARGING = 2,
-  PAID = 3,
-  FAILED = 4,
-}
-
-export let PAYMENT_STATE: EnumDescriptor<PaymentState> = {
-  name: 'PaymentState',
-  values: [{
-    name: 'PROCESSING',
-    value: 1,
-  }, {
-    name: 'CHARGING',
-    value: 2,
-  }, {
-    name: 'PAID',
-    value: 3,
-  }, {
-    name: 'FAILED',
-    value: 4,
-  }]
-}
-
-export interface LineItem {
-  productType?: ProductType,
-  quantity?: number,
-  amount?: number,
-}
-
-export let LINE_ITEM: MessageDescriptor<LineItem> = {
-  name: 'LineItem',
-  fields: [{
-    name: 'productType',
-    index: 1,
-    enumType: PRODUCT_TYPE,
-  }, {
-    name: 'quantity',
-    index: 2,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'amount',
-    index: 3,
-    primitiveType: PrimitiveType.NUMBER,
-  }],
-};
-
-export interface Billing {
-  accountId?: string,
-  billingId?: string,
-  createdTimeMs?: number,
-  state?: PaymentState,
-  month?: string,
-  currency?: string,
-  totalAmount?: number,
-  items?: Array<LineItem>,
-  stripeInvoiceId?: string,
-  stripeInvoiceUrl?: string,
-}
-
-export let BILLING: MessageDescriptor<Billing> = {
-  name: 'Billing',
-  fields: [{
-    name: 'accountId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'billingId',
-    index: 2,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'createdTimeMs',
-    index: 3,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'state',
-    index: 4,
-    enumType: PAYMENT_STATE,
-  }, {
-    name: 'month',
-    index: 5,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'currency',
-    index: 6,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'totalAmount',
-    index: 7,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'items',
-    index: 8,
-    messageType: LINE_ITEM,
-    isArray: true,
-  }, {
-    name: 'stripeInvoiceId',
-    index: 9,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'stripeInvoiceUrl',
-    index: 10,
-    primitiveType: PrimitiveType.STRING,
   }],
 };
 
@@ -190,28 +57,96 @@ export let STRIPE_CONNECTED_ACCOUNT_STATE: EnumDescriptor<StripeConnectedAccount
   }]
 }
 
-export interface EarningsAccount {
-  accountId?: string,
-  stripeConnectedAccountId?: string,
-  stripeConnectedAccountState?: StripeConnectedAccountState,
+export interface LineItem {
+  productID?: ProductID,
+  unit?: string,
+  amountType?: AmountType,
+  quantity?: number,
+  amount?: number,
 }
 
-export let EARNINGS_ACCOUNT: MessageDescriptor<EarningsAccount> = {
-  name: 'EarningsAccount',
+export let LINE_ITEM: MessageDescriptor<LineItem> = {
+  name: 'LineItem',
   fields: [{
-    name: 'accountId',
+    name: 'productID',
     index: 1,
-    primitiveType: PrimitiveType.STRING,
+    enumType: PRODUCT_I_D,
   }, {
-    name: 'stripeConnectedAccountId',
+    name: 'unit',
     index: 2,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'stripeConnectedAccountState',
+    name: 'amountType',
     index: 3,
-    enumType: STRIPE_CONNECTED_ACCOUNT_STATE,
+    enumType: AMOUNT_TYPE,
+  }, {
+    name: 'quantity',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'amount',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
   }],
 };
+
+export interface TransactionStatement {
+  currency?: string,
+  totalAmount?: number,
+  totalAmountType?: AmountType,
+  positiveAmountType?: AmountType,
+  items?: Array<LineItem>,
+}
+
+export let TRANSACTION_STATEMENT: MessageDescriptor<TransactionStatement> = {
+  name: 'TransactionStatement',
+  fields: [{
+    name: 'currency',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'totalAmount',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'totalAmountType',
+    index: 3,
+    enumType: AMOUNT_TYPE,
+  }, {
+    name: 'positiveAmountType',
+    index: 4,
+    enumType: AMOUNT_TYPE,
+  }, {
+    name: 'items',
+    index: 5,
+    messageType: LINE_ITEM,
+    isArray: true,
+  }],
+};
+
+export enum PaymentState {
+  PROCESSING = 1,
+  CHARGING_VIA_STRIPE_INVOICE = 2,
+  PAID = 3,
+  FAILED = 4,
+}
+
+export let PAYMENT_STATE: EnumDescriptor<PaymentState> = {
+  name: 'PaymentState',
+  values: [{
+    name: 'PROCESSING',
+    value: 1,
+  }, {
+    name: 'CHARGING_VIA_STRIPE_INVOICE',
+    value: 2,
+  }, {
+    name: 'PAID',
+    value: 3,
+  }, {
+    name: 'FAILED',
+    value: 4,
+  }]
+}
 
 export enum PayoutState {
   PROCESSING = 1,
@@ -232,57 +167,3 @@ export let PAYOUT_STATE: EnumDescriptor<PayoutState> = {
     value: 3,
   }]
 }
-
-export interface Earnings {
-  accountId?: string,
-  earningsId?: string,
-  createdTimeMs?: number,
-  state?: PayoutState,
-  month?: string,
-  currency?: string,
-  totalAmount?: number,
-  items?: Array<LineItem>,
-  stripeTransferId?: string,
-}
-
-export let EARNINGS: MessageDescriptor<Earnings> = {
-  name: 'Earnings',
-  fields: [{
-    name: 'accountId',
-    index: 1,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'earningsId',
-    index: 2,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'createdTimeMs',
-    index: 3,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'state',
-    index: 4,
-    enumType: PAYOUT_STATE,
-  }, {
-    name: 'month',
-    index: 5,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'currency',
-    index: 6,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'totalAmount',
-    index: 7,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'items',
-    index: 8,
-    messageType: LINE_ITEM,
-    isArray: true,
-  }, {
-    name: 'stripeTransferId',
-    index: 9,
-    primitiveType: PrimitiveType.STRING,
-  }],
-};

@@ -4,9 +4,10 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
 import {
-  deleteBillingAccountSuspendingDueToPastDueTaskStatement,
-  getBilling,
-  updateBillingStatement,
+  deleteBillingProfileSuspendingDueToPastDueTaskStatement,
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  getPayment,
+  updatePaymentStateStatement,
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { MarkPaymentDoneHandlerInterface } from "@phading/commerce_service_interface/web/stripe_webhook/handler";
@@ -26,6 +27,7 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       stripePaymentIntentSuccessSecretKey,
+      () => Date.now(),
     );
   }
 
@@ -33,6 +35,7 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
     private database: Database,
     private stripeClient: Ref<Stripe>,
     private stripeSecretKey: string,
+    private getNow: () => number,
   ) {
     super();
   }
@@ -55,22 +58,33 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
     let invoiceId = event.data.object.invoice as string;
     let invoice = await this.stripeClient.val.invoices.retrieve(invoiceId);
     await this.database.runTransactionAsync(async (transaction) => {
-      let billingRows = await getBilling(
-        transaction,
-        invoice.metadata.billingId,
-      );
-      if (billingRows.length === 0) {
+      let statementId = invoice.metadata.statementId;
+      let rows = await getPayment(transaction, {
+        paymentStatementIdEq: statementId,
+      });
+      if (rows.length === 0) {
         throw newInternalServerErrorError(
-          `Billing ${invoice.metadata.billingId} is not found.`,
+          `Payment ${statementId} is not found.`,
         );
       }
-      let billing = billingRows[0].billingData;
-      billing.state = PaymentState.PAID;
+      let row = rows[0];
+      if (row.paymentState !== PaymentState.CHARGING_VIA_STRIPE_INVOICE) {
+        console.warn(
+          `${loggingPrefix} Payment ${statementId} is in CHARGING state but in ${PaymentState[row.paymentState]} and yet completed.`,
+        );
+      }
       await transaction.batchUpdate([
-        updateBillingStatement(billing),
-        deleteBillingAccountSuspendingDueToPastDueTaskStatement(
-          billing.billingId,
-        ),
+        updatePaymentStateStatement({
+          paymentStatementIdEq: statementId,
+          setState: PaymentState.PAID,
+          setUpdatedTimeMs: this.getNow(),
+        }),
+        deleteBillingProfileSuspendingDueToPastDueTaskStatement({
+          billingProfileSuspendingDueToPastDueTaskStatementIdEq: statementId,
+        }),
+        deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: statementId,
+        }),
       ]);
       await transaction.commit();
     });

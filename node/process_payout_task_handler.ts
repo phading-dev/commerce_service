@@ -1,13 +1,16 @@
 import Stripe from "stripe";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
-import { Earnings, PayoutState } from "../db/schema";
+import { PayoutState } from "../db/schema";
 import {
+  GetPayoutRow,
   deletePayoutTaskStatement,
-  getEarnings,
-  getEarningsAccountFromEarnings,
+  getEarningsProfileFromStatement,
+  getPayout,
   getPayoutTaskMetadata,
-  updateEarningsStatement,
+  getTransactionStatement,
+  updatePayoutStateAndStripeTransferStatement,
+  updatePayoutStateStatement,
   updatePayoutTaskMetadataStatement,
 } from "../db/sql";
 import { Database, Transaction } from "@google-cloud/spanner";
@@ -16,6 +19,7 @@ import {
   ProcessPayoutTaskRequestBody,
   ProcessPayoutTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
+import { AmountType } from "@phading/price/amount_type";
 import {
   newBadRequestError,
   newInternalServerErrorError,
@@ -30,7 +34,11 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
     );
   }
 
-  private taskHandler: ProcessTaskHandlerWrapper;
+  private taskHandler = ProcessTaskHandlerWrapper.create(
+    this.descriptor,
+    5 * 60 * 1000,
+    24 * 60 * 60 * 1000,
+  );
 
   public constructor(
     private database: Database,
@@ -38,18 +46,13 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
     private getNow: () => number,
   ) {
     super();
-    this.taskHandler = ProcessTaskHandlerWrapper.create(
-      this.descriptor,
-      5 * 60 * 1000,
-      24 * 60 * 60 * 1000,
-    );
   }
 
   public async handle(
     loggingPrefix: string,
     body: ProcessPayoutTaskRequestBody,
   ): Promise<ProcessPayoutTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payout task for earnings ${body.earningsId}:`;
+    loggingPrefix = `${loggingPrefix} Payout task for statement ${body.statementId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -63,18 +66,21 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
     body: ProcessPayoutTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getPayoutTaskMetadata(transaction, body.earningsId);
+      let rows = await getPayoutTaskMetadata(transaction, {
+        payoutTaskStatementIdEq: body.statementId,
+      });
       if (rows.length === 0) {
         throw newBadRequestError(`${loggingPrefix} Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updatePayoutTaskMetadataStatement(
-          body.earningsId,
-          task.payoutTaskRetryCount + 1,
-          this.getNow() +
+        updatePayoutTaskMetadataStatement({
+          payoutTaskStatementIdEq: body.statementId,
+          setRetryCount: task.payoutTaskRetryCount + 1,
+          setExecutionTimeMs:
+            this.getNow() +
             this.taskHandler.getBackoffTime(task.payoutTaskRetryCount),
-        ),
+        }),
       ]);
       await transaction.commit();
     });
@@ -84,47 +90,72 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
     loggingPrefix: string,
     body: ProcessPayoutTaskRequestBody,
   ): Promise<void> {
-    let [earnings, accountRows] = await Promise.all([
-      this.getValidEarnings(this.database, body.earningsId),
-      getEarningsAccountFromEarnings(this.database, body.earningsId),
+    let [profileRows, statementRows] = await Promise.all([
+      getEarningsProfileFromStatement(this.database, {
+        transactionStatementStatementIdEq: body.statementId,
+      }),
+      getTransactionStatement(this.database, {
+        transactionStatementStatementIdEq: body.statementId,
+      }),
+      this.getvalidPayout(this.database, body.statementId),
     ]);
-    if (accountRows.length === 0) {
+    if (profileRows.length === 0) {
+      throw newBadRequestError(
+        `${loggingPrefix} Earnings profile for statement ${body.statementId} is not found.`,
+      );
+    }
+    if (statementRows.length === 0) {
+      throw newBadRequestError(
+        `${loggingPrefix} Statement ${body.statementId} is not found.`,
+      );
+    }
+    let transactionStatement = statementRows[0];
+    if (
+      transactionStatement.transactionStatementStatement.totalAmountType !==
+      AmountType.CREDIT
+    ) {
       throw newInternalServerErrorError(
-        `${loggingPrefix} Earnings account ${earnings.accountId} is not found.`,
+        `Transaction statement ${body.statementId}'s total amount is not a credit.`,
       );
     }
     let stripeConnectedAccountId =
-      accountRows[0].aData.stripeConnectedAccountId;
+      profileRows[0].earningsProfileStripeConnectedAccountId;
     let connectedAccount = await this.stripeClient.val.accounts.retrieve(
       stripeConnectedAccountId,
     );
     if (!connectedAccount.payouts_enabled) {
-      await this.reportFailure(loggingPrefix, earnings.earningsId);
+      await this.reportFailure(loggingPrefix, body.statementId);
       return;
     }
 
     // Any error will be retried.
     let transfer = await this.stripeClient.val.transfers.create(
       {
-        amount: earnings.totalAmount,
-        currency: earnings.currency.toLowerCase(),
+        amount: transactionStatement.transactionStatementStatement.totalAmount,
+        currency:
+          transactionStatement.transactionStatementStatement.currency.toLowerCase(),
         destination: stripeConnectedAccountId,
       },
       {
-        idempotencyKey: earnings.earningsId,
+        idempotencyKey: body.statementId,
       },
     );
     let transferId = transfer.id;
-    await this.finalize(loggingPrefix, earnings.earningsId, transferId);
+    await this.finalize(loggingPrefix, body.statementId, transferId);
   }
 
-  private async reportFailure(loggingPrefix: string, earningsId: string) {
+  private async reportFailure(loggingPrefix: string, statementId: string) {
     await this.database.runTransactionAsync(async (transaction) => {
-      let earnings = await this.getValidEarnings(transaction, earningsId);
-      earnings.state = PayoutState.FAILED;
+      await this.getvalidPayout(transaction, statementId);
       await transaction.batchUpdate([
-        updateEarningsStatement(earnings),
-        deletePayoutTaskStatement(earningsId),
+        updatePayoutStateStatement({
+          payoutStatementIdEq: statementId,
+          setState: PayoutState.FAILED,
+          setUpdatedTimeMs: this.getNow(),
+        }),
+        deletePayoutTaskStatement({
+          payoutTaskStatementIdEq: statementId,
+        }),
       ]);
       await transaction.commit();
     });
@@ -132,36 +163,41 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
 
   private async finalize(
     loggingPrefix: string,
-    earningsId: string,
+    statementId: string,
     transferId: string,
   ) {
     await this.database.runTransactionAsync(async (transaction) => {
-      let earnings = await this.getValidEarnings(transaction, earningsId);
-      earnings.state = PayoutState.PAID;
-      earnings.stripeTransferId = transferId;
+      await this.getvalidPayout(transaction, statementId);
       await transaction.batchUpdate([
-        updateEarningsStatement(earnings),
-        deletePayoutTaskStatement(earningsId),
+        updatePayoutStateAndStripeTransferStatement({
+          payoutStatementIdEq: statementId,
+          setState: PayoutState.PAID,
+          setStripeTransferId: transferId,
+          setUpdatedTimeMs: this.getNow(),
+        }),
+        deletePayoutTaskStatement({
+          payoutTaskStatementIdEq: statementId,
+        }),
       ]);
       await transaction.commit();
     });
   }
 
-  private async getValidEarnings(
+  private async getvalidPayout(
     runner: Database | Transaction,
-    earningsId: string,
-  ): Promise<Earnings> {
-    let rows = await getEarnings(runner, earningsId);
+    statementId: string,
+  ): Promise<GetPayoutRow> {
+    let rows = await getPayout(runner, { payoutStatementIdEq: statementId });
     if (rows.length === 0) {
-      // Earnings should almost never be deleted, or should be drained by a long lead time.
-      throw newInternalServerErrorError(`Earnings ${earningsId} is not found.`);
+      // Payout should almost never be deleted, or should be drained by a long lead time.
+      throw newInternalServerErrorError(`Payout ${statementId} is not found.`);
     }
-    let earnings = rows[0].earningsData;
-    if (earnings.state !== PayoutState.PROCESSING) {
+    let row = rows[0];
+    if (row.payoutState !== PayoutState.PROCESSING) {
       throw newBadRequestError(
-        `Earnings ${earningsId} is not in PROCESSING state.`,
+        `Payout ${statementId} is not in PROCESSING state.`,
       );
     }
-    return earnings;
+    return row;
   }
 }

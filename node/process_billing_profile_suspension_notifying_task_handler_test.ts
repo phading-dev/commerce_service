@@ -1,13 +1,13 @@
 import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
-  GET_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASK_METADATA_ROW,
-  deleteBillingAccountSuspensionNotifyingTaskStatement,
-  getBillingAccountSuspensionNotifyingTaskMetadata,
-  insertBillingAccountSuspensionNotifyingTaskStatement,
-  listPendingBillingAccountSuspensionNotifyingTasks,
+  GET_BILLING_PROFILE_SUSPENSION_NOTIFYING_TASK_METADATA_ROW,
+  deleteBillingProfileSuspensionNotifyingTaskStatement,
+  getBillingProfileSuspensionNotifyingTaskMetadata,
+  insertBillingProfileSuspensionNotifyingTaskStatement,
+  listPendingBillingProfileSuspensionNotifyingTasks,
 } from "../db/sql";
-import { ProcessBillingAccountSuspensionNotifyingTaskHandler } from "./process_billing_account_suspension_notifying_task_handler";
+import { ProcessBillingProfileSuspensionNotifyingTaskHandler } from "./process_billing_profile_suspension_notifying_task_handler";
 import { GetAccountContactResponse } from "@phading/user_service_interface/node/interface";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
@@ -21,7 +21,7 @@ import {
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "ProcessBillingAccountSuspensionNotifyingTaskHandlerTest",
+  name: "ProcessBillingProfileSuspensionNotifyingTaskHandlerTest",
   cases: [
     {
       name: "ProcessTask",
@@ -29,13 +29,13 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountSuspensionNotifyingTaskStatement(
-              "account1",
-              1,
-              0,
-              100,
-              100,
-            ),
+            insertBillingProfileSuspensionNotifyingTaskStatement({
+              accountId: "account1",
+              version: 1,
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -50,7 +50,7 @@ TEST_RUNNER.run({
             sendEmailParamsCaptured = sendEmailParams;
           },
         };
-        let handler = new ProcessBillingAccountSuspensionNotifyingTaskHandler(
+        let handler = new ProcessBillingProfileSuspensionNotifyingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           sendgridClientMock,
@@ -75,9 +75,9 @@ TEST_RUNNER.run({
           "sendEmailParams.dynamicTemplateData.name",
         );
         assertThat(
-          await listPendingBillingAccountSuspensionNotifyingTasks(
+          await listPendingBillingProfileSuspensionNotifyingTasks(
             SPANNER_DATABASE,
-            1000000,
+            { billingProfileSuspensionNotifyingTaskExecutionTimeMsLe: 1000000 },
           ),
           isArray([]),
           "tasks",
@@ -86,7 +86,10 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountSuspensionNotifyingTaskStatement("account1", 1),
+            deleteBillingProfileSuspensionNotifyingTaskStatement({
+              billingProfileSuspensionNotifyingTaskAccountIdEq: "account1",
+              billingProfileSuspensionNotifyingTaskVersionEq: 1,
+            }),
           ]);
           await transaction.commit();
         });
@@ -98,13 +101,13 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountSuspensionNotifyingTaskStatement(
-              "account1",
-              1,
-              0,
-              100,
-              100,
-            ),
+            insertBillingProfileSuspensionNotifyingTaskStatement({
+              accountId: "account1",
+              version: 1,
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
@@ -118,7 +121,7 @@ TEST_RUNNER.run({
             throw new Error("Fake error");
           },
         };
-        let handler = new ProcessBillingAccountSuspensionNotifyingTaskHandler(
+        let handler = new ProcessBillingProfileSuspensionNotifyingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           sendgridClientMock,
@@ -139,7 +142,10 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountSuspensionNotifyingTaskStatement("account1", 1),
+            deleteBillingProfileSuspensionNotifyingTaskStatement({
+              billingProfileSuspensionNotifyingTaskAccountIdEq: "account1",
+              billingProfileSuspensionNotifyingTaskVersionEq: 1,
+            }),
           ]);
           await transaction.commit();
         });
@@ -151,17 +157,17 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountSuspensionNotifyingTaskStatement(
-              "account1",
-              1,
-              0,
-              100,
-              100,
-            ),
+            insertBillingProfileSuspensionNotifyingTaskStatement({
+              accountId: "account1",
+              version: 1,
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
           ]);
           await transaction.commit();
         });
-        let handler = new ProcessBillingAccountSuspensionNotifyingTaskHandler(
+        let handler = new ProcessBillingProfileSuspensionNotifyingTaskHandler(
           SPANNER_DATABASE,
           undefined,
           undefined,
@@ -176,18 +182,20 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getBillingAccountSuspensionNotifyingTaskMetadata(
+          await getBillingProfileSuspensionNotifyingTaskMetadata(
             SPANNER_DATABASE,
-            "account1",
-            1,
+            {
+              billingProfileSuspensionNotifyingTaskAccountIdEq: "account1",
+              billingProfileSuspensionNotifyingTaskVersionEq: 1,
+            },
           ),
           isArray([
             eqMessage(
               {
-                billingAccountSuspensionNotifyingTaskRetryCount: 1,
-                billingAccountSuspensionNotifyingTaskExecutionTimeMs: 301000,
+                billingProfileSuspensionNotifyingTaskRetryCount: 1,
+                billingProfileSuspensionNotifyingTaskExecutionTimeMs: 301000,
               },
-              GET_BILLING_ACCOUNT_SUSPENSION_NOTIFYING_TASK_METADATA_ROW,
+              GET_BILLING_PROFILE_SUSPENSION_NOTIFYING_TASK_METADATA_ROW,
             ),
           ]),
           "task",
@@ -196,7 +204,10 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountSuspensionNotifyingTaskStatement("account1", 1),
+            deleteBillingProfileSuspensionNotifyingTaskStatement({
+              billingProfileSuspensionNotifyingTaskAccountIdEq: "account1",
+              billingProfileSuspensionNotifyingTaskVersionEq: 1,
+            }),
           ]);
           await transaction.commit();
         });

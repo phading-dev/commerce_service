@@ -2,20 +2,20 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PayoutState, StripeConnectedAccountState } from "../../db/schema";
 import {
-  GET_EARNINGS_ACCOUNT_ROW,
+  GET_EARNINGS_PROFILE_ROW,
+  GET_PAYOUT_ROW,
   GET_PAYOUT_TASK_ROW,
-  LIST_EARNINGS_ROW,
-  deleteEarningsAccountStatement,
-  deleteEarningsStatement,
+  deleteEarningsProfileStatement,
+  deletePayoutStatement,
   deletePayoutTaskStatement,
-  getEarningsAccount,
+  getEarningsProfile,
+  getPayout,
   getPayoutTask,
-  insertEarningsAccountStatement,
-  insertEarningsStatement,
-  listEarnings,
+  insertEarningsProfileStatement,
+  insertPayoutStatement,
 } from "../../db/sql";
 import { SetConnectedAccountOnboardedHandler } from "./set_connected_account_onboarded_handler";
-import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
+import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { newUnauthorizedError } from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -26,15 +26,17 @@ import { TEST_RUNNER } from "@selfage/test_runner";
 async function cleanupAll() {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      deleteEarningsAccountStatement("account1"),
-      deleteEarningsStatement("earnings1"),
-      deleteEarningsStatement("earnings2"),
-      deleteEarningsStatement("earnings3"),
-      deleteEarningsStatement("earnings4"),
-      deletePayoutTaskStatement("earnings1"),
-      deletePayoutTaskStatement("earnings2"),
-      deletePayoutTaskStatement("earnings3"),
-      deletePayoutTaskStatement("earnings4"),
+      deleteEarningsProfileStatement({
+        earningsProfileAccountIdEq: "account1",
+      }),
+      deletePayoutStatement({ payoutStatementIdEq: "statement1" }),
+      deletePayoutStatement({ payoutStatementIdEq: "statement2" }),
+      deletePayoutStatement({ payoutStatementIdEq: "statement3" }),
+      deletePayoutStatement({ payoutStatementIdEq: "statement4" }),
+      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement1" }),
+      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement2" }),
+      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement3" }),
+      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement4" }),
     ]);
     await transaction.commit();
   });
@@ -49,7 +51,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
+            insertEarningsProfileStatement({
               accountId: "account1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDING,
@@ -63,7 +65,7 @@ TEST_RUNNER.run({
           capabilities: {
             canEarn: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let handler = new SetConnectedAccountOnboardedHandler(
           SPANNER_DATABASE,
           clientMock,
@@ -81,20 +83,20 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getEarningsAccount(SPANNER_DATABASE, "account1"),
+          await getEarningsProfile(SPANNER_DATABASE, {
+            earningsProfileAccountIdEq: "account1",
+          }),
           isArray([
             eqMessage(
               {
-                earningsAccountData: {
-                  accountId: "account1",
-                  stripeConnectedAccountState:
-                    StripeConnectedAccountState.ONBOARDED,
-                },
+                earningsProfileAccountId: "account1",
+                earningsProfileStripeConnectedAccountState:
+                  StripeConnectedAccountState.ONBOARDED,
               },
-              GET_EARNINGS_ACCOUNT_ROW,
+              GET_EARNINGS_PROFILE_ROW,
             ),
           ]),
-          "EarningsAccount",
+          "EarningsProfile",
         );
       },
       tearDown: async () => {
@@ -107,34 +109,30 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsAccountStatement({
+            insertEarningsProfileStatement({
               accountId: "account1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDING,
             }),
-            insertEarningsStatement({
+            insertPayoutStatement({
               accountId: "account1",
-              earningsId: "earnings1",
+              statementId: "statement1",
               state: PayoutState.FAILED,
-              month: "2024-10",
             }),
-            insertEarningsStatement({
+            insertPayoutStatement({
               accountId: "account1",
-              earningsId: "earnings2",
+              statementId: "statement2",
               state: PayoutState.PAID,
-              month: "2024-11",
             }),
-            insertEarningsStatement({
+            insertPayoutStatement({
               accountId: "account1",
-              earningsId: "earnings3",
+              statementId: "statement3",
               state: PayoutState.PROCESSING,
-              month: "2024-12",
             }),
-            insertEarningsStatement({
+            insertPayoutStatement({
               accountId: "account1",
-              earningsId: "earnings4",
+              statementId: "statement4",
               state: PayoutState.FAILED,
-              month: "2024-08",
             }),
           ]);
           await transaction.commit();
@@ -145,7 +143,7 @@ TEST_RUNNER.run({
           capabilities: {
             canEarn: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let handler = new SetConnectedAccountOnboardedHandler(
           SPANNER_DATABASE,
           clientMock,
@@ -163,82 +161,95 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getEarningsAccount(SPANNER_DATABASE, "account1"),
+          await getEarningsProfile(SPANNER_DATABASE, {
+            earningsProfileAccountIdEq: "account1",
+          }),
           isArray([
             eqMessage(
               {
-                earningsAccountData: {
-                  accountId: "account1",
-                  stripeConnectedAccountState:
-                    StripeConnectedAccountState.ONBOARDED,
-                },
+                earningsProfileAccountId: "account1",
+                earningsProfileStripeConnectedAccountState:
+                  StripeConnectedAccountState.ONBOARDED,
               },
-              GET_EARNINGS_ACCOUNT_ROW,
+              GET_EARNINGS_PROFILE_ROW,
             ),
           ]),
-          "EarningsAccount",
+          "EarningsProfile",
         );
         assertThat(
-          await listEarnings(
-            SPANNER_DATABASE,
-            "account1",
-            "2024-01",
-            "2024-12",
-          ),
+          await getPayout(SPANNER_DATABASE, {
+            payoutStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                earningsData: {
-                  accountId: "account1",
-                  earningsId: "earnings3",
-                  state: PayoutState.PROCESSING,
-                  month: "2024-12",
-                },
+                payoutAccountId: "account1",
+                payoutStatementId: "statement1",
+                payoutState: PayoutState.PROCESSING,
+                payoutUpdatedTimeMs: 1000,
               },
-              LIST_EARNINGS_ROW,
-            ),
-            eqMessage(
-              {
-                earningsData: {
-                  accountId: "account1",
-                  earningsId: "earnings2",
-                  state: PayoutState.PAID,
-                  month: "2024-11",
-                },
-              },
-              LIST_EARNINGS_ROW,
-            ),
-            eqMessage(
-              {
-                earningsData: {
-                  accountId: "account1",
-                  earningsId: "earnings1",
-                  state: PayoutState.PROCESSING,
-                  month: "2024-10",
-                },
-              },
-              LIST_EARNINGS_ROW,
-            ),
-            eqMessage(
-              {
-                earningsData: {
-                  accountId: "account1",
-                  earningsId: "earnings4",
-                  state: PayoutState.PROCESSING,
-                  month: "2024-08",
-                },
-              },
-              LIST_EARNINGS_ROW,
+              GET_PAYOUT_ROW,
             ),
           ]),
-          "Earnings",
+          "Payout for statement1",
         );
         assertThat(
-          await getPayoutTask(SPANNER_DATABASE, "earnings1"),
+          await getPayout(SPANNER_DATABASE, {
+            payoutStatementIdEq: "statement2",
+          }),
           isArray([
             eqMessage(
               {
-                payoutTaskEarningsId: "earnings1",
+                payoutAccountId: "account1",
+                payoutStatementId: "statement2",
+                payoutState: PayoutState.PAID,
+              },
+              GET_PAYOUT_ROW,
+            ),
+          ]),
+          "Payout for statement2",
+        );
+        assertThat(
+          await getPayout(SPANNER_DATABASE, {
+            payoutStatementIdEq: "statement3",
+          }),
+          isArray([
+            eqMessage(
+              {
+                payoutAccountId: "account1",
+                payoutStatementId: "statement3",
+                payoutState: PayoutState.PROCESSING,
+              },
+              GET_PAYOUT_ROW,
+            ),
+          ]),
+          "Payout for statement3",
+        );
+        assertThat(
+          await getPayout(SPANNER_DATABASE, {
+            payoutStatementIdEq: "statement4",
+          }),
+          isArray([
+            eqMessage(
+              {
+                payoutAccountId: "account1",
+                payoutStatementId: "statement4",
+                payoutState: PayoutState.PROCESSING,
+                payoutUpdatedTimeMs: 1000,
+              },
+              GET_PAYOUT_ROW,
+            ),
+          ]),
+          "Payout for statement4",
+        );
+        assertThat(
+          await getPayoutTask(SPANNER_DATABASE, {
+            payoutTaskStatementIdEq: "statement1",
+          }),
+          isArray([
+            eqMessage(
+              {
+                payoutTaskStatementId: "statement1",
                 payoutTaskRetryCount: 0,
                 payoutTaskExecutionTimeMs: 1000,
                 payoutTaskCreatedTimeMs: 1000,
@@ -246,14 +257,16 @@ TEST_RUNNER.run({
               GET_PAYOUT_TASK_ROW,
             ),
           ]),
-          "PayoutTask for earnings1",
+          "PayoutTask for statement1",
         );
         assertThat(
-          await getPayoutTask(SPANNER_DATABASE, "earnings4"),
+          await getPayoutTask(SPANNER_DATABASE, {
+            payoutTaskStatementIdEq: "statement4",
+          }),
           isArray([
             eqMessage(
               {
-                payoutTaskEarningsId: "earnings4",
+                payoutTaskStatementId: "statement4",
                 payoutTaskRetryCount: 0,
                 payoutTaskExecutionTimeMs: 1000,
                 payoutTaskCreatedTimeMs: 1000,
@@ -261,7 +274,7 @@ TEST_RUNNER.run({
               GET_PAYOUT_TASK_ROW,
             ),
           ]),
-          "PayoutTask for earnings4",
+          "PayoutTask for statement4",
         );
       },
       tearDown: async () => {
@@ -278,7 +291,7 @@ TEST_RUNNER.run({
           capabilities: {
             canEarn: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let handler = new SetConnectedAccountOnboardedHandler(
           SPANNER_DATABASE,
           clientMock,
@@ -301,7 +314,7 @@ TEST_RUNNER.run({
           error,
           eqHttpError(
             newUnauthorizedError(
-              "Account account1 cannot be updated by logged-in account account2.",
+              "Earnings profile account1 cannot be updated by the logged-in account account2.",
             ),
           ),
           "Error",

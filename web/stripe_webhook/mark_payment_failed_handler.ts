@@ -5,11 +5,11 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
 import {
-  getBilling,
-  getUpdatePaymentMethodNotifyingTaskMetadata,
-  insertBillingAccountSuspendingDueToPastDueTaskStatement,
-  insertUpdatePaymentMethodNotifyingTaskStatement,
-  updateBillingStatement,
+  getPayment,
+  getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
+  insertBillingProfileSuspendingDueToPastDueTaskStatement,
+  insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  updatePaymentStateStatement,
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { MarkPaymentDoneHandlerInterface } from "@phading/commerce_service_interface/web/stripe_webhook/handler";
@@ -61,52 +61,57 @@ export class MarkPaymentFailedHandler extends MarkPaymentDoneHandlerInterface {
     let invoiceId = event.data.object.invoice as string;
     let invoice = await this.stripeClient.val.invoices.retrieve(invoiceId);
     await this.database.runTransactionAsync(async (transaction) => {
-      let billingId = invoice.metadata.billingId;
-      let [billingRows, notifyingTasks] = await Promise.all([
-        getBilling(transaction, billingId),
-        getUpdatePaymentMethodNotifyingTaskMetadata(transaction, billingId),
+      let statementId = invoice.metadata.statementId;
+      let [paymentRows, notifyingTasks] = await Promise.all([
+        getPayment(transaction, { paymentStatementIdEq: statementId }),
+        getPaymentMethodNeedsUpdateNotifyingTaskMetadata(transaction, {
+          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: statementId,
+        }),
       ]);
-      if (billingRows.length === 0) {
+      if (paymentRows.length === 0) {
         throw newInternalServerErrorError(
-          `Billing ${invoice.metadata.billingId} is not found.`,
+          `Billing ${invoice.metadata.statementId} is not found.`,
         );
       }
-      let billing = billingRows[0].billingData;
+      let payment = paymentRows[0];
       let now = this.getNow();
-      if (billing.state === PaymentState.CHARGING) {
-        billing.state = PaymentState.FAILED;
+      if (payment.paymentState === PaymentState.CHARGING_VIA_STRIPE_INVOICE) {
         await transaction.batchUpdate([
-          updateBillingStatement(billing),
-          insertUpdatePaymentMethodNotifyingTaskStatement(
-            billing.billingId,
-            0,
-            now,
-            now,
-          ),
-          insertBillingAccountSuspendingDueToPastDueTaskStatement(
-            billing.billingId,
-            0,
-            now + GRACE_PERIOD_DAYS_IN_MS,
-            now,
-          ),
+          updatePaymentStateStatement({
+            paymentStatementIdEq: statementId,
+            setState: PaymentState.FAILED,
+            setUpdatedTimeMs: now,
+          }),
+          insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+            statementId,
+            retryCount: 0,
+            executionTimeMs: now,
+            createdTimeMs: now,
+          }),
+          insertBillingProfileSuspendingDueToPastDueTaskStatement({
+            statementId,
+            retryCount: 0,
+            executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,
+            createdTimeMs: now,
+          }),
         ]);
         await transaction.commit();
-      } else if (billing.state === PaymentState.FAILED) {
+      } else if (payment.paymentState === PaymentState.FAILED) {
         if (notifyingTasks.length === 0) {
           // This may happen after payment method is updated and payment retried but failed again.
           await transaction.batchUpdate([
-            insertUpdatePaymentMethodNotifyingTaskStatement(
-              billing.billingId,
-              0,
-              now,
-              now,
-            ),
+            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+              statementId,
+              retryCount: 0,
+              executionTimeMs: now,
+              createdTimeMs: now,
+            }),
           ]);
           await transaction.commit();
         }
       } else {
         throw newConflictError(
-          `Billing ${billing.billingId} is in unexpected state: ${PaymentState[billing.state]}`,
+          `Payment ${statementId} is in unexpected state: ${PaymentState[payment.paymentState]}`,
         );
       }
     });

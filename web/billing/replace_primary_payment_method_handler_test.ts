@@ -2,18 +2,18 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
+  GET_PAYMENT_ROW,
   GET_PAYMENT_TASK_ROW,
-  LIST_BILLINGS_ROW,
-  deleteBillingAccountStatement,
-  deleteBillingStatement,
+  deleteBillingProfileStatement,
+  deletePaymentStatement,
   deletePaymentTaskStatement,
+  getPayment,
   getPaymentTask,
-  insertBillingAccountStatement,
-  insertBillingStatement,
-  listBillings,
+  insertBillingProfileStatement,
+  insertPaymentStatement,
 } from "../../db/sql";
 import { ReplacePrimaryPaymentMethodHandler } from "./replace_primary_payment_method_handler";
-import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
+import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
 import { Ref } from "@selfage/ref";
@@ -34,9 +34,9 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountStatement({
+            insertBillingProfileStatement({
               accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
+              stripePaymentCustomerId: "stripeCustomer1",
             }),
           ]);
           await transaction.commit();
@@ -76,7 +76,7 @@ TEST_RUNNER.run({
           capabilities: {
             canBeBilled: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let handler = new ReplacePrimaryPaymentMethodHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
@@ -113,7 +113,9 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountStatement("account1"),
+            deleteBillingProfileStatement({
+              billingProfileAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });
@@ -125,39 +127,34 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountStatement({
+            insertBillingProfileStatement({
               accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
+              stripePaymentCustomerId: "stripeCustomer1",
             }),
-            insertBillingStatement({
-              billingId: "billing1",
+            insertPaymentStatement({
+              statementId: "statement1",
               accountId: "account1",
               state: PaymentState.FAILED,
-              month: "2021-01",
             }),
-            insertBillingStatement({
-              billingId: "billing2",
+            insertPaymentStatement({
+              statementId: "statement2",
               accountId: "account1",
               state: PaymentState.PROCESSING,
-              month: "2021-02",
             }),
-            insertBillingStatement({
-              billingId: "billing3",
+            insertPaymentStatement({
+              statementId: "statement3",
               accountId: "account1",
-              state: PaymentState.CHARGING,
-              month: "2021-03",
+              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
             }),
-            insertBillingStatement({
-              billingId: "billing4",
+            insertPaymentStatement({
+              statementId: "statement4",
               accountId: "account1",
               state: PaymentState.PAID,
-              month: "2021-04",
             }),
-            insertBillingStatement({
-              billingId: "billing5",
+            insertPaymentStatement({
+              statementId: "statement5",
               accountId: "account1",
               state: PaymentState.FAILED,
-              month: "2021-05",
             }),
           ]);
           await transaction.commit();
@@ -191,7 +188,7 @@ TEST_RUNNER.run({
           capabilities: {
             canBeBilled: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let handler = new ReplacePrimaryPaymentMethodHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
@@ -210,77 +207,95 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await listBillings(
-            SPANNER_DATABASE,
-            "account1",
-            "2021-01",
-            "2021-05",
-          ),
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                billingData: {
-                  billingId: "billing5",
-                  accountId: "account1",
-                  state: PaymentState.PROCESSING,
-                  month: "2021-05",
-                },
+                paymentAccountId: "account1",
+                paymentStatementId: "statement1",
+                paymentState: PaymentState.PROCESSING,
+                paymentUpdatedTimeMs: 1000,
               },
-              LIST_BILLINGS_ROW,
-            ),
-            eqMessage(
-              {
-                billingData: {
-                  billingId: "billing4",
-                  accountId: "account1",
-                  state: PaymentState.PAID,
-                  month: "2021-04",
-                },
-              },
-              LIST_BILLINGS_ROW,
-            ),
-            eqMessage(
-              {
-                billingData: {
-                  billingId: "billing3",
-                  accountId: "account1",
-                  state: PaymentState.CHARGING,
-                  month: "2021-03",
-                },
-              },
-              LIST_BILLINGS_ROW,
-            ),
-            eqMessage(
-              {
-                billingData: {
-                  billingId: "billing2",
-                  accountId: "account1",
-                  state: PaymentState.PROCESSING,
-                  month: "2021-02",
-                },
-              },
-              LIST_BILLINGS_ROW,
-            ),
-            eqMessage(
-              {
-                billingData: {
-                  billingId: "billing1",
-                  accountId: "account1",
-                  state: PaymentState.PROCESSING,
-                  month: "2021-01",
-                },
-              },
-              LIST_BILLINGS_ROW,
+              GET_PAYMENT_ROW,
             ),
           ]),
-          "billings",
+          "payment for statement1",
         );
         assertThat(
-          await getPaymentTask(SPANNER_DATABASE, "billing1"),
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement2",
+          }),
+          isArray([
+            eqMessage(
+              {
+                paymentAccountId: "account1",
+                paymentStatementId: "statement2",
+                paymentState: PaymentState.PROCESSING,
+              },
+              GET_PAYMENT_ROW,
+            ),
+          ]),
+          "payment for statement2",
+        );
+        assertThat(
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement3",
+          }),
+          isArray([
+            eqMessage(
+              {
+                paymentAccountId: "account1",
+                paymentStatementId: "statement3",
+                paymentState: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+              },
+              GET_PAYMENT_ROW,
+            ),
+          ]),
+          "payment for statement3",
+        );
+        assertThat(
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement4",
+          }),
+          isArray([
+            eqMessage(
+              {
+                paymentAccountId: "account1",
+                paymentStatementId: "statement4",
+                paymentState: PaymentState.PAID,
+              },
+              GET_PAYMENT_ROW,
+            ),
+          ]),
+          "payment for statement4",
+        );
+        assertThat(
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement5",
+          }),
+          isArray([
+            eqMessage(
+              {
+                paymentAccountId: "account1",
+                paymentStatementId: "statement5",
+                paymentState: PaymentState.PROCESSING,
+                paymentUpdatedTimeMs: 1000,
+              },
+              GET_PAYMENT_ROW,
+            ),
+          ]),
+          "payment for statement5",
+        );
+        assertThat(
+          await getPaymentTask(SPANNER_DATABASE, {
+            paymentTaskStatementIdEq: "statement1",
+          }),
           isUnorderedArray([
             eqMessage(
               {
-                paymentTaskBillingId: "billing1",
+                paymentTaskStatementId: "statement1",
                 paymentTaskRetryCount: 0,
                 paymentTaskExecutionTimeMs: 1000,
                 paymentTaskCreatedTimeMs: 1000,
@@ -288,14 +303,16 @@ TEST_RUNNER.run({
               GET_PAYMENT_TASK_ROW,
             ),
           ]),
-          "paymentTask for billing1",
+          "paymentTask for statement1",
         );
         assertThat(
-          await getPaymentTask(SPANNER_DATABASE, "billing5"),
+          await getPaymentTask(SPANNER_DATABASE, {
+            paymentTaskStatementIdEq: "statement5",
+          }),
           isUnorderedArray([
             eqMessage(
               {
-                paymentTaskBillingId: "billing5",
+                paymentTaskStatementId: "statement5",
                 paymentTaskRetryCount: 0,
                 paymentTaskExecutionTimeMs: 1000,
                 paymentTaskCreatedTimeMs: 1000,
@@ -303,23 +320,35 @@ TEST_RUNNER.run({
               GET_PAYMENT_TASK_ROW,
             ),
           ]),
-          "paymentTask for billing5",
+          "paymentTask for statement5",
         );
       },
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountStatement("account1"),
-            deleteBillingStatement("billing1"),
-            deleteBillingStatement("billing2"),
-            deleteBillingStatement("billing3"),
-            deleteBillingStatement("billing4"),
-            deleteBillingStatement("billing5"),
-            deletePaymentTaskStatement("billing1"),
-            deletePaymentTaskStatement("billing2"),
-            deletePaymentTaskStatement("billing3"),
-            deletePaymentTaskStatement("billing4"),
-            deletePaymentTaskStatement("billing5"),
+            deleteBillingProfileStatement({
+              billingProfileAccountIdEq: "account1",
+            }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement1" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement2" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement3" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement4" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement5" }),
+            deletePaymentTaskStatement({
+              paymentTaskStatementIdEq: "statement1",
+            }),
+            deletePaymentTaskStatement({
+              paymentTaskStatementIdEq: "statement2",
+            }),
+            deletePaymentTaskStatement({
+              paymentTaskStatementIdEq: "statement3",
+            }),
+            deletePaymentTaskStatement({
+              paymentTaskStatementIdEq: "statement4",
+            }),
+            deletePaymentTaskStatement({
+              paymentTaskStatementIdEq: "statement5",
+            }),
           ]);
           await transaction.commit();
         });
@@ -331,9 +360,9 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountStatement({
+            insertBillingProfileStatement({
               accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
+              stripePaymentCustomerId: "stripeCustomer1",
             }),
           ]);
           await transaction.commit();
@@ -386,7 +415,7 @@ TEST_RUNNER.run({
           capabilities: {
             canBeBilled: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let handler = new ReplacePrimaryPaymentMethodHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
@@ -418,7 +447,9 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountStatement("account1"),
+            deleteBillingProfileStatement({
+              billingProfileAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });

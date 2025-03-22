@@ -1,13 +1,13 @@
 import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import {
-  deleteBillingAccountStatement,
-  insertBillingAccountStatement,
+  deleteBillingProfileStatement,
+  insertBillingProfileStatement,
 } from "../../db/sql";
-import { GetPrimaryPaymentMethodHandler } from "./get_primary_payment_methods_handler";
+import { GetPrimaryPaymentMethodHandler } from "./get_primary_payment_method_handler";
 import { GET_PRIMARY_PAYMENT_METHOD_RESPONSE } from "@phading/commerce_service_interface/web/billing/interface";
 import { CardBrand } from "@phading/commerce_service_interface/web/billing/payment_method_masked";
-import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
+import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
 import { Ref } from "@selfage/ref";
@@ -23,9 +23,9 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountStatement({
+            insertBillingProfileStatement({
               accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
+              stripePaymentCustomerId: "stripeCustomer1",
             }),
           ]);
           await transaction.commit();
@@ -68,7 +68,7 @@ TEST_RUNNER.run({
           capabilities: {
             canBeBilled: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let handler = new GetPrimaryPaymentMethodHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
@@ -116,7 +116,9 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountStatement("account1"),
+            deleteBillingProfileStatement({
+              billingProfileAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });

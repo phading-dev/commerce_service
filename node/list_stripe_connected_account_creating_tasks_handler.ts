@@ -29,7 +29,7 @@ export class ListStripeConnectedAccountCreatingTasksHandler extends ListStripeCo
   ): Promise<ListStripeConnectedAccountCreatingTasksResponse> {
     let rows = await listPendingStripeConnectedAccountCreatingTasks(
       this.database,
-      this.getNow(),
+      { stripeConnectedAccountCreatingTaskExecutionTimeMsLe: this.getNow() },
     );
     return {
       tasks: rows.map(

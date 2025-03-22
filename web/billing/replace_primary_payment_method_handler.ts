@@ -4,10 +4,10 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
 import {
-  getBillingAccount,
+  getBillingProfile,
   insertPaymentTaskStatement,
-  listBillingsByState,
-  updateBillingStatement,
+  listPaymentsByState,
+  updatePaymentStateStatement,
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { Statement } from "@google-cloud/spanner/build/src/transaction";
@@ -16,7 +16,7 @@ import {
   ReplacePrimaryPaymentMethodRequestBody,
   ReplacePrimaryPaymentMethodResponse,
 } from "@phading/commerce_service_interface/web/billing/interface";
-import { newExchangeSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
+import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newInternalServerErrorError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
@@ -46,7 +46,7 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
     sessionStr: string,
   ): Promise<ReplacePrimaryPaymentMethodResponse> {
     let { accountId, capabilities } = await this.serviceClient.send(
-      newExchangeSessionAndCheckCapabilityRequest({
+      newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
         capabilitiesMask: {
           checkCanBeBilled: true,
@@ -58,13 +58,15 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
         `Account ${accountId} cannot replace primary payment method.`,
       );
     }
-    let accountRows = await getBillingAccount(this.database, accountId);
-    if (accountRows.length === 0) {
+    let profileRows = await getBillingProfile(this.database, {
+      billingProfileAccountIdEq: accountId,
+    });
+    if (profileRows.length === 0) {
       throw newInternalServerErrorError(
         `Billing account ${accountId} is not found.`,
       );
     }
-    let stripeCustomerId = accountRows[0].billingAccountData.stripeCustomerId;
+    let stripeCustomerId = profileRows[0].billingProfileStripePaymentCustomerId;
     let session = await this.stripeClient.val.checkout.sessions.retrieve(
       body.checkoutSessionId,
       {
@@ -93,21 +95,27 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
 
   private async retryFailedPayments(accountId: string): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let billingRows = await listBillingsByState(
-        transaction,
-        accountId,
-        PaymentState.FAILED,
-      );
+      let paymentRows = await listPaymentsByState(transaction, {
+        paymentAccountIdEq: accountId,
+        paymentStateEq: PaymentState.FAILED,
+      });
       let now = this.getNow();
       let statements = new Array<Statement>();
-      billingRows.map((billing) => {
-        let billingData = billing.billingData;
-        billingData.state = PaymentState.PROCESSING;
+      for (let payment of paymentRows) {
         statements.push(
-          updateBillingStatement(billingData),
-          insertPaymentTaskStatement(billingData.billingId, 0, now, now),
+          updatePaymentStateStatement({
+            paymentStatementIdEq: payment.paymentStatementId,
+            setState: PaymentState.PROCESSING,
+            setUpdatedTimeMs: now,
+          }),
+          insertPaymentTaskStatement({
+            statementId: payment.paymentStatementId,
+            retryCount: 0,
+            executionTimeMs: now,
+            createdTimeMs: now,
+          }),
         );
-      });
+      }
       if (statements.length > 0) {
         await transaction.batchUpdate(statements);
         await transaction.commit();

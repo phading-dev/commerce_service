@@ -1,12 +1,12 @@
 import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import {
-  deleteBillingAccountStatement,
-  insertBillingAccountStatement,
+  deleteBillingProfileStatement,
+  insertBillingProfileStatement,
 } from "../../db/sql";
 import { CreateStripeSessionToAddPaymentMethodHandler } from "./create_stripe_session_to_add_payment_method_handler";
 import { CREATE_STRIPE_SESSION_TO_ADD_PAYMENT_METHOD_RESPONSE } from "@phading/commerce_service_interface/web/billing/interface";
-import { ExchangeSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
+import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
@@ -23,9 +23,9 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingAccountStatement({
+            insertBillingProfileStatement({
               accountId: "account1",
-              stripeCustomerId: "stripeCustomer1",
+              stripePaymentCustomerId: "stripeCustomer1",
             }),
           ]);
           await transaction.commit();
@@ -49,7 +49,7 @@ TEST_RUNNER.run({
           capabilities: {
             canBeBilled: true,
           },
-        } as ExchangeSessionAndCheckCapabilityResponse;
+        } as FetchSessionAndCheckCapabilityResponse;
         let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new CreateStripeSessionToAddPaymentMethodHandler(
           SPANNER_DATABASE,
@@ -100,7 +100,9 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingAccountStatement("account1"),
+            deleteBillingProfileStatement({
+              billingProfileAccountIdEq: "account1",
+            }),
           ]);
           await transaction.commit();
         });
