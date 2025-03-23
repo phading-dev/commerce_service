@@ -175,7 +175,7 @@ TEST_RUNNER.run({
               quantity: 3 * 10 * 1024 * 30 * 24,
             },
             {
-              productID: ProductID.UPLAOD,
+              productID: ProductID.UPLOAD,
               quantity: 2 * 1024,
             },
           ],
@@ -213,7 +213,7 @@ TEST_RUNNER.run({
                       amountType: AmountType.DEBIT,
                     },
                     {
-                      productID: ProductID.UPLAOD,
+                      productID: ProductID.UPLOAD,
                       unit: "MiB",
                       quantity: 2 * 1024,
                       amount: 24,
@@ -293,7 +293,7 @@ TEST_RUNNER.run({
               quantity: 3 * 10 * 1024 * 30 * 24,
             },
             {
-              productID: ProductID.UPLAOD,
+              productID: ProductID.UPLOAD,
               quantity: 2 * 1024,
             },
           ],
@@ -331,7 +331,7 @@ TEST_RUNNER.run({
                       amountType: AmountType.DEBIT,
                     },
                     {
-                      productID: ProductID.UPLAOD,
+                      productID: ProductID.UPLOAD,
                       unit: "MiB",
                       quantity: 2 * 1024,
                       amount: 24,
