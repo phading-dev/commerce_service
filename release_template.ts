@@ -96,6 +96,18 @@ spec:
         image: gcr.io/phading-dev/${ENV_VARS.releaseServiceName}:latest
         ports:
         - containerPort: ${ENV_VARS.port}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: ${ENV_VARS.port}
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: ${ENV_VARS.port}
+          initialDelaySeconds: 10
+          periodSeconds: 10
 ---
 apiVersion: monitoring.googleapis.com/v1
 kind: PodMonitoring

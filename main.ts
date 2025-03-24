@@ -57,9 +57,13 @@ async function main() {
     initStripeClient(),
     initSendgridClient(),
   ]);
-  let service = ServiceHandler.create(http.createServer())
+  let service = ServiceHandler.create(
+    http.createServer(),
+    ENV_VARS.externalOrigin,
+  )
     .addCorsAllowedPreflightHandler()
     .addHealthCheckHandler()
+    .addReadinessHandler()
     .addMetricsHandler();
   service
     .addHandlerRegister(COMMERCE_NODE_SERVICE)
