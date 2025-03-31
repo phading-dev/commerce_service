@@ -32,7 +32,7 @@
   "dependencies": {
     "@google-cloud/spanner": "^7.19.1",
     "@google-cloud/storage": "^7.15.2",
-    "@phading/cluster": "^1.0.2",
+    "@phading/cluster": "^1.0.5",
     "@phading/commerce_service_interface": "^1.1.1",
     "@phading/constants": "^0.3.7",
     "@phading/price_config": "^0.3.2",

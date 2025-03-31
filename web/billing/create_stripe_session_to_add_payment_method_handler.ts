@@ -1,10 +1,10 @@
 import Stripe from "stripe";
-import { CURRENCY } from "../../common/constants";
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { URL_BUILDER } from "../../common/url_builder";
 import { getBillingProfile } from "../../db/sql";
+import { ENV_VARS } from "../../env_vars";
 import { Database } from "@google-cloud/spanner";
 import { CreateStripeSessionToAddPaymentMethodHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
 import {
@@ -64,7 +64,7 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
     let session = await this.stripeClient.val.checkout.sessions.create({
       billing_address_collection: "required",
       mode: "setup",
-      currency: CURRENCY.toLocaleLowerCase(),
+      currency: ENV_VARS.defaultCurrency.toLocaleLowerCase(),
       customer: row.billingProfileStripePaymentCustomerId,
       payment_method_types: ["card"],
       success_url: this.urlBuilder.build(

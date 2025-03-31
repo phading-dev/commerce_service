@@ -1,4 +1,3 @@
-import { CURRENCY } from "../common/constants";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PaymentState, PayoutState, TransactionStatement } from "../db/schema";
 import {
@@ -9,6 +8,7 @@ import {
   insertPayoutTaskStatement,
   insertTransactionStatementStatement,
 } from "../db/sql";
+import { ENV_VARS } from "../env_vars";
 import { Database } from "@google-cloud/spanner";
 import { GenerateTransactionStatementHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
@@ -49,14 +49,14 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
       }
 
       let transactionStatement: TransactionStatement = {
-        currency: CURRENCY,
+        currency: ENV_VARS.defaultCurrency,
         positiveAmountType: body.positiveAmountType,
         items: [],
       };
       for (let item of body.lineItems) {
         let { price, amount } = calculateMoney(
           item.productID,
-          CURRENCY,
+          ENV_VARS.defaultCurrency,
           body.month,
           item.quantity,
         );

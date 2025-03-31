@@ -1,4 +1,3 @@
-export let CURRENCY = "USD";
 export let GRACE_PERIOD_DAYS = 10;
 export let GRACE_PERIOD_DAYS_IN_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 export let APP_NAME="Phading";
