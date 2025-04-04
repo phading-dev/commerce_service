@@ -6,10 +6,10 @@ import { URL_BUILDER } from "../../common/url_builder";
 import { StripeConnectedAccountState } from "../../db/schema";
 import { getEarningsProfile } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { GetConnectedAccountLinkHandlerInterface } from "@phading/commerce_service_interface/web/earnings/handler";
+import { GetEarningsProfileInfoHandlerInterface } from "@phading/commerce_service_interface/web/earnings/handler";
 import {
-  GetConnectedAccountLinkRequestBody,
-  GetConnectedAccountLinkResponse,
+  GetEarningsProfileInfoRequestBody,
+  GetEarningsProfileInfoResponse,
   LinkType,
 } from "@phading/commerce_service_interface/web/earnings/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
@@ -17,13 +17,14 @@ import { UrlBuilder } from "@phading/web_interface/url_builder";
 import {
   newBadRequestError,
   newInternalServerErrorError,
+  newUnauthorizedError,
 } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
 
-export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandlerInterface {
-  public static create(): GetConnectedAccountLinkHandler {
-    return new GetConnectedAccountLinkHandler(
+export class GetEarningsProfileInfoHandler extends GetEarningsProfileInfoHandlerInterface {
+  public static create(): GetEarningsProfileInfoHandler {
+    return new GetEarningsProfileInfoHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       SERVICE_CLIENT,
@@ -42,9 +43,9 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
 
   public async handle(
     loggingPrefix: string,
-    body: GetConnectedAccountLinkRequestBody,
+    body: GetEarningsProfileInfoRequestBody,
     sessionStr: string,
-  ): Promise<GetConnectedAccountLinkResponse> {
+  ): Promise<GetEarningsProfileInfoResponse> {
     let { accountId, capabilities } = await this.serviceClient.send(
       newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
@@ -54,8 +55,8 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
       }),
     );
     if (!capabilities.canEarn) {
-      throw newInternalServerErrorError(
-        `Account ${accountId} is not allowed to get connected account link.`,
+      throw newUnauthorizedError(
+        `Account ${accountId} is not allowed to get earnings profile info.`,
       );
     }
     let rows = await getEarningsProfile(this.database, {
@@ -65,6 +66,11 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
       throw newBadRequestError(`Earnings account ${accountId} not found.`);
     }
     let profile = rows[0];
+    if (!profile.earningsProfileStripeConnectedAccountId) {
+      throw newInternalServerErrorError(
+        `Earnings account ${accountId} does not have a Stripe connected account.`,
+      );
+    }
     if (
       profile.earningsProfileStripeConnectedAccountState ===
       StripeConnectedAccountState.ONBOARDING
@@ -87,8 +93,8 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
         type: "account_onboarding",
       });
       return {
-        type: LinkType.ONBOARDING,
-        url: onboardingLink.url,
+        connectedAccountLinkType: LinkType.ONBOARDING,
+        connectedAccountUrl: onboardingLink.url,
       };
     } else if (
       profile.earningsProfileStripeConnectedAccountState ===
@@ -98,8 +104,8 @@ export class GetConnectedAccountLinkHandler extends GetConnectedAccountLinkHandl
         profile.earningsProfileStripeConnectedAccountId,
       );
       return {
-        type: LinkType.LOGIN,
-        url: loginLink.url,
+        connectedAccountLinkType: LinkType.LOGIN,
+        connectedAccountUrl: loginLink.url,
       };
     } else {
       throw newInternalServerErrorError(

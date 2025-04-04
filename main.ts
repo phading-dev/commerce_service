@@ -26,11 +26,12 @@ import { ProcessStripeConnectedAccountCreatingTaskHandler } from "./node/process
 import { ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler } from "./node/process_stripe_connected_account_needs_setup_notifying_task_handler";
 import { ProcessStripePaymentCustomerCreatingTaskHandler } from "./node/process_stripe_payment_customer_creating_task_handler";
 import { CreateStripeSessionToAddPaymentMethodHandler } from "./web/billing/create_stripe_session_to_add_payment_method_handler";
-import { GetPrimaryPaymentMethodHandler } from "./web/billing/get_primary_payment_method_handler";
+import { GetBillingProfileInfoHandler } from "./web/billing/get_billing_profile_info_handler";
 import { ReplacePrimaryPaymentMethodHandler } from "./web/billing/replace_primary_payment_method_handler";
-import { ListTransactionStatementsHandler } from "./web/documents/list_transaction_statements_handler";
-import { GetConnectedAccountLinkHandler } from "./web/earnings/get_connected_account_link_handler";
+import { RetryFailedPaymentsHandler } from "./web/billing/retry_failed_payments_handler";
+import { GetEarningsProfileInfoHandler } from "./web/earnings/get_earnings_profile_info_handler";
 import { SetConnectedAccountOnboardedHandler } from "./web/earnings/set_connected_account_onboarded_handler";
+import { ListTransactionStatementsHandler } from "./web/statements/list_transaction_statements_handler";
 import { MarkPaymentDoneHandler } from "./web/stripe_webhook/mark_payment_done_handler";
 import { MarkPaymentFailedHandler } from "./web/stripe_webhook/mark_payment_failed_handler";
 import {
@@ -91,11 +92,12 @@ async function main() {
   service
     .addHandlerRegister(COMMERCE_WEB_SERVICE)
     .add(CreateStripeSessionToAddPaymentMethodHandler.create())
-    .add(GetPrimaryPaymentMethodHandler.create())
+    .add(GetBillingProfileInfoHandler.create())
     .add(ReplacePrimaryPaymentMethodHandler.create())
-    .add(ListTransactionStatementsHandler.create())
-    .add(GetConnectedAccountLinkHandler.create())
+    .add(RetryFailedPaymentsHandler.create())
+    .add(GetEarningsProfileInfoHandler.create())
     .add(SetConnectedAccountOnboardedHandler.create())
+    .add(ListTransactionStatementsHandler.create())
     .add(MarkPaymentDoneHandler.create(stripePaymentIntentSuccessSecretKey))
     .add(MarkPaymentFailedHandler.create(stripePaymentIntentFailedSecretKey));
   await service.start(ENV_VARS.port);

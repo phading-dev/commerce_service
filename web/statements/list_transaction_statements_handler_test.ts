@@ -10,11 +10,11 @@ import {
   insertTransactionStatementStatement,
 } from "../../db/sql";
 import { ListTransactionStatementsHandler } from "./list_transaction_statements_handler";
-import { LIST_TRANSACTION_STATEMENTS_RESPONSE } from "@phading/commerce_service_interface/web/documents/interface";
+import { LIST_TRANSACTION_STATEMENTS_RESPONSE } from "@phading/commerce_service_interface/web/statements/interface";
 import {
   PaymentState as PaymentStateResponse,
   PayoutState as PayoutStateResponse,
-} from "@phading/commerce_service_interface/web/documents/transaction_statement";
+} from "@phading/commerce_service_interface/web/statements/transaction_statement";
 import { ProductID } from "@phading/price";
 import { AmountType } from "@phading/price/amount_type";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";

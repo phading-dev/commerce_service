@@ -2,22 +2,18 @@ import Stripe from "stripe";
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
-import { PaymentState } from "../../db/schema";
-import {
-  getBillingProfile,
-  insertPaymentTaskStatement,
-  listPaymentsByState,
-  updatePaymentStateStatement,
-} from "../../db/sql";
+import { getBillingProfile } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { Statement } from "@google-cloud/spanner/build/src/transaction";
 import { ReplacePrimaryPaymentMethodHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
 import {
   ReplacePrimaryPaymentMethodRequestBody,
   ReplacePrimaryPaymentMethodResponse,
 } from "@phading/commerce_service_interface/web/billing/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
-import { newInternalServerErrorError } from "@selfage/http_error";
+import {
+  newInternalServerErrorError,
+  newUnauthorizedError,
+} from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
 
@@ -27,7 +23,6 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       SERVICE_CLIENT,
-      () => Date.now(),
     );
   }
 
@@ -35,7 +30,6 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
     private database: Database,
     private stripeClient: Ref<Stripe>,
     private serviceClient: NodeServiceClient,
-    private getNow: () => number,
   ) {
     super();
   }
@@ -54,8 +48,8 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
       }),
     );
     if (!capabilities.canBeBilled) {
-      throw newInternalServerErrorError(
-        `Account ${accountId} cannot replace primary payment method.`,
+      throw newUnauthorizedError(
+        `Account ${accountId} is not allowed to replace primary payment method.`,
       );
     }
     let profileRows = await getBillingProfile(this.database, {
@@ -77,7 +71,6 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
       .payment_method as string;
 
     await this.setPrimaryPaymentMethod(stripeCustomerId, paymentMethodId);
-    await this.retryFailedPayments(accountId);
     await this.detachOtherPaymentMethods(stripeCustomerId, paymentMethodId);
     return {};
   }
@@ -90,36 +83,6 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
       invoice_settings: {
         default_payment_method: paymentMethodId,
       },
-    });
-  }
-
-  private async retryFailedPayments(accountId: string): Promise<void> {
-    await this.database.runTransactionAsync(async (transaction) => {
-      let paymentRows = await listPaymentsByState(transaction, {
-        paymentAccountIdEq: accountId,
-        paymentStateEq: PaymentState.FAILED,
-      });
-      let now = this.getNow();
-      let statements = new Array<Statement>();
-      for (let payment of paymentRows) {
-        statements.push(
-          updatePaymentStateStatement({
-            paymentStatementIdEq: payment.paymentStatementId,
-            setState: PaymentState.PROCESSING,
-            setUpdatedTimeMs: now,
-          }),
-          insertPaymentTaskStatement({
-            statementId: payment.paymentStatementId,
-            retryCount: 0,
-            executionTimeMs: now,
-            createdTimeMs: now,
-          }),
-        );
-      }
-      if (statements.length > 0) {
-        await transaction.batchUpdate(statements);
-        await transaction.commit();
-      }
     });
   }
 

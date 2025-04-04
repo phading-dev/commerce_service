@@ -5,9 +5,9 @@ import {
   deleteEarningsProfileStatement,
   insertEarningsProfileStatement,
 } from "../../db/sql";
-import { GetConnectedAccountLinkHandler } from "./get_connected_account_link_handler";
+import { GetEarningsProfileInfoHandler } from "./get_earnings_profile_info_handler";
 import {
-  GET_CONNECTED_ACCOUNT_LINK_RESPONSE,
+  GET_EARNINGS_PROFILE_INFO_RESPONSE,
   LinkType,
 } from "@phading/commerce_service_interface/web/earnings/interface";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
@@ -19,7 +19,7 @@ import { assertThat, eq } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "GetConnectedAccountLinkHandlerTest",
+  name: "GetEarningsProfileInfoHandlerTest",
   cases: [
     {
       name: "OnboardingLink",
@@ -55,7 +55,7 @@ TEST_RUNNER.run({
           },
         } as FetchSessionAndCheckCapabilityResponse;
         let urlBuilder = new UrlBuilder("https://test.com");
-        let handler = new GetConnectedAccountLinkHandler(
+        let handler = new GetEarningsProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
@@ -70,10 +70,10 @@ TEST_RUNNER.run({
           response,
           eqMessage(
             {
-              type: LinkType.ONBOARDING,
-              url: "https://stripe.com/onboarding",
+              connectedAccountLinkType: LinkType.ONBOARDING,
+              connectedAccountUrl: "https://stripe.com/onboarding",
             },
-            GET_CONNECTED_ACCOUNT_LINK_RESPONSE,
+            GET_EARNINGS_PROFILE_INFO_RESPONSE,
           ),
           "response",
         );
@@ -142,7 +142,7 @@ TEST_RUNNER.run({
           },
         } as FetchSessionAndCheckCapabilityResponse;
         let urlBuilder = new UrlBuilder("https://test.com");
-        let handler = new GetConnectedAccountLinkHandler(
+        let handler = new GetEarningsProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
@@ -157,10 +157,10 @@ TEST_RUNNER.run({
           response,
           eqMessage(
             {
-              type: LinkType.LOGIN,
-              url: "https://stripe.com/login",
+              connectedAccountLinkType: LinkType.LOGIN,
+              connectedAccountUrl: "https://stripe.com/login",
             },
-            GET_CONNECTED_ACCOUNT_LINK_RESPONSE,
+            GET_EARNINGS_PROFILE_INFO_RESPONSE,
           ),
           "response",
         );

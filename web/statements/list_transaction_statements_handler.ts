@@ -3,17 +3,17 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState, PayoutState } from "../../db/schema";
 import { listTransactionStatements } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { ListTransactionStatementsHandlerInterface } from "@phading/commerce_service_interface/web/documents/handler";
+import { ListTransactionStatementsHandlerInterface } from "@phading/commerce_service_interface/web/statements/handler";
 import {
   ListTransactionStatementsRequestBody,
   ListTransactionStatementsResponse,
-} from "@phading/commerce_service_interface/web/documents/interface";
+} from "@phading/commerce_service_interface/web/statements/interface";
 import {
   LineItem,
   PaymentState as PaymentStateResponse,
   PayoutState as PayoutStateResponse,
   TransactionStatement,
-} from "@phading/commerce_service_interface/web/documents/transaction_statement";
+} from "@phading/commerce_service_interface/web/statements/transaction_statement";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { NodeServiceClient } from "@selfage/node_service_client";
 
