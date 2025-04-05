@@ -39,6 +39,9 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
     body: ReplacePrimaryPaymentMethodRequestBody,
     sessionStr: string,
   ): Promise<ReplacePrimaryPaymentMethodResponse> {
+    if (!body.checkoutSessionId) {
+      throw newInternalServerErrorError(`"checkoutSessionId" is required.`);
+    }
     let { accountId, capabilities } = await this.serviceClient.send(
       newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,

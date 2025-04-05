@@ -17,6 +17,7 @@ import {
 } from "@phading/commerce_service_interface/web/earnings/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import {
+  newBadRequestError,
   newInternalServerErrorError,
   newUnauthorizedError,
 } from "@selfage/http_error";
@@ -44,6 +45,9 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
     body: SetConnectedAccountOnboardedRequestBody,
     sessionStr: string,
   ): Promise<SetConnectedAccountOnboardedResponse> {
+    if (!body.accountId) {
+      throw newBadRequestError(`"accountId" is required.`);
+    }
     let { accountId, capabilities } = await this.serviceClient.send(
       newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,

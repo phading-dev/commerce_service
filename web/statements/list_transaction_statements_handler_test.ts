@@ -1,20 +1,11 @@
 import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
-import { PaymentState, PayoutState } from "../../db/schema";
 import {
-  deletePaymentStatement,
-  deletePayoutStatement,
   deleteTransactionStatementStatement,
-  insertPaymentStatement,
-  insertPayoutStatement,
   insertTransactionStatementStatement,
 } from "../../db/sql";
 import { ListTransactionStatementsHandler } from "./list_transaction_statements_handler";
 import { LIST_TRANSACTION_STATEMENTS_RESPONSE } from "@phading/commerce_service_interface/web/statements/interface";
-import {
-  PaymentState as PaymentStateResponse,
-  PayoutState as PayoutStateResponse,
-} from "@phading/commerce_service_interface/web/statements/transaction_statement";
 import { ProductID } from "@phading/price";
 import { AmountType } from "@phading/price/amount_type";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
@@ -71,40 +62,8 @@ TEST_RUNNER.run({
                 ],
               },
             }),
-            insertPaymentStatement({
-              statementId: "statement1",
-              accountId: "account1",
-              state: PaymentState.PAID,
-              stripeInvoiceUrl: "https://stripe.com/invoice1",
-            }),
             insertTransactionStatementStatement({
               statementId: "statement2",
-              accountId: "account1",
-              month: "2022-10",
-              statement: {
-                currency: "USD",
-                totalAmount: 1402,
-                totalAmountType: AmountType.DEBIT,
-                positiveAmountType: AmountType.DEBIT,
-                items: [
-                  {
-                    productID: ProductID.SHOW,
-                    amountType: AmountType.DEBIT,
-                    unit: "seconds",
-                    amount: 82,
-                    quantity: 882,
-                  },
-                ],
-              },
-            }),
-            insertPaymentStatement({
-              statementId: "statement2",
-              accountId: "account1",
-              state: PaymentState.FAILED,
-              stripeInvoiceUrl: "https://stripe.com/invoice2",
-            }),
-            insertTransactionStatementStatement({
-              statementId: "statement3",
               accountId: "account1",
               month: "2022-09",
               statement: {
@@ -123,14 +82,8 @@ TEST_RUNNER.run({
                 ],
               },
             }),
-            insertPaymentStatement({
-              statementId: "statement3",
-              accountId: "account1",
-              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
-              stripeInvoiceUrl: "https://stripe.com/invoice3",
-            }),
             insertTransactionStatementStatement({
-              statementId: "statement4",
+              statementId: "statement3",
               accountId: "account1",
               month: "2022-08",
               statement: {
@@ -156,13 +109,8 @@ TEST_RUNNER.run({
                 ],
               },
             }),
-            insertPaymentStatement({
-              statementId: "statement4",
-              accountId: "account1",
-              state: PaymentState.PROCESSING,
-            }),
             insertTransactionStatementStatement({
-              statementId: "statement5",
+              statementId: "statement4",
               accountId: "account1",
               month: "2022-07",
               statement: {
@@ -188,13 +136,8 @@ TEST_RUNNER.run({
                 ],
               },
             }),
-            insertPayoutStatement({
-              statementId: "statement5",
-              accountId: "account1",
-              state: PayoutState.PAID,
-            }),
             insertTransactionStatementStatement({
-              statementId: "statement6",
+              statementId: "statement5",
               accountId: "account1",
               month: "2022-06",
               statement: {
@@ -213,13 +156,8 @@ TEST_RUNNER.run({
                 ],
               },
             }),
-            insertPayoutStatement({
-              statementId: "statement6",
-              accountId: "account1",
-              state: PayoutState.FAILED,
-            }),
             insertTransactionStatementStatement({
-              statementId: "statement7",
+              statementId: "statement6",
               accountId: "account1",
               month: "2022-05",
               statement: {
@@ -238,13 +176,8 @@ TEST_RUNNER.run({
                 ],
               },
             }),
-            insertPayoutStatement({
-              statementId: "statement7",
-              accountId: "account1",
-              state: PayoutState.PROCESSING,
-            }),
             insertTransactionStatementStatement({
-              statementId: "statement8",
+              statementId: "statement7",
               accountId: "account1",
               month: "2022-04",
               statement: {
@@ -306,34 +239,9 @@ TEST_RUNNER.run({
                       quantity: 990,
                     },
                   ],
-                  payment: {
-                    state: PaymentStateResponse.PAID,
-                    stripeInvoiceUrl: "https://stripe.com/invoice1",
-                  },
                 },
                 {
                   statementId: "statement2",
-                  month: "2022-10",
-                  currency: "USD",
-                  totalAmount: 1402,
-                  totalAmountType: AmountType.DEBIT,
-                  positiveAmountType: AmountType.DEBIT,
-                  items: [
-                    {
-                      productID: ProductID.SHOW,
-                      amountType: AmountType.DEBIT,
-                      unit: "seconds",
-                      amount: 82,
-                      quantity: 882,
-                    },
-                  ],
-                  payment: {
-                    state: PaymentStateResponse.FAILED,
-                    stripeInvoiceUrl: "https://stripe.com/invoice2",
-                  },
-                },
-                {
-                  statementId: "statement3",
                   month: "2022-09",
                   currency: "USD",
                   totalAmount: 1500,
@@ -348,13 +256,9 @@ TEST_RUNNER.run({
                       quantity: 885,
                     },
                   ],
-                  payment: {
-                    state: PaymentStateResponse.PROCESSING,
-                    stripeInvoiceUrl: "https://stripe.com/invoice3",
-                  },
                 },
                 {
-                  statementId: "statement4",
+                  statementId: "statement3",
                   month: "2022-08",
                   currency: "USD",
                   totalAmount: 1600,
@@ -376,12 +280,9 @@ TEST_RUNNER.run({
                       quantity: 777,
                     },
                   ],
-                  payment: {
-                    state: PaymentStateResponse.PROCESSING,
-                  },
                 },
                 {
-                  statementId: "statement5",
+                  statementId: "statement4",
                   month: "2022-07",
                   currency: "USD",
                   totalAmount: 1700,
@@ -403,12 +304,9 @@ TEST_RUNNER.run({
                       quantity: 660,
                     },
                   ],
-                  payout: {
-                    state: PayoutStateResponse.PAID,
-                  },
                 },
                 {
-                  statementId: "statement6",
+                  statementId: "statement5",
                   month: "2022-06",
                   currency: "USD",
                   totalAmount: 1800,
@@ -423,12 +321,9 @@ TEST_RUNNER.run({
                       quantity: 892,
                     },
                   ],
-                  payout: {
-                    state: PayoutStateResponse.FAILED,
-                  },
                 },
                 {
-                  statementId: "statement7",
+                  statementId: "statement6",
                   month: "2022-05",
                   currency: "USD",
                   totalAmount: 1900,
@@ -443,9 +338,6 @@ TEST_RUNNER.run({
                       quantity: 895,
                     },
                   ],
-                  payout: {
-                    state: PayoutStateResponse.PROCESSING,
-                  },
                 },
               ],
             },
@@ -481,16 +373,6 @@ TEST_RUNNER.run({
             deleteTransactionStatementStatement({
               transactionStatementStatementIdEq: "statement7",
             }),
-            deleteTransactionStatementStatement({
-              transactionStatementStatementIdEq: "statement8",
-            }),
-            deletePaymentStatement({ paymentStatementIdEq: "statement1" }),
-            deletePaymentStatement({ paymentStatementIdEq: "statement2" }),
-            deletePaymentStatement({ paymentStatementIdEq: "statement3" }),
-            deletePaymentStatement({ paymentStatementIdEq: "statement4" }),
-            deletePayoutStatement({ payoutStatementIdEq: "statement5" }),
-            deletePayoutStatement({ payoutStatementIdEq: "statement6" }),
-            deletePayoutStatement({ payoutStatementIdEq: "statement7" }),
           ]);
           await transaction.commit();
         });

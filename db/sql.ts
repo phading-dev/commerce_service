@@ -2745,19 +2745,6 @@ export interface ListTransactionStatementsRow {
   transactionStatementMonth?: string,
   transactionStatementStatement?: TransactionStatement,
   transactionStatementCreatedTimeMs?: number,
-  paymentStatementId?: string,
-  paymentAccountId?: string,
-  paymentState?: PaymentState,
-  paymentStripeInvoiceId?: string,
-  paymentStripeInvoiceUrl?: string,
-  paymentUpdatedTimeMs?: number,
-  paymentCreatedTimeMs?: number,
-  payoutStatementId?: string,
-  payoutAccountId?: string,
-  payoutState?: PayoutState,
-  payoutStripeTransferId?: string,
-  payoutUpdatedTimeMs?: number,
-  payoutCreatedTimeMs?: number,
 }
 
 export let LIST_TRANSACTION_STATEMENTS_ROW: MessageDescriptor<ListTransactionStatementsRow> = {
@@ -2782,58 +2769,6 @@ export let LIST_TRANSACTION_STATEMENTS_ROW: MessageDescriptor<ListTransactionSta
     name: 'transactionStatementCreatedTimeMs',
     index: 5,
     primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'paymentStatementId',
-    index: 6,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'paymentAccountId',
-    index: 7,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'paymentState',
-    index: 8,
-    enumType: PAYMENT_STATE,
-  }, {
-    name: 'paymentStripeInvoiceId',
-    index: 9,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'paymentStripeInvoiceUrl',
-    index: 10,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'paymentUpdatedTimeMs',
-    index: 11,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'paymentCreatedTimeMs',
-    index: 12,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'payoutStatementId',
-    index: 13,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'payoutAccountId',
-    index: 14,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'payoutState',
-    index: 15,
-    enumType: PAYOUT_STATE,
-  }, {
-    name: 'payoutStripeTransferId',
-    index: 16,
-    primitiveType: PrimitiveType.STRING,
-  }, {
-    name: 'payoutUpdatedTimeMs',
-    index: 17,
-    primitiveType: PrimitiveType.NUMBER,
-  }, {
-    name: 'payoutCreatedTimeMs',
-    index: 18,
-    primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
@@ -2846,7 +2781,7 @@ export async function listTransactionStatements(
   }
 ): Promise<Array<ListTransactionStatementsRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT t.statementId, t.accountId, t.month, t.statement, t.createdTimeMs, pa.statementId, pa.accountId, pa.state, pa.stripeInvoiceId, pa.stripeInvoiceUrl, pa.updatedTimeMs, pa.createdTimeMs, po.statementId, po.accountId, po.state, po.stripeTransferId, po.updatedTimeMs, po.createdTimeMs FROM TransactionStatement AS t LEFT JOIN Payment AS pa ON t.statementId = pa.statementId LEFT JOIN Payout AS po ON t.statementId = po.statementId WHERE (t.accountId = @transactionStatementAccountIdEq AND t.month >= @transactionStatementMonthGe AND t.month <= @transactionStatementMonthLe) ORDER BY t.month DESC",
+    sql: "SELECT TransactionStatement.statementId, TransactionStatement.accountId, TransactionStatement.month, TransactionStatement.statement, TransactionStatement.createdTimeMs FROM TransactionStatement WHERE (TransactionStatement.accountId = @transactionStatementAccountIdEq AND TransactionStatement.month >= @transactionStatementMonthGe AND TransactionStatement.month <= @transactionStatementMonthLe) ORDER BY TransactionStatement.month DESC",
     params: {
       transactionStatementAccountIdEq: args.transactionStatementAccountIdEq == null ? null : args.transactionStatementAccountIdEq,
       transactionStatementMonthGe: args.transactionStatementMonthGe == null ? null : args.transactionStatementMonthGe,
@@ -2866,19 +2801,6 @@ export async function listTransactionStatements(
       transactionStatementMonth: row.at(2).value == null ? undefined : row.at(2).value,
       transactionStatementStatement: row.at(3).value == null ? undefined : deserializeMessage(row.at(3).value, TRANSACTION_STATEMENT),
       transactionStatementCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
-      paymentStatementId: row.at(5).value == null ? undefined : row.at(5).value,
-      paymentAccountId: row.at(6).value == null ? undefined : row.at(6).value,
-      paymentState: row.at(7).value == null ? undefined : toEnumFromNumber(row.at(7).value.value, PAYMENT_STATE),
-      paymentStripeInvoiceId: row.at(8).value == null ? undefined : row.at(8).value,
-      paymentStripeInvoiceUrl: row.at(9).value == null ? undefined : row.at(9).value,
-      paymentUpdatedTimeMs: row.at(10).value == null ? undefined : row.at(10).value.value,
-      paymentCreatedTimeMs: row.at(11).value == null ? undefined : row.at(11).value.value,
-      payoutStatementId: row.at(12).value == null ? undefined : row.at(12).value,
-      payoutAccountId: row.at(13).value == null ? undefined : row.at(13).value,
-      payoutState: row.at(14).value == null ? undefined : toEnumFromNumber(row.at(14).value.value, PAYOUT_STATE),
-      payoutStripeTransferId: row.at(15).value == null ? undefined : row.at(15).value,
-      payoutUpdatedTimeMs: row.at(16).value == null ? undefined : row.at(16).value.value,
-      payoutCreatedTimeMs: row.at(17).value == null ? undefined : row.at(17).value.value,
     });
   }
   return resRows;
@@ -2960,6 +2882,115 @@ export async function listPaymentsByState(
   return resRows;
 }
 
+export interface ListPaymentsWithStatementsRow {
+  paymentStatementId?: string,
+  paymentAccountId?: string,
+  paymentState?: PaymentState,
+  paymentStripeInvoiceId?: string,
+  paymentStripeInvoiceUrl?: string,
+  paymentUpdatedTimeMs?: number,
+  paymentCreatedTimeMs?: number,
+  transactionStatementStatementId?: string,
+  transactionStatementAccountId?: string,
+  transactionStatementMonth?: string,
+  transactionStatementStatement?: TransactionStatement,
+  transactionStatementCreatedTimeMs?: number,
+}
+
+export let LIST_PAYMENTS_WITH_STATEMENTS_ROW: MessageDescriptor<ListPaymentsWithStatementsRow> = {
+  name: 'ListPaymentsWithStatementsRow',
+  fields: [{
+    name: 'paymentStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentState',
+    index: 3,
+    enumType: PAYMENT_STATE,
+  }, {
+    name: 'paymentStripeInvoiceId',
+    index: 4,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentStripeInvoiceUrl',
+    index: 5,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentUpdatedTimeMs',
+    index: 6,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentCreatedTimeMs',
+    index: 7,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'transactionStatementStatementId',
+    index: 8,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementAccountId',
+    index: 9,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementMonth',
+    index: 10,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementStatement',
+    index: 11,
+    messageType: TRANSACTION_STATEMENT,
+  }, {
+    name: 'transactionStatementCreatedTimeMs',
+    index: 12,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function listPaymentsWithStatements(
+  runner: Database | Transaction,
+  args: {
+    paymentAccountIdEq?: string,
+    transactionStatementMonthGe?: string,
+    transactionStatementMonthLe?: string,
+  }
+): Promise<Array<ListPaymentsWithStatementsRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT p.statementId, p.accountId, p.state, p.stripeInvoiceId, p.stripeInvoiceUrl, p.updatedTimeMs, p.createdTimeMs, t.statementId, t.accountId, t.month, t.statement, t.createdTimeMs FROM Payment AS p LEFT JOIN TransactionStatement AS t ON p.statementId = t.statementId WHERE (p.accountId = @paymentAccountIdEq AND t.month >= @transactionStatementMonthGe AND t.month <= @transactionStatementMonthLe) ORDER BY t.month DESC",
+    params: {
+      paymentAccountIdEq: args.paymentAccountIdEq == null ? null : args.paymentAccountIdEq,
+      transactionStatementMonthGe: args.transactionStatementMonthGe == null ? null : args.transactionStatementMonthGe,
+      transactionStatementMonthLe: args.transactionStatementMonthLe == null ? null : args.transactionStatementMonthLe,
+    },
+    types: {
+      paymentAccountIdEq: { type: "string" },
+      transactionStatementMonthGe: { type: "string" },
+      transactionStatementMonthLe: { type: "string" },
+    }
+  });
+  let resRows = new Array<ListPaymentsWithStatementsRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      paymentState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYMENT_STATE),
+      paymentStripeInvoiceId: row.at(3).value == null ? undefined : row.at(3).value,
+      paymentStripeInvoiceUrl: row.at(4).value == null ? undefined : row.at(4).value,
+      paymentUpdatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
+      paymentCreatedTimeMs: row.at(6).value == null ? undefined : row.at(6).value.value,
+      transactionStatementStatementId: row.at(7).value == null ? undefined : row.at(7).value,
+      transactionStatementAccountId: row.at(8).value == null ? undefined : row.at(8).value,
+      transactionStatementMonth: row.at(9).value == null ? undefined : row.at(9).value,
+      transactionStatementStatement: row.at(10).value == null ? undefined : deserializeMessage(row.at(10).value, TRANSACTION_STATEMENT),
+      transactionStatementCreatedTimeMs: row.at(11).value == null ? undefined : row.at(11).value.value,
+    });
+  }
+  return resRows;
+}
+
 export interface ListPayoutsByStateRow {
   payoutStatementId?: string,
   payoutAccountId?: string,
@@ -3025,6 +3056,109 @@ export async function listPayoutsByState(
       payoutStripeTransferId: row.at(3).value == null ? undefined : row.at(3).value,
       payoutUpdatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
       payoutCreatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
+    });
+  }
+  return resRows;
+}
+
+export interface ListPayoutsWithStatementsRow {
+  payoutStatementId?: string,
+  payoutAccountId?: string,
+  payoutState?: PayoutState,
+  payoutStripeTransferId?: string,
+  payoutUpdatedTimeMs?: number,
+  payoutCreatedTimeMs?: number,
+  transactionStatementStatementId?: string,
+  transactionStatementAccountId?: string,
+  transactionStatementMonth?: string,
+  transactionStatementStatement?: TransactionStatement,
+  transactionStatementCreatedTimeMs?: number,
+}
+
+export let LIST_PAYOUTS_WITH_STATEMENTS_ROW: MessageDescriptor<ListPayoutsWithStatementsRow> = {
+  name: 'ListPayoutsWithStatementsRow',
+  fields: [{
+    name: 'payoutStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutAccountId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutState',
+    index: 3,
+    enumType: PAYOUT_STATE,
+  }, {
+    name: 'payoutStripeTransferId',
+    index: 4,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutUpdatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutCreatedTimeMs',
+    index: 6,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'transactionStatementStatementId',
+    index: 7,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementAccountId',
+    index: 8,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementMonth',
+    index: 9,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'transactionStatementStatement',
+    index: 10,
+    messageType: TRANSACTION_STATEMENT,
+  }, {
+    name: 'transactionStatementCreatedTimeMs',
+    index: 11,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function listPayoutsWithStatements(
+  runner: Database | Transaction,
+  args: {
+    payoutAccountIdEq?: string,
+    transactionStatementMonthGe?: string,
+    transactionStatementMonthLe?: string,
+  }
+): Promise<Array<ListPayoutsWithStatementsRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT p.statementId, p.accountId, p.state, p.stripeTransferId, p.updatedTimeMs, p.createdTimeMs, t.statementId, t.accountId, t.month, t.statement, t.createdTimeMs FROM Payout AS p LEFT JOIN TransactionStatement AS t ON p.statementId = t.statementId WHERE (p.accountId = @payoutAccountIdEq AND t.month >= @transactionStatementMonthGe AND t.month <= @transactionStatementMonthLe) ORDER BY t.month DESC",
+    params: {
+      payoutAccountIdEq: args.payoutAccountIdEq == null ? null : args.payoutAccountIdEq,
+      transactionStatementMonthGe: args.transactionStatementMonthGe == null ? null : args.transactionStatementMonthGe,
+      transactionStatementMonthLe: args.transactionStatementMonthLe == null ? null : args.transactionStatementMonthLe,
+    },
+    types: {
+      payoutAccountIdEq: { type: "string" },
+      transactionStatementMonthGe: { type: "string" },
+      transactionStatementMonthLe: { type: "string" },
+    }
+  });
+  let resRows = new Array<ListPayoutsWithStatementsRow>();
+  for (let row of rows) {
+    resRows.push({
+      payoutStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      payoutState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYOUT_STATE),
+      payoutStripeTransferId: row.at(3).value == null ? undefined : row.at(3).value,
+      payoutUpdatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      payoutCreatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
+      transactionStatementStatementId: row.at(6).value == null ? undefined : row.at(6).value,
+      transactionStatementAccountId: row.at(7).value == null ? undefined : row.at(7).value,
+      transactionStatementMonth: row.at(8).value == null ? undefined : row.at(8).value,
+      transactionStatementStatement: row.at(9).value == null ? undefined : deserializeMessage(row.at(9).value, TRANSACTION_STATEMENT),
+      transactionStatementCreatedTimeMs: row.at(10).value == null ? undefined : row.at(10).value.value,
     });
   }
   return resRows;

@@ -1,7 +1,7 @@
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
-import { PaymentState, PayoutState } from "../../db/schema";
 import { listTransactionStatements } from "../../db/sql";
+import { getMonthDifference } from "../common/date_helper";
 import { Database } from "@google-cloud/spanner";
 import { ListTransactionStatementsHandlerInterface } from "@phading/commerce_service_interface/web/statements/handler";
 import {
@@ -10,11 +10,11 @@ import {
 } from "@phading/commerce_service_interface/web/statements/interface";
 import {
   LineItem,
-  PaymentState as PaymentStateResponse,
-  PayoutState as PayoutStateResponse,
   TransactionStatement,
 } from "@phading/commerce_service_interface/web/statements/transaction_statement";
+import { MAX_MONTH_RANGE } from "@phading/constants/commerce";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
+import { newBadRequestError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 
 export class ListTransactionStatementsHandler extends ListTransactionStatementsHandlerInterface {
@@ -37,6 +37,18 @@ export class ListTransactionStatementsHandler extends ListTransactionStatementsH
     body: ListTransactionStatementsRequestBody,
     sessionStr: string,
   ): Promise<ListTransactionStatementsResponse> {
+    if (!body.startMonth) {
+      throw newBadRequestError(`"startMonth" is required.`);
+    }
+    if (!body.endMonth) {
+      throw newBadRequestError(`"endMonth" is required.`);
+    }
+    if (
+      getMonthDifference(new Date(body.startMonth), new Date(body.endMonth)) >
+      MAX_MONTH_RANGE
+    ) {
+      throw newBadRequestError(`The range of months is too long.`);
+    }
     let { accountId } = await this.serviceClient.send(
       newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
@@ -66,47 +78,8 @@ export class ListTransactionStatementsHandler extends ListTransactionStatementsH
               amount: item.amount,
             }),
           ),
-          payment: row.paymentStatementId
-            ? {
-                state: this.convertPaymentState(row.paymentState),
-                stripeInvoiceUrl: row.paymentStripeInvoiceUrl,
-              }
-            : undefined,
-          payout: row.payoutStatementId
-            ? {
-                state: this.convertPayoutState(row.payoutState),
-              }
-            : undefined,
         }),
       ),
     };
-  }
-
-  private convertPaymentState(state: PaymentState): PaymentStateResponse {
-    switch (state) {
-      case PaymentState.PROCESSING:
-        return PaymentStateResponse.PROCESSING;
-      case PaymentState.CHARGING_VIA_STRIPE_INVOICE:
-        return PaymentStateResponse.PROCESSING;
-      case PaymentState.PAID:
-        return PaymentStateResponse.PAID;
-      case PaymentState.FAILED:
-        return PaymentStateResponse.FAILED;
-      default:
-        throw new Error(`Unknown payment state: ${state}`);
-    }
-  }
-
-  private convertPayoutState(state: PayoutState): PayoutStateResponse {
-    switch (state) {
-      case PayoutState.PROCESSING:
-        return PayoutStateResponse.PROCESSING;
-      case PayoutState.PAID:
-        return PayoutStateResponse.PAID;
-      case PayoutState.FAILED:
-        return PayoutStateResponse.FAILED;
-      default:
-        throw new Error(`Unknown payout state: ${state}`);
-    }
   }
 }

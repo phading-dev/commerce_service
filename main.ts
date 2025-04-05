@@ -27,9 +27,11 @@ import { ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler } from "./n
 import { ProcessStripePaymentCustomerCreatingTaskHandler } from "./node/process_stripe_payment_customer_creating_task_handler";
 import { CreateStripeSessionToAddPaymentMethodHandler } from "./web/billing/create_stripe_session_to_add_payment_method_handler";
 import { GetBillingProfileInfoHandler } from "./web/billing/get_billing_profile_info_handler";
+import { ListPaymentsHandler } from "./web/billing/list_payments_handler";
 import { ReplacePrimaryPaymentMethodHandler } from "./web/billing/replace_primary_payment_method_handler";
 import { RetryFailedPaymentsHandler } from "./web/billing/retry_failed_payments_handler";
 import { GetEarningsProfileInfoHandler } from "./web/earnings/get_earnings_profile_info_handler";
+import { ListPayoutsHandler } from "./web/earnings/list_payouts_handler";
 import { SetConnectedAccountOnboardedHandler } from "./web/earnings/set_connected_account_onboarded_handler";
 import { ListTransactionStatementsHandler } from "./web/statements/list_transaction_statements_handler";
 import { MarkPaymentDoneHandler } from "./web/stripe_webhook/mark_payment_done_handler";
@@ -93,9 +95,11 @@ async function main() {
     .addHandlerRegister(COMMERCE_WEB_SERVICE)
     .add(CreateStripeSessionToAddPaymentMethodHandler.create())
     .add(GetBillingProfileInfoHandler.create())
+    .add(ListPaymentsHandler.create())
     .add(ReplacePrimaryPaymentMethodHandler.create())
     .add(RetryFailedPaymentsHandler.create())
     .add(GetEarningsProfileInfoHandler.create())
+    .add(ListPayoutsHandler.create())
     .add(SetConnectedAccountOnboardedHandler.create())
     .add(ListTransactionStatementsHandler.create())
     .add(MarkPaymentDoneHandler.create(stripePaymentIntentSuccessSecretKey))

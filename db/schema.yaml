@@ -519,24 +519,6 @@
         - all: true
     - name: ListTransactionStatements
       from: TransactionStatement
-      as: t
-      join:
-        - type: LEFT
-          with: Payment
-          as: pa
-          on:
-            op: =
-            lColumn: statementId
-            lTable: t
-            rColumn: statementId
-        - type: LEFT
-          with: Payout
-          as: po
-          on:
-            op: =
-            lColumn: statementId
-            lTable: t
-            rColumn: statementId
       where:
         op: AND
         exprs:
@@ -551,11 +533,6 @@
           desc: true
       get:
         - all: true
-          table: t
-        - all: true
-          table: pa
-        - all: true
-          table: po
     - name: ListPaymentsByState
       from: Payment
       where:
@@ -570,6 +547,39 @@
           desc: true
       get:
         - all: true
+    - name: ListPaymentsWithStatements
+      from: Payment
+      as: p
+      join:
+        - type: LEFT
+          with: TransactionStatement
+          as: t
+          on:
+            op: =
+            lColumn: statementId
+            lTable: p
+            rColumn: statementId
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: accountId
+            lTable: p
+          - op: ">="
+            lColumn: month
+            lTable: t
+          - op: "<="
+            lColumn: month
+            lTable: t
+      orderBy:
+        - column: month
+          table: t
+          desc: true
+      get:
+        - all: true
+          table: p
+        - all: true
+          table: t
     - name: ListPayoutsByState
       from: Payout
       where:
@@ -584,5 +594,38 @@
           desc: true
       get:
         - all: true
+    - name: ListPayoutsWithStatements
+      from: Payout
+      as: p
+      join:
+        - type: LEFT
+          with: TransactionStatement
+          as: t
+          on:
+            op: =
+            lColumn: statementId
+            lTable: p
+            rColumn: statementId
+      where:
+        op: AND
+        exprs:
+          - op: =
+            lColumn: accountId
+            lTable: p
+          - op: ">="
+            lColumn: month
+            lTable: t
+          - op: "<="
+            lColumn: month
+            lTable: t
+      orderBy:
+        - column: month
+          table: t
+          desc: true
+      get:
+        - all: true
+          table: p
+        - all: true
+          table: t
   outputDdl: ./db/ddl
   outputSql: ./db/sql
