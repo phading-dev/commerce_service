@@ -102,13 +102,12 @@ export class ProcessBillingProfileSuspensionNotifyingTaskHandler extends Process
     );
     await this.sendgridClient.send({
       to: accountResponse.contactEmail,
-      from: ENV_VARS.fromEmailAddress,
+      from: ENV_VARS.contactEmail,
       templateId: LOCALIZATION.accountSuspensionEmailTemplateId,
       dynamicTemplateData: {
         name: accountResponse.naturalName,
         appName: APP_NAME,
-        accountSuspensionContactEmail:
-          ENV_VARS.accountSuspensionContactEmailAddress,
+        accountSuspensionContactEmail: ENV_VARS.contactEmail,
       },
     });
     await this.database.runTransactionAsync(async (transaction) => {

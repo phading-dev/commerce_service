@@ -117,7 +117,7 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
     );
     await this.sendgridClient.send({
       to: contactEmail,
-      from: ENV_VARS.fromEmailAddress,
+      from: ENV_VARS.contactEmail,
       templateId: LOCALIZATION.updatePaymentMethodEmailTemplateId,
       dynamicTemplateData: {
         month: transactionStatement.transactionStatementMonth,

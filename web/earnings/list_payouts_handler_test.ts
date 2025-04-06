@@ -142,7 +142,7 @@ TEST_RUNNER.run({
               payouts: [
                 {
                   payoutId: "statement5",
-                  month: "2023-01",
+                  month: "2023-02",
                   amount: 1700,
                   currency: "USD",
                   state: PayoutStateResponse.PAID,

@@ -105,6 +105,7 @@ export class GetBillingProfileInfoHandler extends GetBillingProfileInfoHandlerIn
         profile.billingProfileStateInfo.state,
         paymentRows.length > 0,
       ),
+      paymentAfterMs: profile.billingProfilePaymentAfterMs,
     };
   }
 

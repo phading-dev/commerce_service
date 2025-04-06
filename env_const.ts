@@ -7,8 +7,6 @@ ENV_VARS.stripePaymentIntentSuccessSecretKeyFile =
 ENV_VARS.stripePaymentIntentFailedSecretKeyFile =
   "stripe_payment_intent_failed_secret_key";
 ENV_VARS.sendgridApiKeyFile = "send_grid_api_key";
-ENV_VARS.fromEmailAddress = "contact-test@ykuyo.com";
-ENV_VARS.accountSuspensionContactEmailAddress = "contact-test@ykuyo.com";
 ENV_VARS.updatePaymentMethodEnEmailTemplateId =
   "d-ff7a366080984aa5a00231e211214943";
 ENV_VARS.accountSuspensionEnEmailTemplateId =

@@ -180,7 +180,7 @@ TEST_RUNNER.run({
                 },
                 {
                   paymentId: "statement3",
-                  month: "2022-11",
+                  month: "2022-12",
                   amount: 1500,
                   currency: "USD",
                   stripeInvoiceUrl: "https://stripe.com/invoice3",
@@ -189,7 +189,7 @@ TEST_RUNNER.run({
                 },
                 {
                   paymentId: "statement2",
-                  month: "2022-10",
+                  month: "2022-11",
                   amount: 1400,
                   currency: "USD",
                   state: PaymentStateResponse.FAILED,
