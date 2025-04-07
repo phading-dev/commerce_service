@@ -89,7 +89,6 @@ export class GetBillingProfileInfoHandler extends GetBillingProfileInfoHandlerIn
     return {
       primaryPaymentMethod: paymentMethod
         ? {
-            paymentMethodId: paymentMethod.id,
             card: {
               brand: parseEnum(
                 paymentMethod.card.brand.toUpperCase(),

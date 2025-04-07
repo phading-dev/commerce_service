@@ -38,7 +38,6 @@ TEST_RUNNER.run({
               statementId: "statement1",
               accountId: "account1",
               state: PaymentState.PAID,
-              stripeInvoiceUrl: "https://stripe.com/invoice1",
               updatedTimeMs: 1000,
             }),
             insertTransactionStatementStatement({
@@ -69,7 +68,6 @@ TEST_RUNNER.run({
               statementId: "statement3",
               accountId: "account1",
               state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
-              stripeInvoiceUrl: "https://stripe.com/invoice3",
               updatedTimeMs: 3000,
             }),
             insertTransactionStatementStatement({
@@ -94,7 +92,6 @@ TEST_RUNNER.run({
               statementId: "statement5",
               accountId: "account1",
               state: PaymentState.PROCESSING,
-              stripeInvoiceUrl: "https://stripe.com/invoice5",
               updatedTimeMs: 5000,
             }),
             insertTransactionStatementStatement({
@@ -110,14 +107,12 @@ TEST_RUNNER.run({
               statementId: "statement6",
               accountId: "account1",
               state: PaymentState.PAID,
-              stripeInvoiceUrl: "https://stripe.com/invoice6",
               updatedTimeMs: 6000,
             }),
             insertPaymentStatement({
               statementId: "statement7",
               accountId: "account1",
               state: PaymentState.PAID,
-              stripeInvoiceUrl: "https://stripe.com/invoice7",
               updatedTimeMs: 7000,
             }),
             insertTransactionStatementStatement({
@@ -161,34 +156,27 @@ TEST_RUNNER.run({
             {
               payments: [
                 {
-                  paymentId: "statement6",
                   month: "2023-03",
                   amount: 1800,
                   currency: "USD",
-                  stripeInvoiceUrl: "https://stripe.com/invoice6",
                   state: PaymentStateResponse.PAID,
                   updatedTimeMs: 6000,
                 },
                 {
-                  paymentId: "statement5",
                   month: "2023-02",
                   amount: 1700,
                   currency: "USD",
-                  stripeInvoiceUrl: "https://stripe.com/invoice5",
                   state: PaymentStateResponse.PROCESSING,
                   updatedTimeMs: 5000,
                 },
                 {
-                  paymentId: "statement3",
                   month: "2022-12",
                   amount: 1500,
                   currency: "USD",
-                  stripeInvoiceUrl: "https://stripe.com/invoice3",
                   state: PaymentStateResponse.PROCESSING,
                   updatedTimeMs: 3000,
                 },
                 {
-                  paymentId: "statement2",
                   month: "2022-11",
                   amount: 1400,
                   currency: "USD",

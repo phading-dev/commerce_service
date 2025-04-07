@@ -166,7 +166,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         idempotencyKey: body.statementId,
       },
     );
-    invoice = await this.stripeClient.val.invoices.finalizeInvoice(
+    await this.stripeClient.val.invoices.finalizeInvoice(
       invoice.id,
       {
         auto_advance: true,
@@ -175,12 +175,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         idempotencyKey: body.statementId,
       },
     );
-    await this.finalize(
-      loggingPrefix,
-      body.statementId,
-      invoice.id,
-      invoice.hosted_invoice_url,
-    );
+    await this.finalize(loggingPrefix, body.statementId, invoice.id);
   }
 
   private async reportFailure(
@@ -220,7 +215,6 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     loggingPrefix: string,
     statementId: string,
     invoiceId: string,
-    invoiceUrl: string,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
       await this.getValidPayment(transaction, statementId);
@@ -229,7 +223,6 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
           paymentStatementIdEq: statementId,
           setState: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
           setStripeInvoiceId: invoiceId,
-          setStripeInvoiceUrl: invoiceUrl,
           setUpdatedTimeMs: this.getNow(),
         }),
         deletePaymentTaskStatement({

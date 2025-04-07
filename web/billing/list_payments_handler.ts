@@ -68,11 +68,9 @@ export class ListPaymentsHandler extends ListPaymentsHandlerInterface {
     return {
       payments: rows.map(
         (row): Payment => ({
-          paymentId: row.paymentStatementId,
           month: row.transactionStatementMonth,
           amount: row.transactionStatementStatement.totalAmount,
           currency: row.transactionStatementStatement.currency,
-          stripeInvoiceUrl: row.paymentStripeInvoiceUrl,
           state: this.convertPaymentState(row.paymentState),
           updatedTimeMs: row.paymentUpdatedTimeMs,
         }),

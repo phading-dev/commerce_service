@@ -316,19 +316,17 @@ export function insertPaymentStatement(
     accountId?: string,
     state?: PaymentState,
     stripeInvoiceId?: string,
-    stripeInvoiceUrl?: string,
     updatedTimeMs?: number,
     createdTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "INSERT Payment (statementId, accountId, state, stripeInvoiceId, stripeInvoiceUrl, updatedTimeMs, createdTimeMs) VALUES (@statementId, @accountId, @state, @stripeInvoiceId, @stripeInvoiceUrl, @updatedTimeMs, @createdTimeMs)",
+    sql: "INSERT Payment (statementId, accountId, state, stripeInvoiceId, updatedTimeMs, createdTimeMs) VALUES (@statementId, @accountId, @state, @stripeInvoiceId, @updatedTimeMs, @createdTimeMs)",
     params: {
       statementId: args.statementId,
       accountId: args.accountId == null ? null : args.accountId,
       state: args.state == null ? null : Spanner.float(args.state),
       stripeInvoiceId: args.stripeInvoiceId == null ? null : args.stripeInvoiceId,
-      stripeInvoiceUrl: args.stripeInvoiceUrl == null ? null : args.stripeInvoiceUrl,
       updatedTimeMs: args.updatedTimeMs == null ? null : Spanner.float(args.updatedTimeMs),
       createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
     },
@@ -337,7 +335,6 @@ export function insertPaymentStatement(
       accountId: { type: "string" },
       state: { type: "float64" },
       stripeInvoiceId: { type: "string" },
-      stripeInvoiceUrl: { type: "string" },
       updatedTimeMs: { type: "float64" },
       createdTimeMs: { type: "float64" },
     }
@@ -365,7 +362,6 @@ export interface GetPaymentRow {
   paymentAccountId?: string,
   paymentState?: PaymentState,
   paymentStripeInvoiceId?: string,
-  paymentStripeInvoiceUrl?: string,
   paymentUpdatedTimeMs?: number,
   paymentCreatedTimeMs?: number,
 }
@@ -389,16 +385,12 @@ export let GET_PAYMENT_ROW: MessageDescriptor<GetPaymentRow> = {
     index: 4,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'paymentStripeInvoiceUrl',
-    index: 5,
-    primitiveType: PrimitiveType.STRING,
-  }, {
     name: 'paymentUpdatedTimeMs',
-    index: 6,
+    index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }, {
     name: 'paymentCreatedTimeMs',
-    index: 7,
+    index: 6,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
@@ -410,7 +402,7 @@ export async function getPayment(
   }
 ): Promise<Array<GetPaymentRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT Payment.statementId, Payment.accountId, Payment.state, Payment.stripeInvoiceId, Payment.stripeInvoiceUrl, Payment.updatedTimeMs, Payment.createdTimeMs FROM Payment WHERE (Payment.statementId = @paymentStatementIdEq)",
+    sql: "SELECT Payment.statementId, Payment.accountId, Payment.state, Payment.stripeInvoiceId, Payment.updatedTimeMs, Payment.createdTimeMs FROM Payment WHERE (Payment.statementId = @paymentStatementIdEq)",
     params: {
       paymentStatementIdEq: args.paymentStatementIdEq,
     },
@@ -425,9 +417,8 @@ export async function getPayment(
       paymentAccountId: row.at(1).value == null ? undefined : row.at(1).value,
       paymentState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYMENT_STATE),
       paymentStripeInvoiceId: row.at(3).value == null ? undefined : row.at(3).value,
-      paymentStripeInvoiceUrl: row.at(4).value == null ? undefined : row.at(4).value,
-      paymentUpdatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
-      paymentCreatedTimeMs: row.at(6).value == null ? undefined : row.at(6).value.value,
+      paymentUpdatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      paymentCreatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
     });
   }
   return resRows;
@@ -2489,24 +2480,21 @@ export function updatePaymentStateAndStripeInvoiceStatement(
     paymentStatementIdEq: string,
     setState?: PaymentState,
     setStripeInvoiceId?: string,
-    setStripeInvoiceUrl?: string,
     setUpdatedTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE Payment SET state = @setState, stripeInvoiceId = @setStripeInvoiceId, stripeInvoiceUrl = @setStripeInvoiceUrl, updatedTimeMs = @setUpdatedTimeMs WHERE (Payment.statementId = @paymentStatementIdEq)",
+    sql: "UPDATE Payment SET state = @setState, stripeInvoiceId = @setStripeInvoiceId, updatedTimeMs = @setUpdatedTimeMs WHERE (Payment.statementId = @paymentStatementIdEq)",
     params: {
       paymentStatementIdEq: args.paymentStatementIdEq,
       setState: args.setState == null ? null : Spanner.float(args.setState),
       setStripeInvoiceId: args.setStripeInvoiceId == null ? null : args.setStripeInvoiceId,
-      setStripeInvoiceUrl: args.setStripeInvoiceUrl == null ? null : args.setStripeInvoiceUrl,
       setUpdatedTimeMs: args.setUpdatedTimeMs == null ? null : Spanner.float(args.setUpdatedTimeMs),
     },
     types: {
       paymentStatementIdEq: { type: "string" },
       setState: { type: "float64" },
       setStripeInvoiceId: { type: "string" },
-      setStripeInvoiceUrl: { type: "string" },
       setUpdatedTimeMs: { type: "float64" },
     }
   };
@@ -2811,7 +2799,6 @@ export interface ListPaymentsByStateRow {
   paymentAccountId?: string,
   paymentState?: PaymentState,
   paymentStripeInvoiceId?: string,
-  paymentStripeInvoiceUrl?: string,
   paymentUpdatedTimeMs?: number,
   paymentCreatedTimeMs?: number,
 }
@@ -2835,16 +2822,12 @@ export let LIST_PAYMENTS_BY_STATE_ROW: MessageDescriptor<ListPaymentsByStateRow>
     index: 4,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'paymentStripeInvoiceUrl',
-    index: 5,
-    primitiveType: PrimitiveType.STRING,
-  }, {
     name: 'paymentUpdatedTimeMs',
-    index: 6,
+    index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }, {
     name: 'paymentCreatedTimeMs',
-    index: 7,
+    index: 6,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
@@ -2857,7 +2840,7 @@ export async function listPaymentsByState(
   }
 ): Promise<Array<ListPaymentsByStateRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT Payment.statementId, Payment.accountId, Payment.state, Payment.stripeInvoiceId, Payment.stripeInvoiceUrl, Payment.updatedTimeMs, Payment.createdTimeMs FROM Payment WHERE (Payment.accountId = @paymentAccountIdEq AND Payment.state = @paymentStateEq) ORDER BY Payment.createdTimeMs DESC",
+    sql: "SELECT Payment.statementId, Payment.accountId, Payment.state, Payment.stripeInvoiceId, Payment.updatedTimeMs, Payment.createdTimeMs FROM Payment WHERE (Payment.accountId = @paymentAccountIdEq AND Payment.state = @paymentStateEq) ORDER BY Payment.createdTimeMs DESC",
     params: {
       paymentAccountIdEq: args.paymentAccountIdEq == null ? null : args.paymentAccountIdEq,
       paymentStateEq: args.paymentStateEq == null ? null : Spanner.float(args.paymentStateEq),
@@ -2874,9 +2857,8 @@ export async function listPaymentsByState(
       paymentAccountId: row.at(1).value == null ? undefined : row.at(1).value,
       paymentState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYMENT_STATE),
       paymentStripeInvoiceId: row.at(3).value == null ? undefined : row.at(3).value,
-      paymentStripeInvoiceUrl: row.at(4).value == null ? undefined : row.at(4).value,
-      paymentUpdatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
-      paymentCreatedTimeMs: row.at(6).value == null ? undefined : row.at(6).value.value,
+      paymentUpdatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      paymentCreatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
     });
   }
   return resRows;
@@ -2887,7 +2869,6 @@ export interface ListPaymentsWithStatementsRow {
   paymentAccountId?: string,
   paymentState?: PaymentState,
   paymentStripeInvoiceId?: string,
-  paymentStripeInvoiceUrl?: string,
   paymentUpdatedTimeMs?: number,
   paymentCreatedTimeMs?: number,
   transactionStatementStatementId?: string,
@@ -2916,36 +2897,32 @@ export let LIST_PAYMENTS_WITH_STATEMENTS_ROW: MessageDescriptor<ListPaymentsWith
     index: 4,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'paymentStripeInvoiceUrl',
-    index: 5,
-    primitiveType: PrimitiveType.STRING,
-  }, {
     name: 'paymentUpdatedTimeMs',
-    index: 6,
+    index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }, {
     name: 'paymentCreatedTimeMs',
-    index: 7,
+    index: 6,
     primitiveType: PrimitiveType.NUMBER,
   }, {
     name: 'transactionStatementStatementId',
-    index: 8,
+    index: 7,
     primitiveType: PrimitiveType.STRING,
   }, {
     name: 'transactionStatementAccountId',
-    index: 9,
+    index: 8,
     primitiveType: PrimitiveType.STRING,
   }, {
     name: 'transactionStatementMonth',
-    index: 10,
+    index: 9,
     primitiveType: PrimitiveType.STRING,
   }, {
     name: 'transactionStatementStatement',
-    index: 11,
+    index: 10,
     messageType: TRANSACTION_STATEMENT,
   }, {
     name: 'transactionStatementCreatedTimeMs',
-    index: 12,
+    index: 11,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
@@ -2959,7 +2936,7 @@ export async function listPaymentsWithStatements(
   }
 ): Promise<Array<ListPaymentsWithStatementsRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT p.statementId, p.accountId, p.state, p.stripeInvoiceId, p.stripeInvoiceUrl, p.updatedTimeMs, p.createdTimeMs, t.statementId, t.accountId, t.month, t.statement, t.createdTimeMs FROM Payment AS p LEFT JOIN TransactionStatement AS t ON p.statementId = t.statementId WHERE (p.accountId = @paymentAccountIdEq AND t.month >= @transactionStatementMonthGe AND t.month <= @transactionStatementMonthLe) ORDER BY t.month DESC",
+    sql: "SELECT p.statementId, p.accountId, p.state, p.stripeInvoiceId, p.updatedTimeMs, p.createdTimeMs, t.statementId, t.accountId, t.month, t.statement, t.createdTimeMs FROM Payment AS p LEFT JOIN TransactionStatement AS t ON p.statementId = t.statementId WHERE (p.accountId = @paymentAccountIdEq AND t.month >= @transactionStatementMonthGe AND t.month <= @transactionStatementMonthLe) ORDER BY t.month DESC",
     params: {
       paymentAccountIdEq: args.paymentAccountIdEq == null ? null : args.paymentAccountIdEq,
       transactionStatementMonthGe: args.transactionStatementMonthGe == null ? null : args.transactionStatementMonthGe,
@@ -2978,14 +2955,13 @@ export async function listPaymentsWithStatements(
       paymentAccountId: row.at(1).value == null ? undefined : row.at(1).value,
       paymentState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, PAYMENT_STATE),
       paymentStripeInvoiceId: row.at(3).value == null ? undefined : row.at(3).value,
-      paymentStripeInvoiceUrl: row.at(4).value == null ? undefined : row.at(4).value,
-      paymentUpdatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
-      paymentCreatedTimeMs: row.at(6).value == null ? undefined : row.at(6).value.value,
-      transactionStatementStatementId: row.at(7).value == null ? undefined : row.at(7).value,
-      transactionStatementAccountId: row.at(8).value == null ? undefined : row.at(8).value,
-      transactionStatementMonth: row.at(9).value == null ? undefined : row.at(9).value,
-      transactionStatementStatement: row.at(10).value == null ? undefined : deserializeMessage(row.at(10).value, TRANSACTION_STATEMENT),
-      transactionStatementCreatedTimeMs: row.at(11).value == null ? undefined : row.at(11).value.value,
+      paymentUpdatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      paymentCreatedTimeMs: row.at(5).value == null ? undefined : row.at(5).value.value,
+      transactionStatementStatementId: row.at(6).value == null ? undefined : row.at(6).value,
+      transactionStatementAccountId: row.at(7).value == null ? undefined : row.at(7).value,
+      transactionStatementMonth: row.at(8).value == null ? undefined : row.at(8).value,
+      transactionStatementStatement: row.at(9).value == null ? undefined : deserializeMessage(row.at(9).value, TRANSACTION_STATEMENT),
+      transactionStatementCreatedTimeMs: row.at(10).value == null ? undefined : row.at(10).value.value,
     });
   }
   return resRows;

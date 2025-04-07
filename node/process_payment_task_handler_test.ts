@@ -149,10 +149,7 @@ TEST_RUNNER.run({
               finalizeInvoiceIdCaptured = finalizeInvoiceId;
               finalizeInvoiceParamsCaptured = finalizeInvoiceParams;
               finalizeInvoiceOptionCaptured = finalizeInvoiceOption;
-              return {
-                id: "invoice1",
-                hosted_invoice_url: "https://stripe.invoice.url",
-              };
+              return {};
             },
           },
         };
@@ -242,7 +239,6 @@ TEST_RUNNER.run({
                 paymentAccountId: "account1",
                 paymentState: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
                 paymentStripeInvoiceId: "invoice1",
-                paymentStripeInvoiceUrl: "https://stripe.invoice.url",
                 paymentUpdatedTimeMs: 1000,
               },
               GET_PAYMENT_ROW,
@@ -391,7 +387,8 @@ TEST_RUNNER.run({
           isArray([
             eqMessage(
               {
-                billingProfileSuspendingDueToPastDueTaskStatementId: "statement1",
+                billingProfileSuspendingDueToPastDueTaskStatementId:
+                  "statement1",
                 billingProfileSuspendingDueToPastDueTaskRetryCount: 0,
                 billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
                 billingProfileSuspendingDueToPastDueTaskCreatedTimeMs: 1000,

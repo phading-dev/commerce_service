@@ -73,7 +73,7 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
         }),
         listPayoutsByState(transaction, {
           payoutAccountIdEq: accountId,
-          payoutStateEq: PayoutState.FAILED,
+          payoutStateEq: PayoutState.DISABLED,
         }),
       ]);
       if (profileRows.length === 0) {

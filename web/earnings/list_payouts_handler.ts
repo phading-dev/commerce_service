@@ -68,7 +68,6 @@ export class ListPayoutsHandler extends ListPayoutsHandlerInterface {
     return {
       payouts: rows.map(
         (row): Payout => ({
-          payoutId: row.payoutStatementId,
           month: row.transactionStatementMonth,
           amount: row.transactionStatementStatement.totalAmount,
           currency: row.transactionStatementStatement.currency,
@@ -85,8 +84,8 @@ export class ListPayoutsHandler extends ListPayoutsHandlerInterface {
         return PayoutStateResponse.PROCESSING;
       case PayoutState.PAID:
         return PayoutStateResponse.PAID;
-      case PayoutState.FAILED:
-        return PayoutStateResponse.FAILED;
+      case PayoutState.DISABLED:
+        return PayoutStateResponse.DISABLED;
       default:
         throw new Error(`Unknown payout state: ${state}`);
     }

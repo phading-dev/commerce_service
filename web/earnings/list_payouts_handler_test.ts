@@ -52,7 +52,7 @@ TEST_RUNNER.run({
             insertPayoutStatement({
               statementId: "statement2",
               accountId: "account1",
-              state: PayoutState.FAILED,
+              state: PayoutState.DISABLED,
               updatedTimeMs: 2000,
             }),
             insertTransactionStatementStatement({
@@ -141,7 +141,6 @@ TEST_RUNNER.run({
             {
               payouts: [
                 {
-                  payoutId: "statement5",
                   month: "2023-02",
                   amount: 1700,
                   currency: "USD",
@@ -149,7 +148,6 @@ TEST_RUNNER.run({
                   updatedTimeMs: 5000,
                 },
                 {
-                  payoutId: "statement3",
                   month: "2022-12",
                   amount: 1500,
                   currency: "USD",
@@ -157,11 +155,10 @@ TEST_RUNNER.run({
                   updatedTimeMs: 3000,
                 },
                 {
-                  payoutId: "statement2",
                   month: "2022-11",
                   amount: 1400,
                   currency: "USD",
-                  state: PayoutStateResponse.FAILED,
+                  state: PayoutStateResponse.DISABLED,
                   updatedTimeMs: 2000,
                 },
               ],

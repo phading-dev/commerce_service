@@ -257,7 +257,7 @@ TEST_RUNNER.run({
               {
                 payoutStatementId: "statement1",
                 payoutAccountId: "account1",
-                payoutState: PayoutState.FAILED,
+                payoutState: PayoutState.DISABLED,
                 payoutUpdatedTimeMs: 1000,
               },
               GET_PAYOUT_ROW,

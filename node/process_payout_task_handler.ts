@@ -150,7 +150,7 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
       await transaction.batchUpdate([
         updatePayoutStateStatement({
           payoutStatementIdEq: statementId,
-          setState: PayoutState.FAILED,
+          setState: PayoutState.DISABLED,
           setUpdatedTimeMs: this.getNow(),
         }),
         deletePayoutTaskStatement({

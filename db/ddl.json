@@ -74,16 +74,13 @@
       "name": "stripeInvoiceId",
       "addColumnDdl": "ALTER TABLE Payment ADD COLUMN stripeInvoiceId STRING(MAX)"
     }, {
-      "name": "stripeInvoiceUrl",
-      "addColumnDdl": "ALTER TABLE Payment ADD COLUMN stripeInvoiceUrl STRING(MAX)"
-    }, {
       "name": "updatedTimeMs",
       "addColumnDdl": "ALTER TABLE Payment ADD COLUMN updatedTimeMs FLOAT64"
     }, {
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE Payment ADD COLUMN createdTimeMs FLOAT64"
     }],
-    "createTableDdl": "CREATE TABLE Payment (statementId STRING(MAX) NOT NULL, accountId STRING(MAX), state FLOAT64, stripeInvoiceId STRING(MAX), stripeInvoiceUrl STRING(MAX), updatedTimeMs FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (statementId ASC)",
+    "createTableDdl": "CREATE TABLE Payment (statementId STRING(MAX) NOT NULL, accountId STRING(MAX), state FLOAT64, stripeInvoiceId STRING(MAX), updatedTimeMs FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (statementId ASC)",
     "indexes": [{
       "name": "PaymentByState",
       "createIndexDdl": "CREATE INDEX PaymentByState ON Payment(accountId, state, createdTimeMs DESC)"

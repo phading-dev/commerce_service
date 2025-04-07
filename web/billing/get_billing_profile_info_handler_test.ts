@@ -107,7 +107,6 @@ TEST_RUNNER.run({
           eqMessage(
             {
               primaryPaymentMethod: {
-                paymentMethodId: "paymentMethod1",
                 card: {
                   brand: CardBrand.VISA,
                   lastFourDigits: "1234",

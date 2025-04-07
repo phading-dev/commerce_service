@@ -117,7 +117,7 @@ TEST_RUNNER.run({
             insertPayoutStatement({
               accountId: "account1",
               statementId: "statement1",
-              state: PayoutState.FAILED,
+              state: PayoutState.DISABLED,
             }),
             insertPayoutStatement({
               accountId: "account1",
@@ -132,7 +132,7 @@ TEST_RUNNER.run({
             insertPayoutStatement({
               accountId: "account1",
               statementId: "statement4",
-              state: PayoutState.FAILED,
+              state: PayoutState.DISABLED,
             }),
           ]);
           await transaction.commit();
