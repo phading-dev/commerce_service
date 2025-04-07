@@ -17,6 +17,7 @@ import {
 } from "@phading/commerce_service_interface/node/interface";
 import { AmountType } from "@phading/price/amount_type";
 import { calculateMoney } from "@phading/price_config/calculator";
+import { newInternalServerErrorError } from "@selfage/http_error";
 
 export class GenerateTransactionStatementHandler extends GenerateTransactionStatementHandlerInterface {
   public static create(): GenerateTransactionStatementHandler {
@@ -50,7 +51,6 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
 
       let transactionStatement: TransactionStatement = {
         currency: ENV_VARS.defaultCurrency,
-        positiveAmountType: body.positiveAmountType,
         items: [],
       };
       for (let item of body.lineItems) {
@@ -68,23 +68,25 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
           amount,
         });
       }
-      transactionStatement.totalAmount = transactionStatement.items.reduce(
-        (total, item) =>
-          total +
-          (item.amountType === transactionStatement.positiveAmountType
-            ? item.amount
-            : -item.amount),
-        0,
-      );
+      let creditAmount = 0;
+      let debitAmount = 0;
+      transactionStatement.items.forEach((item) => {
+        switch (item.amountType) {
+          case AmountType.CREDIT:
+            creditAmount += item.amount;
+            break;
+          case AmountType.DEBIT:
+            debitAmount += item.amount;
+            break;
+          default:
+            throw newInternalServerErrorError(
+              `Invalid amount type: ${AmountType[item.amountType]}`,
+            );
+        }
+      });
       transactionStatement.totalAmountType =
-        transactionStatement.totalAmount >= 0
-          ? transactionStatement.positiveAmountType
-          : transactionStatement.positiveAmountType === AmountType.CREDIT
-            ? AmountType.DEBIT
-            : AmountType.CREDIT;
-      transactionStatement.totalAmount = Math.abs(
-        transactionStatement.totalAmount,
-      );
+        debitAmount >= creditAmount ? AmountType.DEBIT : AmountType.CREDIT;
+      transactionStatement.totalAmount = Math.abs(debitAmount - creditAmount);
 
       let now = this.getNow();
       let statementId = this.generateUuid();
@@ -96,37 +98,39 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
           statement: transactionStatement,
           createdTimeMs: now,
         }),
-        ...(transactionStatement.totalAmountType === AmountType.CREDIT
-          ? [
-              insertPayoutStatement({
-                statementId,
-                accountId: body.accountId,
-                state: PayoutState.PROCESSING,
-                updatedTimeMs: now,
-                createdTimeMs: now,
-              }),
-              insertPayoutTaskStatement({
-                statementId,
-                retryCount: 0,
-                executionTimeMs: now,
-                createdTimeMs: now,
-              }),
-            ]
-          : [
-              insertPaymentStatement({
-                statementId,
-                accountId: body.accountId,
-                state: PaymentState.PROCESSING,
-                createdTimeMs: now,
-                updatedTimeMs: now,
-              }),
-              insertPaymentTaskStatement({
-                statementId,
-                retryCount: 0,
-                executionTimeMs: now,
-                createdTimeMs: now,
-              }),
-            ]),
+        ...(transactionStatement.totalAmount === 0
+          ? []
+          : transactionStatement.totalAmountType === AmountType.CREDIT
+            ? [
+                insertPayoutStatement({
+                  statementId,
+                  accountId: body.accountId,
+                  state: PayoutState.PROCESSING,
+                  updatedTimeMs: now,
+                  createdTimeMs: now,
+                }),
+                insertPayoutTaskStatement({
+                  statementId,
+                  retryCount: 0,
+                  executionTimeMs: now,
+                  createdTimeMs: now,
+                }),
+              ]
+            : [
+                insertPaymentStatement({
+                  statementId,
+                  accountId: body.accountId,
+                  state: PaymentState.PROCESSING,
+                  createdTimeMs: now,
+                  updatedTimeMs: now,
+                }),
+                insertPaymentTaskStatement({
+                  statementId,
+                  retryCount: 0,
+                  executionTimeMs: now,
+                  createdTimeMs: now,
+                }),
+              ]),
       ]);
       await transaction.commit();
     });

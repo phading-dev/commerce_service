@@ -31,7 +31,6 @@ TEST_RUNNER.run({
                 currency: "USD",
                 totalAmount: 1300,
                 totalAmountType: AmountType.DEBIT,
-                positiveAmountType: AmountType.DEBIT,
                 items: [],
               },
             }),
@@ -43,7 +42,6 @@ TEST_RUNNER.run({
                 currency: "USD",
                 totalAmount: 1300,
                 totalAmountType: AmountType.DEBIT,
-                positiveAmountType: AmountType.DEBIT,
                 items: [
                   {
                     productID: ProductID.SHOW,
@@ -70,7 +68,6 @@ TEST_RUNNER.run({
                 currency: "USD",
                 totalAmount: 1500,
                 totalAmountType: AmountType.DEBIT,
-                positiveAmountType: AmountType.DEBIT,
                 items: [
                   {
                     productID: ProductID.SHOW,
@@ -90,7 +87,6 @@ TEST_RUNNER.run({
                 currency: "USD",
                 totalAmount: 1600,
                 totalAmountType: AmountType.DEBIT,
-                positiveAmountType: AmountType.CREDIT,
                 items: [
                   {
                     productID: ProductID.SHOW,
@@ -117,7 +113,6 @@ TEST_RUNNER.run({
                 currency: "USD",
                 totalAmount: 1700,
                 totalAmountType: AmountType.CREDIT,
-                positiveAmountType: AmountType.CREDIT,
                 items: [
                   {
                     productID: ProductID.SHOW_CREDIT,
@@ -144,7 +139,6 @@ TEST_RUNNER.run({
                 currency: "USD",
                 totalAmount: 1800,
                 totalAmountType: AmountType.CREDIT,
-                positiveAmountType: AmountType.DEBIT,
                 items: [
                   {
                     productID: ProductID.SHOW_CREDIT,
@@ -159,32 +153,11 @@ TEST_RUNNER.run({
             insertTransactionStatementStatement({
               statementId: "statement6",
               accountId: "account1",
-              month: "2022-05",
-              statement: {
-                currency: "USD",
-                totalAmount: 1900,
-                totalAmountType: AmountType.CREDIT,
-                positiveAmountType: AmountType.CREDIT,
-                items: [
-                  {
-                    productID: ProductID.SHOW_CREDIT,
-                    amountType: AmountType.CREDIT,
-                    unit: "seconds",
-                    amount: 95,
-                    quantity: 895,
-                  },
-                ],
-              },
-            }),
-            insertTransactionStatementStatement({
-              statementId: "statement7",
-              accountId: "account1",
               month: "2022-04",
               statement: {
                 currency: "USD",
                 totalAmount: 2100,
                 totalAmountType: AmountType.DEBIT,
-                positiveAmountType: AmountType.DEBIT,
                 items: [],
               },
             }),
@@ -222,7 +195,6 @@ TEST_RUNNER.run({
                   currency: "USD",
                   totalAmount: 1300,
                   totalAmountType: AmountType.DEBIT,
-                  positiveAmountType: AmountType.DEBIT,
                   items: [
                     {
                       productID: ProductID.SHOW,
@@ -246,7 +218,6 @@ TEST_RUNNER.run({
                   currency: "USD",
                   totalAmount: 1500,
                   totalAmountType: AmountType.DEBIT,
-                  positiveAmountType: AmountType.DEBIT,
                   items: [
                     {
                       productID: ProductID.SHOW,
@@ -263,7 +234,6 @@ TEST_RUNNER.run({
                   currency: "USD",
                   totalAmount: 1600,
                   totalAmountType: AmountType.DEBIT,
-                  positiveAmountType: AmountType.CREDIT,
                   items: [
                     {
                       productID: ProductID.SHOW,
@@ -287,7 +257,6 @@ TEST_RUNNER.run({
                   currency: "USD",
                   totalAmount: 1700,
                   totalAmountType: AmountType.CREDIT,
-                  positiveAmountType: AmountType.CREDIT,
                   items: [
                     {
                       productID: ProductID.SHOW_CREDIT,
@@ -311,7 +280,6 @@ TEST_RUNNER.run({
                   currency: "USD",
                   totalAmount: 1800,
                   totalAmountType: AmountType.CREDIT,
-                  positiveAmountType: AmountType.DEBIT,
                   items: [
                     {
                       productID: ProductID.SHOW_CREDIT,
@@ -319,23 +287,6 @@ TEST_RUNNER.run({
                       unit: "seconds",
                       amount: 92,
                       quantity: 892,
-                    },
-                  ],
-                },
-                {
-                  statementId: "statement6",
-                  month: "2022-05",
-                  currency: "USD",
-                  totalAmount: 1900,
-                  totalAmountType: AmountType.CREDIT,
-                  positiveAmountType: AmountType.CREDIT,
-                  items: [
-                    {
-                      productID: ProductID.SHOW_CREDIT,
-                      amountType: AmountType.CREDIT,
-                      unit: "seconds",
-                      amount: 95,
-                      quantity: 895,
                     },
                   ],
                 },
@@ -369,9 +320,6 @@ TEST_RUNNER.run({
             }),
             deleteTransactionStatementStatement({
               transactionStatementStatementIdEq: "statement6",
-            }),
-            deleteTransactionStatementStatement({
-              transactionStatementStatementIdEq: "statement7",
             }),
           ]);
           await transaction.commit();

@@ -94,7 +94,6 @@ export interface TransactionStatement {
   currency?: string,
   totalAmount?: number,
   totalAmountType?: AmountType,
-  positiveAmountType?: AmountType,
   items?: Array<LineItem>,
 }
 
@@ -113,12 +112,8 @@ export let TRANSACTION_STATEMENT: MessageDescriptor<TransactionStatement> = {
     index: 3,
     enumType: AMOUNT_TYPE,
   }, {
-    name: 'positiveAmountType',
-    index: 4,
-    enumType: AMOUNT_TYPE,
-  }, {
     name: 'items',
-    index: 5,
+    index: 4,
     messageType: LINE_ITEM,
     isArray: true,
   }],

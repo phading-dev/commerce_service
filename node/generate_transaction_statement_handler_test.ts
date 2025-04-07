@@ -68,11 +68,10 @@ TEST_RUNNER.run({
         await handler.handle("", {
           accountId: "account1",
           month: "2021-01",
-          positiveAmountType: AmountType.DEBIT,
           lineItems: [
             {
               productID: ProductID.SHOW,
-              quantity: 3600,
+              quantity: 10 * 3600,
             },
           ],
         });
@@ -90,14 +89,13 @@ TEST_RUNNER.run({
                 transactionStatementMonth: "2021-01",
                 transactionStatementStatement: {
                   currency: "USD",
-                  positiveAmountType: AmountType.DEBIT,
                   totalAmountType: AmountType.DEBIT,
                   totalAmount: 10,
                   items: [
                     {
                       productID: ProductID.SHOW,
                       unit: "seconds",
-                      quantity: 3600,
+                      quantity: 10 * 3600,
                       amount: 10,
                       amountType: AmountType.DEBIT,
                     },
@@ -164,11 +162,10 @@ TEST_RUNNER.run({
         await handler.handle("", {
           accountId: "account1",
           month: "2021-01",
-          positiveAmountType: AmountType.CREDIT,
           lineItems: [
             {
               productID: ProductID.SHOW_CREDIT,
-              quantity: 20 * 3600,
+              quantity: 20 * 10 * 3600,
             },
             {
               productID: ProductID.STORAGE,
@@ -194,14 +191,13 @@ TEST_RUNNER.run({
                 transactionStatementMonth: "2021-01",
                 transactionStatementStatement: {
                   currency: "USD",
-                  positiveAmountType: AmountType.CREDIT,
                   totalAmountType: AmountType.CREDIT,
                   totalAmount: 91,
                   items: [
                     {
                       productID: ProductID.SHOW_CREDIT,
                       unit: "seconds",
-                      quantity: 20 * 3600,
+                      quantity: 20 * 10 * 3600,
                       amount: 160,
                       amountType: AmountType.CREDIT,
                     },
@@ -282,11 +278,10 @@ TEST_RUNNER.run({
         await handler.handle("", {
           accountId: "account1",
           month: "2021-01",
-          positiveAmountType: AmountType.CREDIT,
           lineItems: [
             {
               productID: ProductID.SHOW_CREDIT,
-              quantity: 2 * 3600,
+              quantity: 2 * 10 * 3600,
             },
             {
               productID: ProductID.STORAGE,
@@ -312,14 +307,13 @@ TEST_RUNNER.run({
                 transactionStatementMonth: "2021-01",
                 transactionStatementStatement: {
                   currency: "USD",
-                  positiveAmountType: AmountType.CREDIT,
                   totalAmountType: AmountType.DEBIT,
                   totalAmount: 53,
                   items: [
                     {
                       productID: ProductID.SHOW_CREDIT,
                       unit: "seconds",
-                      quantity: 2 * 3600,
+                      quantity: 2 * 10 * 3600,
                       amount: 16,
                       amountType: AmountType.CREDIT,
                     },
@@ -387,6 +381,104 @@ TEST_RUNNER.run({
       },
     },
     {
+      name: "ZeroDebit",
+      execute: async () => {
+        // Prepare
+        let handler = new GenerateTransactionStatementHandler(
+          SPANNER_DATABASE,
+          () => "statement1",
+          () => 1000,
+        );
+
+        // Execute
+        await handler.handle("", {
+          accountId: "account1",
+          month: "2021-01",
+          lineItems: [
+            {
+              productID: ProductID.SHOW_CREDIT,
+              quantity: 3 * 10 * 3600,
+            },
+            {
+              productID: ProductID.UPLOAD,
+              quantity: 2 * 1024,
+            },
+          ],
+        });
+
+        // Verify
+        assertThat(
+          await getTransactionStatement(SPANNER_DATABASE, {
+            transactionStatementStatementIdEq: "statement1",
+          }),
+          isArray([
+            eqMessage(
+              {
+                transactionStatementAccountId: "account1",
+                transactionStatementStatementId: "statement1",
+                transactionStatementMonth: "2021-01",
+                transactionStatementStatement: {
+                  currency: "USD",
+                  totalAmountType: AmountType.DEBIT,
+                  totalAmount: 0,
+                  items: [
+                    {
+                      productID: ProductID.SHOW_CREDIT,
+                      unit: "seconds",
+                      quantity: 3 * 10 * 3600,
+                      amount: 24,
+                      amountType: AmountType.CREDIT,
+                    },
+                    {
+                      productID: ProductID.UPLOAD,
+                      unit: "MiB",
+                      quantity: 2 * 1024,
+                      amount: 24,
+                      amountType: AmountType.DEBIT,
+                    },
+                  ],
+                },
+                transactionStatementCreatedTimeMs: 1000,
+              },
+              GET_TRANSACTION_STATEMENT_ROW,
+            ),
+          ]),
+          "statement",
+        );
+        assertThat(
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
+          isArray([]),
+          "payment",
+        );
+        assertThat(
+          await listPendingPaymentTasks(SPANNER_DATABASE, {
+            paymentTaskExecutionTimeMsLe: 1000000,
+          }),
+          isArray([]),
+          "paymentTask",
+        );
+        assertThat(
+          await getPayout(SPANNER_DATABASE, {
+            payoutStatementIdEq: "statement1",
+          }),
+          isArray([]),
+          "payout",
+        );
+        assertThat(
+          await listPendingPayoutTasks(SPANNER_DATABASE, {
+            payoutTaskExecutionTimeMsLe: 1000000,
+          }),
+          isArray([]),
+          "payoutTask",
+        );
+      },
+      tearDown: async () => {
+        await cleanupAll();
+      },
+    },
+    {
       name: "StatementAlreadyExists",
       execute: async () => {
         // Prepare
@@ -410,7 +502,6 @@ TEST_RUNNER.run({
         await handler.handle("", {
           accountId: "account1",
           month: "2021-01",
-          positiveAmountType: AmountType.DEBIT,
           lineItems: [
             {
               productID: ProductID.SHOW,

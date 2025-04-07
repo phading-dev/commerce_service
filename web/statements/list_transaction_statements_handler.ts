@@ -67,8 +67,6 @@ export class ListTransactionStatementsHandler extends ListTransactionStatementsH
           currency: row.transactionStatementStatement.currency,
           totalAmount: row.transactionStatementStatement.totalAmount,
           totalAmountType: row.transactionStatementStatement.totalAmountType,
-          positiveAmountType:
-            row.transactionStatementStatement.positiveAmountType,
           items: row.transactionStatementStatement.items.map(
             (item): LineItem => ({
               productID: item.productID,
