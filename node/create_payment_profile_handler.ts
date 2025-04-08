@@ -1,20 +1,20 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { BillingProfileState } from "../db/schema";
+import { PaymentProfileState } from "../db/schema";
 import {
-  getBillingProfile,
-  insertBillingProfileStatement,
+  getPaymentProfile,
+  insertPaymentProfileStatement,
   insertStripePaymentCustomerCreatingTaskStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { CreateBillingProfileHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { CreatePaymentProfileHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  CreateBillingProfileRequestBody,
-  CreateBillingProfileResponse,
+  CreatePaymentProfileRequestBody,
+  CreatePaymentProfileResponse,
 } from "@phading/commerce_service_interface/node/interface";
 
-export class CreateBillingProfileHandler extends CreateBillingProfileHandlerInterface {
-  public static create(): CreateBillingProfileHandler {
-    return new CreateBillingProfileHandler(SPANNER_DATABASE, () => Date.now());
+export class CreatePaymentProfileHandler extends CreatePaymentProfileHandlerInterface {
+  public static create(): CreatePaymentProfileHandler {
+    return new CreatePaymentProfileHandler(SPANNER_DATABASE, () => Date.now());
   }
 
   private static DELAYED_PAYMENT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -28,25 +28,25 @@ export class CreateBillingProfileHandler extends CreateBillingProfileHandlerInte
 
   public async handle(
     loggingPrefix: string,
-    body: CreateBillingProfileRequestBody,
-  ): Promise<CreateBillingProfileResponse> {
+    body: CreatePaymentProfileRequestBody,
+  ): Promise<CreatePaymentProfileResponse> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getBillingProfile(transaction, {
-        billingProfileAccountIdEq: body.accountId,
+      let rows = await getPaymentProfile(transaction, {
+        paymentProfileAccountIdEq: body.accountId,
       });
       if (rows.length > 0) {
         return;
       }
       let now = this.getNow();
       await transaction.batchUpdate([
-        insertBillingProfileStatement({
+        insertPaymentProfileStatement({
           accountId: body.accountId,
           stateInfo: {
             version: 0,
-            state: BillingProfileState.HEALTHY,
+            state: PaymentProfileState.HEALTHY,
             updatedTimeMs: now,
           },
-          paymentAfterMs: now + CreateBillingProfileHandler.DELAYED_PAYMENT_MS,
+          paymentAfterMs: now + CreatePaymentProfileHandler.DELAYED_PAYMENT_MS,
         }),
         insertStripePaymentCustomerCreatingTaskStatement({
           accountId: body.accountId,

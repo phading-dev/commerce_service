@@ -1,8 +1,8 @@
 import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import {
-  deleteBillingProfileStatement,
-  insertBillingProfileStatement,
+  deletePaymentProfileStatement,
+  insertPaymentProfileStatement,
 } from "../../db/sql";
 import { ReplacePrimaryPaymentMethodHandler } from "./replace_primary_payment_method_handler";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
@@ -20,7 +20,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
               stripePaymentCustomerId: "stripeCustomer1",
             }),
@@ -98,8 +98,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();
@@ -112,7 +112,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
               stripePaymentCustomerId: "stripeCustomer1",
             }),
@@ -198,8 +198,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();

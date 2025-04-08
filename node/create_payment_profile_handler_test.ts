@@ -1,27 +1,27 @@
 import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { BillingProfileState } from "../db/schema";
+import { PaymentProfileState } from "../db/schema";
 import {
-  GET_BILLING_PROFILE_ROW,
+  GET_PAYMENT_PROFILE_ROW,
   GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_ROW,
-  deleteBillingProfileStatement,
+  deletePaymentProfileStatement,
   deleteStripePaymentCustomerCreatingTaskStatement,
-  getBillingProfile,
+  getPaymentProfile,
   getStripePaymentCustomerCreatingTask,
 } from "../db/sql";
-import { CreateBillingProfileHandler } from "./create_billing_profile_handler";
+import { CreatePaymentProfileHandler } from "./create_payment_profile_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { assertThat, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "CreateBillingProfileHandlerTest",
+  name: "CreatePaymentProfileHandlerTest",
   cases: [
     {
       name: "Success",
       execute: async () => {
         // Prepare
-        let handler = new CreateBillingProfileHandler(
+        let handler = new CreatePaymentProfileHandler(
           SPANNER_DATABASE,
           () => 1000,
         );
@@ -31,21 +31,21 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getBillingProfile(SPANNER_DATABASE, {
-            billingProfileAccountIdEq: "account1",
+          await getPaymentProfile(SPANNER_DATABASE, {
+            paymentProfileAccountIdEq: "account1",
           }),
           isArray([
             eqMessage(
               {
-                billingProfileAccountId: "account1",
-                billingProfileStateInfo: {
+                paymentProfileAccountId: "account1",
+                paymentProfileStateInfo: {
                   version: 0,
-                  state: BillingProfileState.HEALTHY,
+                  state: PaymentProfileState.HEALTHY,
                   updatedTimeMs: 1000,
                 },
-                billingProfilePaymentAfterMs: 2592001000,
+                paymentProfilePaymentAfterMs: 2592001000,
               },
-              GET_BILLING_PROFILE_ROW,
+              GET_PAYMENT_PROFILE_ROW,
             ),
           ]),
           "account",
@@ -76,8 +76,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
             deleteStripePaymentCustomerCreatingTaskStatement({
               stripePaymentCustomerCreatingTaskAccountIdEq: "account1",

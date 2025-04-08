@@ -4,9 +4,9 @@ import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
 import {
   deleteStripePaymentCustomerCreatingTaskStatement,
-  getBillingProfile,
+  getPaymentProfile,
   getStripePaymentCustomerCreatingTaskMetadata,
-  updateBillingProfilePaymentCustomerStatement,
+  updatePaymentProfilePaymentCustomerStatement,
   updateStripePaymentCustomerCreatingTaskMetadataStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
@@ -54,7 +54,7 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
     loggingPrefix: string,
     body: ProcessStripePaymentCustomerCreatingTaskRequestBody,
   ): Promise<ProcessStripePaymentCustomerCreatingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Billing payment customer creating task for billing profile ${body.accountId}:`;
+    loggingPrefix = `${loggingPrefix} Payment payment customer creating task for payment profile ${body.accountId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -114,29 +114,29 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {
-      let profileRows = await getBillingProfile(transaction, {
-        billingProfileAccountIdEq: body.accountId,
+      let profileRows = await getPaymentProfile(transaction, {
+        paymentProfileAccountIdEq: body.accountId,
       });
       if (profileRows.length === 0) {
         throw newInternalServerErrorError(
-          `Billing profile ${body.accountId} is not found.`,
+          `Payment profile ${body.accountId} is not found.`,
         );
       }
       let profile = profileRows[0];
-      if (profile.billingProfileStripePaymentCustomerId) {
-        if (profile.billingProfileStripePaymentCustomerId !== customer.id) {
+      if (profile.paymentProfileStripePaymentCustomerId) {
+        if (profile.paymentProfileStripePaymentCustomerId !== customer.id) {
           throw newInternalServerErrorError(
-            `Billing profile ${body.accountId} already has a stripe customer id ${profile.billingProfileStripePaymentCustomerId} which is different from the new one ${customer.id}.`,
+            `Payment profile ${body.accountId} already has a stripe customer id ${profile.paymentProfileStripePaymentCustomerId} which is different from the new one ${customer.id}.`,
           );
         } else {
           throw newBadRequestError(
-            `Billing profile ${body.accountId} already has a stripe customer id ${profile.billingProfileStripePaymentCustomerId}.`,
+            `Payment profile ${body.accountId} already has a stripe customer id ${profile.paymentProfileStripePaymentCustomerId}.`,
           );
         }
       } else {
         await transaction.batchUpdate([
-          updateBillingProfilePaymentCustomerStatement({
-            billingProfileAccountIdEq: body.accountId,
+          updatePaymentProfilePaymentCustomerStatement({
+            paymentProfileAccountIdEq: body.accountId,
             setStripePaymentCustomerId: customer.id,
           }),
           deleteStripePaymentCustomerCreatingTaskStatement({

@@ -9,10 +9,10 @@ import { STRIPE_CLIENT } from "../common/stripe_client";
 import { StripeConnectedAccountState } from "../db/schema";
 import {
   deleteStripeConnectedAccountCreatingTaskStatement,
-  getEarningsProfile,
+  getPayoutProfile,
   getStripeConnectedAccountCreatingTaskMetadata,
   insertStripeConnectedAccountNeedsSetupNotifyingTaskStatement,
-  updateEarningsProfileConnectedAccountStatement,
+  updatePayoutProfileConnectedAccountStatement,
   updateStripeConnectedAccountCreatingTaskMetadataStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
@@ -59,7 +59,7 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
     loggingPrefix: string,
     body: ProcessStripeConnectedAccountCreatingTaskRequestBody,
   ): Promise<ProcessStripeConnectedAccountCreatingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Stripe connected account creating task for earnings profile ${body.accountId}:`;
+    loggingPrefix = `${loggingPrefix} Stripe connected account creating task for payout profile ${body.accountId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -137,30 +137,30 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {
-      let profileRows = await getEarningsProfile(transaction, {
-        earningsProfileAccountIdEq: body.accountId,
+      let profileRows = await getPayoutProfile(transaction, {
+        payoutProfileAccountIdEq: body.accountId,
       });
       if (profileRows.length === 0) {
         throw newInternalServerErrorError(
-          `Earnings profile ${body.accountId} is not found.`,
+          `Payout profile ${body.accountId} is not found.`,
         );
       }
       let profile = profileRows[0];
-      if (profile.earningsProfileStripeConnectedAccountId) {
-        if (profile.earningsProfileStripeConnectedAccountId !== account.id) {
+      if (profile.payoutProfileStripeConnectedAccountId) {
+        if (profile.payoutProfileStripeConnectedAccountId !== account.id) {
           throw newInternalServerErrorError(
-            `Earnings profile ${body.accountId} already has a stripe connected account id ${profile.earningsProfileStripeConnectedAccountId} which is different from the new one ${account.id}.`,
+            `Payout profile ${body.accountId} already has a stripe connected account id ${profile.payoutProfileStripeConnectedAccountId} which is different from the new one ${account.id}.`,
           );
         } else {
           throw newBadRequestError(
-            `Earnings profile ${body.accountId} already has a stripe connected account id ${profile.earningsProfileStripeConnectedAccountId}.`,
+            `Payout profile ${body.accountId} already has a stripe connected account id ${profile.payoutProfileStripeConnectedAccountId}.`,
           );
         }
       } else {
         let now = this.getNow();
         await transaction.batchUpdate([
-          updateEarningsProfileConnectedAccountStatement({
-            earningsProfileAccountIdEq: body.accountId,
+          updatePayoutProfileConnectedAccountStatement({
+            payoutProfileAccountIdEq: body.accountId,
             setStripeConnectedAccountId: account.id,
             setStripeConnectedAccountState:
               StripeConnectedAccountState.ONBOARDING,

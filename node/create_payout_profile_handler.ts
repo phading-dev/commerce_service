@@ -1,19 +1,19 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
-  getEarningsProfile,
-  insertEarningsProfileStatement,
+  getPayoutProfile,
+  insertPayoutProfileStatement,
   insertStripeConnectedAccountCreatingTaskStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { CreateEarningsProfileHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { CreatePayoutProfileHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  CreateEarningsProfileRequestBody,
-  CreateEarningsProfileResponse,
+  CreatePayoutProfileRequestBody,
+  CreatePayoutProfileResponse,
 } from "@phading/commerce_service_interface/node/interface";
 
-export class CreateEarningsProfileHandler extends CreateEarningsProfileHandlerInterface {
-  public static create(): CreateEarningsProfileHandler {
-    return new CreateEarningsProfileHandler(SPANNER_DATABASE, () => Date.now());
+export class CreatePayoutProfileHandler extends CreatePayoutProfileHandlerInterface {
+  public static create(): CreatePayoutProfileHandler {
+    return new CreatePayoutProfileHandler(SPANNER_DATABASE, () => Date.now());
   }
 
   public constructor(
@@ -25,18 +25,18 @@ export class CreateEarningsProfileHandler extends CreateEarningsProfileHandlerIn
 
   public async handle(
     loggingPrefix: string,
-    body: CreateEarningsProfileRequestBody,
-  ): Promise<CreateEarningsProfileResponse> {
+    body: CreatePayoutProfileRequestBody,
+  ): Promise<CreatePayoutProfileResponse> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getEarningsProfile(transaction, {
-        earningsProfileAccountIdEq: body.accountId,
+      let rows = await getPayoutProfile(transaction, {
+        payoutProfileAccountIdEq: body.accountId,
       });
       if (rows.length > 0) {
         return;
       }
       let now = this.getNow();
       await transaction.batchUpdate([
-        insertEarningsProfileStatement({
+        insertPayoutProfileStatement({
           accountId: body.accountId,
           createdTimeMs: now,
         }),

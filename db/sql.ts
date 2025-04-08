@@ -1,24 +1,24 @@
-import { BillingProfileStateInfo, BILLING_PROFILE_STATE_INFO, StripeConnectedAccountState, STRIPE_CONNECTED_ACCOUNT_STATE, TransactionStatement, TRANSACTION_STATEMENT, PaymentState, PAYMENT_STATE, PayoutState, PAYOUT_STATE } from './schema';
+import { PaymentProfileStateInfo, PAYMENT_PROFILE_STATE_INFO, StripeConnectedAccountState, STRIPE_CONNECTED_ACCOUNT_STATE, TransactionStatement, TRANSACTION_STATEMENT, PaymentState, PAYMENT_STATE, PayoutState, PAYOUT_STATE } from './schema';
 import { serializeMessage, deserializeMessage, toEnumFromNumber } from '@selfage/message/serializer';
 import { Spanner, Database, Transaction } from '@google-cloud/spanner';
 import { Statement } from '@google-cloud/spanner/build/src/transaction';
 import { PrimitiveType, MessageDescriptor } from '@selfage/message/descriptor';
 
-export function insertBillingProfileStatement(
+export function insertPaymentProfileStatement(
   args: {
     accountId: string,
     stripePaymentCustomerId?: string,
-    stateInfo?: BillingProfileStateInfo,
+    stateInfo?: PaymentProfileStateInfo,
     paymentAfterMs?: number,
     createdTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "INSERT BillingProfile (accountId, stripePaymentCustomerId, stateInfo, paymentAfterMs, createdTimeMs) VALUES (@accountId, @stripePaymentCustomerId, @stateInfo, @paymentAfterMs, @createdTimeMs)",
+    sql: "INSERT PaymentProfile (accountId, stripePaymentCustomerId, stateInfo, paymentAfterMs, createdTimeMs) VALUES (@accountId, @stripePaymentCustomerId, @stateInfo, @paymentAfterMs, @createdTimeMs)",
     params: {
       accountId: args.accountId,
       stripePaymentCustomerId: args.stripePaymentCustomerId == null ? null : args.stripePaymentCustomerId,
-      stateInfo: args.stateInfo == null ? null : Buffer.from(serializeMessage(args.stateInfo, BILLING_PROFILE_STATE_INFO).buffer),
+      stateInfo: args.stateInfo == null ? null : Buffer.from(serializeMessage(args.stateInfo, PAYMENT_PROFILE_STATE_INFO).buffer),
       paymentAfterMs: args.paymentAfterMs == null ? null : Spanner.float(args.paymentAfterMs),
       createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
     },
@@ -32,84 +32,84 @@ export function insertBillingProfileStatement(
   };
 }
 
-export function deleteBillingProfileStatement(
+export function deletePaymentProfileStatement(
   args: {
-    billingProfileAccountIdEq: string,
+    paymentProfileAccountIdEq: string,
   }
 ): Statement {
   return {
-    sql: "DELETE BillingProfile WHERE (BillingProfile.accountId = @billingProfileAccountIdEq)",
+    sql: "DELETE PaymentProfile WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
     params: {
-      billingProfileAccountIdEq: args.billingProfileAccountIdEq,
+      paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
     },
     types: {
-      billingProfileAccountIdEq: { type: "string" },
+      paymentProfileAccountIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetBillingProfileRow {
-  billingProfileAccountId?: string,
-  billingProfileStripePaymentCustomerId?: string,
-  billingProfileStateInfo?: BillingProfileStateInfo,
-  billingProfilePaymentAfterMs?: number,
-  billingProfileCreatedTimeMs?: number,
+export interface GetPaymentProfileRow {
+  paymentProfileAccountId?: string,
+  paymentProfileStripePaymentCustomerId?: string,
+  paymentProfileStateInfo?: PaymentProfileStateInfo,
+  paymentProfilePaymentAfterMs?: number,
+  paymentProfileCreatedTimeMs?: number,
 }
 
-export let GET_BILLING_PROFILE_ROW: MessageDescriptor<GetBillingProfileRow> = {
-  name: 'GetBillingProfileRow',
+export let GET_PAYMENT_PROFILE_ROW: MessageDescriptor<GetPaymentProfileRow> = {
+  name: 'GetPaymentProfileRow',
   fields: [{
-    name: 'billingProfileAccountId',
+    name: 'paymentProfileAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileStripePaymentCustomerId',
+    name: 'paymentProfileStripePaymentCustomerId',
     index: 2,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileStateInfo',
+    name: 'paymentProfileStateInfo',
     index: 3,
-    messageType: BILLING_PROFILE_STATE_INFO,
+    messageType: PAYMENT_PROFILE_STATE_INFO,
   }, {
-    name: 'billingProfilePaymentAfterMs',
+    name: 'paymentProfilePaymentAfterMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileCreatedTimeMs',
+    name: 'paymentProfileCreatedTimeMs',
     index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingProfile(
+export async function getPaymentProfile(
   runner: Database | Transaction,
   args: {
-    billingProfileAccountIdEq: string,
+    paymentProfileAccountIdEq: string,
   }
-): Promise<Array<GetBillingProfileRow>> {
+): Promise<Array<GetPaymentProfileRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfile.accountId, BillingProfile.stripePaymentCustomerId, BillingProfile.stateInfo, BillingProfile.paymentAfterMs, BillingProfile.createdTimeMs FROM BillingProfile WHERE (BillingProfile.accountId = @billingProfileAccountIdEq)",
+    sql: "SELECT PaymentProfile.accountId, PaymentProfile.stripePaymentCustomerId, PaymentProfile.stateInfo, PaymentProfile.paymentAfterMs, PaymentProfile.createdTimeMs FROM PaymentProfile WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
     params: {
-      billingProfileAccountIdEq: args.billingProfileAccountIdEq,
+      paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
     },
     types: {
-      billingProfileAccountIdEq: { type: "string" },
+      paymentProfileAccountIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingProfileRow>();
+  let resRows = new Array<GetPaymentProfileRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      billingProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
-      billingProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, BILLING_PROFILE_STATE_INFO),
-      billingProfilePaymentAfterMs: row.at(3).value == null ? undefined : row.at(3).value.value,
-      billingProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      paymentProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
+      paymentProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, PAYMENT_PROFILE_STATE_INFO),
+      paymentProfilePaymentAfterMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      paymentProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
     });
   }
   return resRows;
 }
 
-export function insertEarningsProfileStatement(
+export function insertPayoutProfileStatement(
   args: {
     accountId: string,
     stripeConnectedAccountId?: string,
@@ -118,7 +118,7 @@ export function insertEarningsProfileStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT EarningsProfile (accountId, stripeConnectedAccountId, stripeConnectedAccountState, createdTimeMs) VALUES (@accountId, @stripeConnectedAccountId, @stripeConnectedAccountState, @createdTimeMs)",
+    sql: "INSERT PayoutProfile (accountId, stripeConnectedAccountId, stripeConnectedAccountState, createdTimeMs) VALUES (@accountId, @stripeConnectedAccountId, @stripeConnectedAccountState, @createdTimeMs)",
     params: {
       accountId: args.accountId,
       stripeConnectedAccountId: args.stripeConnectedAccountId == null ? null : args.stripeConnectedAccountId,
@@ -134,72 +134,72 @@ export function insertEarningsProfileStatement(
   };
 }
 
-export function deleteEarningsProfileStatement(
+export function deletePayoutProfileStatement(
   args: {
-    earningsProfileAccountIdEq: string,
+    payoutProfileAccountIdEq: string,
   }
 ): Statement {
   return {
-    sql: "DELETE EarningsProfile WHERE (EarningsProfile.accountId = @earningsProfileAccountIdEq)",
+    sql: "DELETE PayoutProfile WHERE (PayoutProfile.accountId = @payoutProfileAccountIdEq)",
     params: {
-      earningsProfileAccountIdEq: args.earningsProfileAccountIdEq,
+      payoutProfileAccountIdEq: args.payoutProfileAccountIdEq,
     },
     types: {
-      earningsProfileAccountIdEq: { type: "string" },
+      payoutProfileAccountIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetEarningsProfileRow {
-  earningsProfileAccountId?: string,
-  earningsProfileStripeConnectedAccountId?: string,
-  earningsProfileStripeConnectedAccountState?: StripeConnectedAccountState,
-  earningsProfileCreatedTimeMs?: number,
+export interface GetPayoutProfileRow {
+  payoutProfileAccountId?: string,
+  payoutProfileStripeConnectedAccountId?: string,
+  payoutProfileStripeConnectedAccountState?: StripeConnectedAccountState,
+  payoutProfileCreatedTimeMs?: number,
 }
 
-export let GET_EARNINGS_PROFILE_ROW: MessageDescriptor<GetEarningsProfileRow> = {
-  name: 'GetEarningsProfileRow',
+export let GET_PAYOUT_PROFILE_ROW: MessageDescriptor<GetPayoutProfileRow> = {
+  name: 'GetPayoutProfileRow',
   fields: [{
-    name: 'earningsProfileAccountId',
+    name: 'payoutProfileAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'earningsProfileStripeConnectedAccountId',
+    name: 'payoutProfileStripeConnectedAccountId',
     index: 2,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'earningsProfileStripeConnectedAccountState',
+    name: 'payoutProfileStripeConnectedAccountState',
     index: 3,
     enumType: STRIPE_CONNECTED_ACCOUNT_STATE,
   }, {
-    name: 'earningsProfileCreatedTimeMs',
+    name: 'payoutProfileCreatedTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getEarningsProfile(
+export async function getPayoutProfile(
   runner: Database | Transaction,
   args: {
-    earningsProfileAccountIdEq: string,
+    payoutProfileAccountIdEq: string,
   }
-): Promise<Array<GetEarningsProfileRow>> {
+): Promise<Array<GetPayoutProfileRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT EarningsProfile.accountId, EarningsProfile.stripeConnectedAccountId, EarningsProfile.stripeConnectedAccountState, EarningsProfile.createdTimeMs FROM EarningsProfile WHERE (EarningsProfile.accountId = @earningsProfileAccountIdEq)",
+    sql: "SELECT PayoutProfile.accountId, PayoutProfile.stripeConnectedAccountId, PayoutProfile.stripeConnectedAccountState, PayoutProfile.createdTimeMs FROM PayoutProfile WHERE (PayoutProfile.accountId = @payoutProfileAccountIdEq)",
     params: {
-      earningsProfileAccountIdEq: args.earningsProfileAccountIdEq,
+      payoutProfileAccountIdEq: args.payoutProfileAccountIdEq,
     },
     types: {
-      earningsProfileAccountIdEq: { type: "string" },
+      payoutProfileAccountIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetEarningsProfileRow>();
+  let resRows = new Array<GetPayoutProfileRow>();
   for (let row of rows) {
     resRows.push({
-      earningsProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      earningsProfileStripeConnectedAccountId: row.at(1).value == null ? undefined : row.at(1).value,
-      earningsProfileStripeConnectedAccountState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, STRIPE_CONNECTED_ACCOUNT_STATE),
-      earningsProfileCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      payoutProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutProfileStripeConnectedAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      payoutProfileStripeConnectedAccountState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, STRIPE_CONNECTED_ACCOUNT_STATE),
+      payoutProfileCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
     });
   }
   return resRows;
@@ -1528,7 +1528,7 @@ export function updatePaymentMethodNeedsUpdateNotifyingTaskMetadataStatement(
   };
 }
 
-export function insertBillingProfileSuspendingDueToPastDueTaskStatement(
+export function insertPaymentProfileSuspendingDueToPastDueTaskStatement(
   args: {
     statementId: string,
     retryCount?: number,
@@ -1537,7 +1537,7 @@ export function insertBillingProfileSuspendingDueToPastDueTaskStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT BillingProfileSuspendingDueToPastDueTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT PaymentProfileSuspendingDueToPastDueTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       statementId: args.statementId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
@@ -1553,180 +1553,180 @@ export function insertBillingProfileSuspendingDueToPastDueTaskStatement(
   };
 }
 
-export function deleteBillingProfileSuspendingDueToPastDueTaskStatement(
+export function deletePaymentProfileSuspendingDueToPastDueTaskStatement(
   args: {
-    billingProfileSuspendingDueToPastDueTaskStatementIdEq: string,
+    paymentProfileSuspendingDueToPastDueTaskStatementIdEq: string,
   }
 ): Statement {
   return {
-    sql: "DELETE BillingProfileSuspendingDueToPastDueTask WHERE (BillingProfileSuspendingDueToPastDueTask.statementId = @billingProfileSuspendingDueToPastDueTaskStatementIdEq)",
+    sql: "DELETE PaymentProfileSuspendingDueToPastDueTask WHERE (PaymentProfileSuspendingDueToPastDueTask.statementId = @paymentProfileSuspendingDueToPastDueTaskStatementIdEq)",
     params: {
-      billingProfileSuspendingDueToPastDueTaskStatementIdEq: args.billingProfileSuspendingDueToPastDueTaskStatementIdEq,
+      paymentProfileSuspendingDueToPastDueTaskStatementIdEq: args.paymentProfileSuspendingDueToPastDueTaskStatementIdEq,
     },
     types: {
-      billingProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
+      paymentProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetBillingProfileSuspendingDueToPastDueTaskRow {
-  billingProfileSuspendingDueToPastDueTaskStatementId?: string,
-  billingProfileSuspendingDueToPastDueTaskRetryCount?: number,
-  billingProfileSuspendingDueToPastDueTaskExecutionTimeMs?: number,
-  billingProfileSuspendingDueToPastDueTaskCreatedTimeMs?: number,
+export interface GetPaymentProfileSuspendingDueToPastDueTaskRow {
+  paymentProfileSuspendingDueToPastDueTaskStatementId?: string,
+  paymentProfileSuspendingDueToPastDueTaskRetryCount?: number,
+  paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs?: number,
+  paymentProfileSuspendingDueToPastDueTaskCreatedTimeMs?: number,
 }
 
-export let GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW: MessageDescriptor<GetBillingProfileSuspendingDueToPastDueTaskRow> = {
-  name: 'GetBillingProfileSuspendingDueToPastDueTaskRow',
+export let GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW: MessageDescriptor<GetPaymentProfileSuspendingDueToPastDueTaskRow> = {
+  name: 'GetPaymentProfileSuspendingDueToPastDueTaskRow',
   fields: [{
-    name: 'billingProfileSuspendingDueToPastDueTaskStatementId',
+    name: 'paymentProfileSuspendingDueToPastDueTaskStatementId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileSuspendingDueToPastDueTaskRetryCount',
+    name: 'paymentProfileSuspendingDueToPastDueTaskRetryCount',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileSuspendingDueToPastDueTaskExecutionTimeMs',
+    name: 'paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileSuspendingDueToPastDueTaskCreatedTimeMs',
+    name: 'paymentProfileSuspendingDueToPastDueTaskCreatedTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingProfileSuspendingDueToPastDueTask(
+export async function getPaymentProfileSuspendingDueToPastDueTask(
   runner: Database | Transaction,
   args: {
-    billingProfileSuspendingDueToPastDueTaskStatementIdEq: string,
+    paymentProfileSuspendingDueToPastDueTaskStatementIdEq: string,
   }
-): Promise<Array<GetBillingProfileSuspendingDueToPastDueTaskRow>> {
+): Promise<Array<GetPaymentProfileSuspendingDueToPastDueTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileSuspendingDueToPastDueTask.statementId, BillingProfileSuspendingDueToPastDueTask.retryCount, BillingProfileSuspendingDueToPastDueTask.executionTimeMs, BillingProfileSuspendingDueToPastDueTask.createdTimeMs FROM BillingProfileSuspendingDueToPastDueTask WHERE (BillingProfileSuspendingDueToPastDueTask.statementId = @billingProfileSuspendingDueToPastDueTaskStatementIdEq)",
+    sql: "SELECT PaymentProfileSuspendingDueToPastDueTask.statementId, PaymentProfileSuspendingDueToPastDueTask.retryCount, PaymentProfileSuspendingDueToPastDueTask.executionTimeMs, PaymentProfileSuspendingDueToPastDueTask.createdTimeMs FROM PaymentProfileSuspendingDueToPastDueTask WHERE (PaymentProfileSuspendingDueToPastDueTask.statementId = @paymentProfileSuspendingDueToPastDueTaskStatementIdEq)",
     params: {
-      billingProfileSuspendingDueToPastDueTaskStatementIdEq: args.billingProfileSuspendingDueToPastDueTaskStatementIdEq,
+      paymentProfileSuspendingDueToPastDueTaskStatementIdEq: args.paymentProfileSuspendingDueToPastDueTaskStatementIdEq,
     },
     types: {
-      billingProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
+      paymentProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingProfileSuspendingDueToPastDueTaskRow>();
+  let resRows = new Array<GetPaymentProfileSuspendingDueToPastDueTaskRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileSuspendingDueToPastDueTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
-      billingProfileSuspendingDueToPastDueTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
-      billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
-      billingProfileSuspendingDueToPastDueTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      paymentProfileSuspendingDueToPastDueTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentProfileSuspendingDueToPastDueTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      paymentProfileSuspendingDueToPastDueTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingBillingProfileSuspendingDueToPastDueTasksRow {
-  billingProfileSuspendingDueToPastDueTaskStatementId?: string,
+export interface ListPendingPaymentProfileSuspendingDueToPastDueTasksRow {
+  paymentProfileSuspendingDueToPastDueTaskStatementId?: string,
 }
 
-export let LIST_PENDING_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASKS_ROW: MessageDescriptor<ListPendingBillingProfileSuspendingDueToPastDueTasksRow> = {
-  name: 'ListPendingBillingProfileSuspendingDueToPastDueTasksRow',
+export let LIST_PENDING_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASKS_ROW: MessageDescriptor<ListPendingPaymentProfileSuspendingDueToPastDueTasksRow> = {
+  name: 'ListPendingPaymentProfileSuspendingDueToPastDueTasksRow',
   fields: [{
-    name: 'billingProfileSuspendingDueToPastDueTaskStatementId',
+    name: 'paymentProfileSuspendingDueToPastDueTaskStatementId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }],
 };
 
-export async function listPendingBillingProfileSuspendingDueToPastDueTasks(
+export async function listPendingPaymentProfileSuspendingDueToPastDueTasks(
   runner: Database | Transaction,
   args: {
-    billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe?: number,
+    paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe?: number,
   }
-): Promise<Array<ListPendingBillingProfileSuspendingDueToPastDueTasksRow>> {
+): Promise<Array<ListPendingPaymentProfileSuspendingDueToPastDueTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileSuspendingDueToPastDueTask.statementId FROM BillingProfileSuspendingDueToPastDueTask WHERE BillingProfileSuspendingDueToPastDueTask.executionTimeMs <= @billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe",
+    sql: "SELECT PaymentProfileSuspendingDueToPastDueTask.statementId FROM PaymentProfileSuspendingDueToPastDueTask WHERE PaymentProfileSuspendingDueToPastDueTask.executionTimeMs <= @paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe",
     params: {
-      billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: args.billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe == null ? null : new Date(args.billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe).toISOString(),
+      paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: args.paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe == null ? null : new Date(args.paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: { type: "timestamp" },
+      paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingBillingProfileSuspendingDueToPastDueTasksRow>();
+  let resRows = new Array<ListPendingPaymentProfileSuspendingDueToPastDueTasksRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileSuspendingDueToPastDueTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentProfileSuspendingDueToPastDueTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
     });
   }
   return resRows;
 }
 
-export interface GetBillingProfileSuspendingDueToPastDueTaskMetadataRow {
-  billingProfileSuspendingDueToPastDueTaskRetryCount?: number,
-  billingProfileSuspendingDueToPastDueTaskExecutionTimeMs?: number,
+export interface GetPaymentProfileSuspendingDueToPastDueTaskMetadataRow {
+  paymentProfileSuspendingDueToPastDueTaskRetryCount?: number,
+  paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs?: number,
 }
 
-export let GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_METADATA_ROW: MessageDescriptor<GetBillingProfileSuspendingDueToPastDueTaskMetadataRow> = {
-  name: 'GetBillingProfileSuspendingDueToPastDueTaskMetadataRow',
+export let GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_METADATA_ROW: MessageDescriptor<GetPaymentProfileSuspendingDueToPastDueTaskMetadataRow> = {
+  name: 'GetPaymentProfileSuspendingDueToPastDueTaskMetadataRow',
   fields: [{
-    name: 'billingProfileSuspendingDueToPastDueTaskRetryCount',
+    name: 'paymentProfileSuspendingDueToPastDueTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileSuspendingDueToPastDueTaskExecutionTimeMs',
+    name: 'paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingProfileSuspendingDueToPastDueTaskMetadata(
+export async function getPaymentProfileSuspendingDueToPastDueTaskMetadata(
   runner: Database | Transaction,
   args: {
-    billingProfileSuspendingDueToPastDueTaskStatementIdEq: string,
+    paymentProfileSuspendingDueToPastDueTaskStatementIdEq: string,
   }
-): Promise<Array<GetBillingProfileSuspendingDueToPastDueTaskMetadataRow>> {
+): Promise<Array<GetPaymentProfileSuspendingDueToPastDueTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileSuspendingDueToPastDueTask.retryCount, BillingProfileSuspendingDueToPastDueTask.executionTimeMs FROM BillingProfileSuspendingDueToPastDueTask WHERE (BillingProfileSuspendingDueToPastDueTask.statementId = @billingProfileSuspendingDueToPastDueTaskStatementIdEq)",
+    sql: "SELECT PaymentProfileSuspendingDueToPastDueTask.retryCount, PaymentProfileSuspendingDueToPastDueTask.executionTimeMs FROM PaymentProfileSuspendingDueToPastDueTask WHERE (PaymentProfileSuspendingDueToPastDueTask.statementId = @paymentProfileSuspendingDueToPastDueTaskStatementIdEq)",
     params: {
-      billingProfileSuspendingDueToPastDueTaskStatementIdEq: args.billingProfileSuspendingDueToPastDueTaskStatementIdEq,
+      paymentProfileSuspendingDueToPastDueTaskStatementIdEq: args.paymentProfileSuspendingDueToPastDueTaskStatementIdEq,
     },
     types: {
-      billingProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
+      paymentProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingProfileSuspendingDueToPastDueTaskMetadataRow>();
+  let resRows = new Array<GetPaymentProfileSuspendingDueToPastDueTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileSuspendingDueToPastDueTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
-      billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+      paymentProfileSuspendingDueToPastDueTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updateBillingProfileSuspendingDueToPastDueTaskMetadataStatement(
+export function updatePaymentProfileSuspendingDueToPastDueTaskMetadataStatement(
   args: {
-    billingProfileSuspendingDueToPastDueTaskStatementIdEq: string,
+    paymentProfileSuspendingDueToPastDueTaskStatementIdEq: string,
     setRetryCount?: number,
     setExecutionTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE BillingProfileSuspendingDueToPastDueTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingProfileSuspendingDueToPastDueTask.statementId = @billingProfileSuspendingDueToPastDueTaskStatementIdEq)",
+    sql: "UPDATE PaymentProfileSuspendingDueToPastDueTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentProfileSuspendingDueToPastDueTask.statementId = @paymentProfileSuspendingDueToPastDueTaskStatementIdEq)",
     params: {
-      billingProfileSuspendingDueToPastDueTaskStatementIdEq: args.billingProfileSuspendingDueToPastDueTaskStatementIdEq,
+      paymentProfileSuspendingDueToPastDueTaskStatementIdEq: args.paymentProfileSuspendingDueToPastDueTaskStatementIdEq,
       setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
       setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      billingProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
+      paymentProfileSuspendingDueToPastDueTaskStatementIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
   };
 }
 
-export function insertBillingProfileSuspensionNotifyingTaskStatement(
+export function insertPaymentProfileSuspensionNotifyingTaskStatement(
   args: {
     accountId: string,
     version: number,
@@ -1736,7 +1736,7 @@ export function insertBillingProfileSuspensionNotifyingTaskStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT BillingProfileSuspensionNotifyingTask (accountId, version, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @version, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT PaymentProfileSuspensionNotifyingTask (accountId, version, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @version, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       accountId: args.accountId,
       version: Spanner.float(args.version),
@@ -1754,204 +1754,204 @@ export function insertBillingProfileSuspensionNotifyingTaskStatement(
   };
 }
 
-export function deleteBillingProfileSuspensionNotifyingTaskStatement(
+export function deletePaymentProfileSuspensionNotifyingTaskStatement(
   args: {
-    billingProfileSuspensionNotifyingTaskAccountIdEq: string,
-    billingProfileSuspensionNotifyingTaskVersionEq: number,
+    paymentProfileSuspensionNotifyingTaskAccountIdEq: string,
+    paymentProfileSuspensionNotifyingTaskVersionEq: number,
   }
 ): Statement {
   return {
-    sql: "DELETE BillingProfileSuspensionNotifyingTask WHERE (BillingProfileSuspensionNotifyingTask.accountId = @billingProfileSuspensionNotifyingTaskAccountIdEq AND BillingProfileSuspensionNotifyingTask.version = @billingProfileSuspensionNotifyingTaskVersionEq)",
+    sql: "DELETE PaymentProfileSuspensionNotifyingTask WHERE (PaymentProfileSuspensionNotifyingTask.accountId = @paymentProfileSuspensionNotifyingTaskAccountIdEq AND PaymentProfileSuspensionNotifyingTask.version = @paymentProfileSuspensionNotifyingTaskVersionEq)",
     params: {
-      billingProfileSuspensionNotifyingTaskAccountIdEq: args.billingProfileSuspensionNotifyingTaskAccountIdEq,
-      billingProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.billingProfileSuspensionNotifyingTaskVersionEq),
+      paymentProfileSuspensionNotifyingTaskAccountIdEq: args.paymentProfileSuspensionNotifyingTaskAccountIdEq,
+      paymentProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.paymentProfileSuspensionNotifyingTaskVersionEq),
     },
     types: {
-      billingProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
-      billingProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
+      paymentProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
+      paymentProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
     }
   };
 }
 
-export interface GetBillingProfileSuspensionNotifyingTaskRow {
-  billingProfileSuspensionNotifyingTaskAccountId?: string,
-  billingProfileSuspensionNotifyingTaskVersion?: number,
-  billingProfileSuspensionNotifyingTaskRetryCount?: number,
-  billingProfileSuspensionNotifyingTaskExecutionTimeMs?: number,
-  billingProfileSuspensionNotifyingTaskCreatedTimeMs?: number,
+export interface GetPaymentProfileSuspensionNotifyingTaskRow {
+  paymentProfileSuspensionNotifyingTaskAccountId?: string,
+  paymentProfileSuspensionNotifyingTaskVersion?: number,
+  paymentProfileSuspensionNotifyingTaskRetryCount?: number,
+  paymentProfileSuspensionNotifyingTaskExecutionTimeMs?: number,
+  paymentProfileSuspensionNotifyingTaskCreatedTimeMs?: number,
 }
 
-export let GET_BILLING_PROFILE_SUSPENSION_NOTIFYING_TASK_ROW: MessageDescriptor<GetBillingProfileSuspensionNotifyingTaskRow> = {
-  name: 'GetBillingProfileSuspensionNotifyingTaskRow',
+export let GET_PAYMENT_PROFILE_SUSPENSION_NOTIFYING_TASK_ROW: MessageDescriptor<GetPaymentProfileSuspensionNotifyingTaskRow> = {
+  name: 'GetPaymentProfileSuspensionNotifyingTaskRow',
   fields: [{
-    name: 'billingProfileSuspensionNotifyingTaskAccountId',
+    name: 'paymentProfileSuspensionNotifyingTaskAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileSuspensionNotifyingTaskVersion',
+    name: 'paymentProfileSuspensionNotifyingTaskVersion',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileSuspensionNotifyingTaskRetryCount',
+    name: 'paymentProfileSuspensionNotifyingTaskRetryCount',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileSuspensionNotifyingTaskExecutionTimeMs',
+    name: 'paymentProfileSuspensionNotifyingTaskExecutionTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileSuspensionNotifyingTaskCreatedTimeMs',
+    name: 'paymentProfileSuspensionNotifyingTaskCreatedTimeMs',
     index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingProfileSuspensionNotifyingTask(
+export async function getPaymentProfileSuspensionNotifyingTask(
   runner: Database | Transaction,
   args: {
-    billingProfileSuspensionNotifyingTaskAccountIdEq: string,
-    billingProfileSuspensionNotifyingTaskVersionEq: number,
+    paymentProfileSuspensionNotifyingTaskAccountIdEq: string,
+    paymentProfileSuspensionNotifyingTaskVersionEq: number,
   }
-): Promise<Array<GetBillingProfileSuspensionNotifyingTaskRow>> {
+): Promise<Array<GetPaymentProfileSuspensionNotifyingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileSuspensionNotifyingTask.accountId, BillingProfileSuspensionNotifyingTask.version, BillingProfileSuspensionNotifyingTask.retryCount, BillingProfileSuspensionNotifyingTask.executionTimeMs, BillingProfileSuspensionNotifyingTask.createdTimeMs FROM BillingProfileSuspensionNotifyingTask WHERE (BillingProfileSuspensionNotifyingTask.accountId = @billingProfileSuspensionNotifyingTaskAccountIdEq AND BillingProfileSuspensionNotifyingTask.version = @billingProfileSuspensionNotifyingTaskVersionEq)",
+    sql: "SELECT PaymentProfileSuspensionNotifyingTask.accountId, PaymentProfileSuspensionNotifyingTask.version, PaymentProfileSuspensionNotifyingTask.retryCount, PaymentProfileSuspensionNotifyingTask.executionTimeMs, PaymentProfileSuspensionNotifyingTask.createdTimeMs FROM PaymentProfileSuspensionNotifyingTask WHERE (PaymentProfileSuspensionNotifyingTask.accountId = @paymentProfileSuspensionNotifyingTaskAccountIdEq AND PaymentProfileSuspensionNotifyingTask.version = @paymentProfileSuspensionNotifyingTaskVersionEq)",
     params: {
-      billingProfileSuspensionNotifyingTaskAccountIdEq: args.billingProfileSuspensionNotifyingTaskAccountIdEq,
-      billingProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.billingProfileSuspensionNotifyingTaskVersionEq),
+      paymentProfileSuspensionNotifyingTaskAccountIdEq: args.paymentProfileSuspensionNotifyingTaskAccountIdEq,
+      paymentProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.paymentProfileSuspensionNotifyingTaskVersionEq),
     },
     types: {
-      billingProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
-      billingProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
+      paymentProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
+      paymentProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
     }
   });
-  let resRows = new Array<GetBillingProfileSuspensionNotifyingTaskRow>();
+  let resRows = new Array<GetPaymentProfileSuspensionNotifyingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileSuspensionNotifyingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      billingProfileSuspensionNotifyingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
-      billingProfileSuspensionNotifyingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
-      billingProfileSuspensionNotifyingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
-      billingProfileSuspensionNotifyingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
+      paymentProfileSuspensionNotifyingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentProfileSuspensionNotifyingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
+      paymentProfileSuspensionNotifyingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      paymentProfileSuspensionNotifyingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      paymentProfileSuspensionNotifyingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingBillingProfileSuspensionNotifyingTasksRow {
-  billingProfileSuspensionNotifyingTaskAccountId?: string,
-  billingProfileSuspensionNotifyingTaskVersion?: number,
+export interface ListPendingPaymentProfileSuspensionNotifyingTasksRow {
+  paymentProfileSuspensionNotifyingTaskAccountId?: string,
+  paymentProfileSuspensionNotifyingTaskVersion?: number,
 }
 
-export let LIST_PENDING_BILLING_PROFILE_SUSPENSION_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingBillingProfileSuspensionNotifyingTasksRow> = {
-  name: 'ListPendingBillingProfileSuspensionNotifyingTasksRow',
+export let LIST_PENDING_PAYMENT_PROFILE_SUSPENSION_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingPaymentProfileSuspensionNotifyingTasksRow> = {
+  name: 'ListPendingPaymentProfileSuspensionNotifyingTasksRow',
   fields: [{
-    name: 'billingProfileSuspensionNotifyingTaskAccountId',
+    name: 'paymentProfileSuspensionNotifyingTaskAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileSuspensionNotifyingTaskVersion',
+    name: 'paymentProfileSuspensionNotifyingTaskVersion',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function listPendingBillingProfileSuspensionNotifyingTasks(
+export async function listPendingPaymentProfileSuspensionNotifyingTasks(
   runner: Database | Transaction,
   args: {
-    billingProfileSuspensionNotifyingTaskExecutionTimeMsLe?: number,
+    paymentProfileSuspensionNotifyingTaskExecutionTimeMsLe?: number,
   }
-): Promise<Array<ListPendingBillingProfileSuspensionNotifyingTasksRow>> {
+): Promise<Array<ListPendingPaymentProfileSuspensionNotifyingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileSuspensionNotifyingTask.accountId, BillingProfileSuspensionNotifyingTask.version FROM BillingProfileSuspensionNotifyingTask WHERE BillingProfileSuspensionNotifyingTask.executionTimeMs <= @billingProfileSuspensionNotifyingTaskExecutionTimeMsLe",
+    sql: "SELECT PaymentProfileSuspensionNotifyingTask.accountId, PaymentProfileSuspensionNotifyingTask.version FROM PaymentProfileSuspensionNotifyingTask WHERE PaymentProfileSuspensionNotifyingTask.executionTimeMs <= @paymentProfileSuspensionNotifyingTaskExecutionTimeMsLe",
     params: {
-      billingProfileSuspensionNotifyingTaskExecutionTimeMsLe: args.billingProfileSuspensionNotifyingTaskExecutionTimeMsLe == null ? null : new Date(args.billingProfileSuspensionNotifyingTaskExecutionTimeMsLe).toISOString(),
+      paymentProfileSuspensionNotifyingTaskExecutionTimeMsLe: args.paymentProfileSuspensionNotifyingTaskExecutionTimeMsLe == null ? null : new Date(args.paymentProfileSuspensionNotifyingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      billingProfileSuspensionNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
+      paymentProfileSuspensionNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingBillingProfileSuspensionNotifyingTasksRow>();
+  let resRows = new Array<ListPendingPaymentProfileSuspensionNotifyingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileSuspensionNotifyingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      billingProfileSuspensionNotifyingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
+      paymentProfileSuspensionNotifyingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentProfileSuspensionNotifyingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
     });
   }
   return resRows;
 }
 
-export interface GetBillingProfileSuspensionNotifyingTaskMetadataRow {
-  billingProfileSuspensionNotifyingTaskRetryCount?: number,
-  billingProfileSuspensionNotifyingTaskExecutionTimeMs?: number,
+export interface GetPaymentProfileSuspensionNotifyingTaskMetadataRow {
+  paymentProfileSuspensionNotifyingTaskRetryCount?: number,
+  paymentProfileSuspensionNotifyingTaskExecutionTimeMs?: number,
 }
 
-export let GET_BILLING_PROFILE_SUSPENSION_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetBillingProfileSuspensionNotifyingTaskMetadataRow> = {
-  name: 'GetBillingProfileSuspensionNotifyingTaskMetadataRow',
+export let GET_PAYMENT_PROFILE_SUSPENSION_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetPaymentProfileSuspensionNotifyingTaskMetadataRow> = {
+  name: 'GetPaymentProfileSuspensionNotifyingTaskMetadataRow',
   fields: [{
-    name: 'billingProfileSuspensionNotifyingTaskRetryCount',
+    name: 'paymentProfileSuspensionNotifyingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileSuspensionNotifyingTaskExecutionTimeMs',
+    name: 'paymentProfileSuspensionNotifyingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingProfileSuspensionNotifyingTaskMetadata(
+export async function getPaymentProfileSuspensionNotifyingTaskMetadata(
   runner: Database | Transaction,
   args: {
-    billingProfileSuspensionNotifyingTaskAccountIdEq: string,
-    billingProfileSuspensionNotifyingTaskVersionEq: number,
+    paymentProfileSuspensionNotifyingTaskAccountIdEq: string,
+    paymentProfileSuspensionNotifyingTaskVersionEq: number,
   }
-): Promise<Array<GetBillingProfileSuspensionNotifyingTaskMetadataRow>> {
+): Promise<Array<GetPaymentProfileSuspensionNotifyingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileSuspensionNotifyingTask.retryCount, BillingProfileSuspensionNotifyingTask.executionTimeMs FROM BillingProfileSuspensionNotifyingTask WHERE (BillingProfileSuspensionNotifyingTask.accountId = @billingProfileSuspensionNotifyingTaskAccountIdEq AND BillingProfileSuspensionNotifyingTask.version = @billingProfileSuspensionNotifyingTaskVersionEq)",
+    sql: "SELECT PaymentProfileSuspensionNotifyingTask.retryCount, PaymentProfileSuspensionNotifyingTask.executionTimeMs FROM PaymentProfileSuspensionNotifyingTask WHERE (PaymentProfileSuspensionNotifyingTask.accountId = @paymentProfileSuspensionNotifyingTaskAccountIdEq AND PaymentProfileSuspensionNotifyingTask.version = @paymentProfileSuspensionNotifyingTaskVersionEq)",
     params: {
-      billingProfileSuspensionNotifyingTaskAccountIdEq: args.billingProfileSuspensionNotifyingTaskAccountIdEq,
-      billingProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.billingProfileSuspensionNotifyingTaskVersionEq),
+      paymentProfileSuspensionNotifyingTaskAccountIdEq: args.paymentProfileSuspensionNotifyingTaskAccountIdEq,
+      paymentProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.paymentProfileSuspensionNotifyingTaskVersionEq),
     },
     types: {
-      billingProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
-      billingProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
+      paymentProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
+      paymentProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
     }
   });
-  let resRows = new Array<GetBillingProfileSuspensionNotifyingTaskMetadataRow>();
+  let resRows = new Array<GetPaymentProfileSuspensionNotifyingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileSuspensionNotifyingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
-      billingProfileSuspensionNotifyingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+      paymentProfileSuspensionNotifyingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      paymentProfileSuspensionNotifyingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updateBillingProfileSuspensionNotifyingTaskMetadataStatement(
+export function updatePaymentProfileSuspensionNotifyingTaskMetadataStatement(
   args: {
-    billingProfileSuspensionNotifyingTaskAccountIdEq: string,
-    billingProfileSuspensionNotifyingTaskVersionEq: number,
+    paymentProfileSuspensionNotifyingTaskAccountIdEq: string,
+    paymentProfileSuspensionNotifyingTaskVersionEq: number,
     setRetryCount?: number,
     setExecutionTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE BillingProfileSuspensionNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingProfileSuspensionNotifyingTask.accountId = @billingProfileSuspensionNotifyingTaskAccountIdEq AND BillingProfileSuspensionNotifyingTask.version = @billingProfileSuspensionNotifyingTaskVersionEq)",
+    sql: "UPDATE PaymentProfileSuspensionNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentProfileSuspensionNotifyingTask.accountId = @paymentProfileSuspensionNotifyingTaskAccountIdEq AND PaymentProfileSuspensionNotifyingTask.version = @paymentProfileSuspensionNotifyingTaskVersionEq)",
     params: {
-      billingProfileSuspensionNotifyingTaskAccountIdEq: args.billingProfileSuspensionNotifyingTaskAccountIdEq,
-      billingProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.billingProfileSuspensionNotifyingTaskVersionEq),
+      paymentProfileSuspensionNotifyingTaskAccountIdEq: args.paymentProfileSuspensionNotifyingTaskAccountIdEq,
+      paymentProfileSuspensionNotifyingTaskVersionEq: Spanner.float(args.paymentProfileSuspensionNotifyingTaskVersionEq),
       setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
       setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      billingProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
-      billingProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
+      paymentProfileSuspensionNotifyingTaskAccountIdEq: { type: "string" },
+      paymentProfileSuspensionNotifyingTaskVersionEq: { type: "float64" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
   };
 }
 
-export function insertBillingProfileStateSyncingTaskStatement(
+export function insertPaymentProfileStateSyncingTaskStatement(
   args: {
     accountId: string,
     version: number,
@@ -1961,7 +1961,7 @@ export function insertBillingProfileStateSyncingTaskStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT BillingProfileStateSyncingTask (accountId, version, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @version, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT PaymentProfileStateSyncingTask (accountId, version, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @version, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       accountId: args.accountId,
       version: Spanner.float(args.version),
@@ -1979,197 +1979,197 @@ export function insertBillingProfileStateSyncingTaskStatement(
   };
 }
 
-export function deleteBillingProfileStateSyncingTaskStatement(
+export function deletePaymentProfileStateSyncingTaskStatement(
   args: {
-    billingProfileStateSyncingTaskAccountIdEq: string,
-    billingProfileStateSyncingTaskVersionEq: number,
+    paymentProfileStateSyncingTaskAccountIdEq: string,
+    paymentProfileStateSyncingTaskVersionEq: number,
   }
 ): Statement {
   return {
-    sql: "DELETE BillingProfileStateSyncingTask WHERE (BillingProfileStateSyncingTask.accountId = @billingProfileStateSyncingTaskAccountIdEq AND BillingProfileStateSyncingTask.version = @billingProfileStateSyncingTaskVersionEq)",
+    sql: "DELETE PaymentProfileStateSyncingTask WHERE (PaymentProfileStateSyncingTask.accountId = @paymentProfileStateSyncingTaskAccountIdEq AND PaymentProfileStateSyncingTask.version = @paymentProfileStateSyncingTaskVersionEq)",
     params: {
-      billingProfileStateSyncingTaskAccountIdEq: args.billingProfileStateSyncingTaskAccountIdEq,
-      billingProfileStateSyncingTaskVersionEq: Spanner.float(args.billingProfileStateSyncingTaskVersionEq),
+      paymentProfileStateSyncingTaskAccountIdEq: args.paymentProfileStateSyncingTaskAccountIdEq,
+      paymentProfileStateSyncingTaskVersionEq: Spanner.float(args.paymentProfileStateSyncingTaskVersionEq),
     },
     types: {
-      billingProfileStateSyncingTaskAccountIdEq: { type: "string" },
-      billingProfileStateSyncingTaskVersionEq: { type: "float64" },
+      paymentProfileStateSyncingTaskAccountIdEq: { type: "string" },
+      paymentProfileStateSyncingTaskVersionEq: { type: "float64" },
     }
   };
 }
 
-export interface GetBillingProfileStateSyncingTaskRow {
-  billingProfileStateSyncingTaskAccountId?: string,
-  billingProfileStateSyncingTaskVersion?: number,
-  billingProfileStateSyncingTaskRetryCount?: number,
-  billingProfileStateSyncingTaskExecutionTimeMs?: number,
-  billingProfileStateSyncingTaskCreatedTimeMs?: number,
+export interface GetPaymentProfileStateSyncingTaskRow {
+  paymentProfileStateSyncingTaskAccountId?: string,
+  paymentProfileStateSyncingTaskVersion?: number,
+  paymentProfileStateSyncingTaskRetryCount?: number,
+  paymentProfileStateSyncingTaskExecutionTimeMs?: number,
+  paymentProfileStateSyncingTaskCreatedTimeMs?: number,
 }
 
-export let GET_BILLING_PROFILE_STATE_SYNCING_TASK_ROW: MessageDescriptor<GetBillingProfileStateSyncingTaskRow> = {
-  name: 'GetBillingProfileStateSyncingTaskRow',
+export let GET_PAYMENT_PROFILE_STATE_SYNCING_TASK_ROW: MessageDescriptor<GetPaymentProfileStateSyncingTaskRow> = {
+  name: 'GetPaymentProfileStateSyncingTaskRow',
   fields: [{
-    name: 'billingProfileStateSyncingTaskAccountId',
+    name: 'paymentProfileStateSyncingTaskAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileStateSyncingTaskVersion',
+    name: 'paymentProfileStateSyncingTaskVersion',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileStateSyncingTaskRetryCount',
+    name: 'paymentProfileStateSyncingTaskRetryCount',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileStateSyncingTaskExecutionTimeMs',
+    name: 'paymentProfileStateSyncingTaskExecutionTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileStateSyncingTaskCreatedTimeMs',
+    name: 'paymentProfileStateSyncingTaskCreatedTimeMs',
     index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingProfileStateSyncingTask(
+export async function getPaymentProfileStateSyncingTask(
   runner: Database | Transaction,
   args: {
-    billingProfileStateSyncingTaskAccountIdEq: string,
-    billingProfileStateSyncingTaskVersionEq: number,
+    paymentProfileStateSyncingTaskAccountIdEq: string,
+    paymentProfileStateSyncingTaskVersionEq: number,
   }
-): Promise<Array<GetBillingProfileStateSyncingTaskRow>> {
+): Promise<Array<GetPaymentProfileStateSyncingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileStateSyncingTask.accountId, BillingProfileStateSyncingTask.version, BillingProfileStateSyncingTask.retryCount, BillingProfileStateSyncingTask.executionTimeMs, BillingProfileStateSyncingTask.createdTimeMs FROM BillingProfileStateSyncingTask WHERE (BillingProfileStateSyncingTask.accountId = @billingProfileStateSyncingTaskAccountIdEq AND BillingProfileStateSyncingTask.version = @billingProfileStateSyncingTaskVersionEq)",
+    sql: "SELECT PaymentProfileStateSyncingTask.accountId, PaymentProfileStateSyncingTask.version, PaymentProfileStateSyncingTask.retryCount, PaymentProfileStateSyncingTask.executionTimeMs, PaymentProfileStateSyncingTask.createdTimeMs FROM PaymentProfileStateSyncingTask WHERE (PaymentProfileStateSyncingTask.accountId = @paymentProfileStateSyncingTaskAccountIdEq AND PaymentProfileStateSyncingTask.version = @paymentProfileStateSyncingTaskVersionEq)",
     params: {
-      billingProfileStateSyncingTaskAccountIdEq: args.billingProfileStateSyncingTaskAccountIdEq,
-      billingProfileStateSyncingTaskVersionEq: Spanner.float(args.billingProfileStateSyncingTaskVersionEq),
+      paymentProfileStateSyncingTaskAccountIdEq: args.paymentProfileStateSyncingTaskAccountIdEq,
+      paymentProfileStateSyncingTaskVersionEq: Spanner.float(args.paymentProfileStateSyncingTaskVersionEq),
     },
     types: {
-      billingProfileStateSyncingTaskAccountIdEq: { type: "string" },
-      billingProfileStateSyncingTaskVersionEq: { type: "float64" },
+      paymentProfileStateSyncingTaskAccountIdEq: { type: "string" },
+      paymentProfileStateSyncingTaskVersionEq: { type: "float64" },
     }
   });
-  let resRows = new Array<GetBillingProfileStateSyncingTaskRow>();
+  let resRows = new Array<GetPaymentProfileStateSyncingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileStateSyncingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      billingProfileStateSyncingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
-      billingProfileStateSyncingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
-      billingProfileStateSyncingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
-      billingProfileStateSyncingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
+      paymentProfileStateSyncingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentProfileStateSyncingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
+      paymentProfileStateSyncingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      paymentProfileStateSyncingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      paymentProfileStateSyncingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingBillingProfileStateSyncingTasksRow {
-  billingProfileStateSyncingTaskAccountId?: string,
-  billingProfileStateSyncingTaskVersion?: number,
+export interface ListPendingPaymentProfileStateSyncingTasksRow {
+  paymentProfileStateSyncingTaskAccountId?: string,
+  paymentProfileStateSyncingTaskVersion?: number,
 }
 
-export let LIST_PENDING_BILLING_PROFILE_STATE_SYNCING_TASKS_ROW: MessageDescriptor<ListPendingBillingProfileStateSyncingTasksRow> = {
-  name: 'ListPendingBillingProfileStateSyncingTasksRow',
+export let LIST_PENDING_PAYMENT_PROFILE_STATE_SYNCING_TASKS_ROW: MessageDescriptor<ListPendingPaymentProfileStateSyncingTasksRow> = {
+  name: 'ListPendingPaymentProfileStateSyncingTasksRow',
   fields: [{
-    name: 'billingProfileStateSyncingTaskAccountId',
+    name: 'paymentProfileStateSyncingTaskAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileStateSyncingTaskVersion',
+    name: 'paymentProfileStateSyncingTaskVersion',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function listPendingBillingProfileStateSyncingTasks(
+export async function listPendingPaymentProfileStateSyncingTasks(
   runner: Database | Transaction,
   args: {
-    billingProfileStateSyncingTaskExecutionTimeMsLe?: number,
+    paymentProfileStateSyncingTaskExecutionTimeMsLe?: number,
   }
-): Promise<Array<ListPendingBillingProfileStateSyncingTasksRow>> {
+): Promise<Array<ListPendingPaymentProfileStateSyncingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileStateSyncingTask.accountId, BillingProfileStateSyncingTask.version FROM BillingProfileStateSyncingTask WHERE BillingProfileStateSyncingTask.executionTimeMs <= @billingProfileStateSyncingTaskExecutionTimeMsLe",
+    sql: "SELECT PaymentProfileStateSyncingTask.accountId, PaymentProfileStateSyncingTask.version FROM PaymentProfileStateSyncingTask WHERE PaymentProfileStateSyncingTask.executionTimeMs <= @paymentProfileStateSyncingTaskExecutionTimeMsLe",
     params: {
-      billingProfileStateSyncingTaskExecutionTimeMsLe: args.billingProfileStateSyncingTaskExecutionTimeMsLe == null ? null : new Date(args.billingProfileStateSyncingTaskExecutionTimeMsLe).toISOString(),
+      paymentProfileStateSyncingTaskExecutionTimeMsLe: args.paymentProfileStateSyncingTaskExecutionTimeMsLe == null ? null : new Date(args.paymentProfileStateSyncingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      billingProfileStateSyncingTaskExecutionTimeMsLe: { type: "timestamp" },
+      paymentProfileStateSyncingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingBillingProfileStateSyncingTasksRow>();
+  let resRows = new Array<ListPendingPaymentProfileStateSyncingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileStateSyncingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      billingProfileStateSyncingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
+      paymentProfileStateSyncingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentProfileStateSyncingTaskVersion: row.at(1).value == null ? undefined : row.at(1).value.value,
     });
   }
   return resRows;
 }
 
-export interface GetBillingProfileStateSyncingTaskMetadataRow {
-  billingProfileStateSyncingTaskRetryCount?: number,
-  billingProfileStateSyncingTaskExecutionTimeMs?: number,
+export interface GetPaymentProfileStateSyncingTaskMetadataRow {
+  paymentProfileStateSyncingTaskRetryCount?: number,
+  paymentProfileStateSyncingTaskExecutionTimeMs?: number,
 }
 
-export let GET_BILLING_PROFILE_STATE_SYNCING_TASK_METADATA_ROW: MessageDescriptor<GetBillingProfileStateSyncingTaskMetadataRow> = {
-  name: 'GetBillingProfileStateSyncingTaskMetadataRow',
+export let GET_PAYMENT_PROFILE_STATE_SYNCING_TASK_METADATA_ROW: MessageDescriptor<GetPaymentProfileStateSyncingTaskMetadataRow> = {
+  name: 'GetPaymentProfileStateSyncingTaskMetadataRow',
   fields: [{
-    name: 'billingProfileStateSyncingTaskRetryCount',
+    name: 'paymentProfileStateSyncingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileStateSyncingTaskExecutionTimeMs',
+    name: 'paymentProfileStateSyncingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingProfileStateSyncingTaskMetadata(
+export async function getPaymentProfileStateSyncingTaskMetadata(
   runner: Database | Transaction,
   args: {
-    billingProfileStateSyncingTaskAccountIdEq: string,
-    billingProfileStateSyncingTaskVersionEq: number,
+    paymentProfileStateSyncingTaskAccountIdEq: string,
+    paymentProfileStateSyncingTaskVersionEq: number,
   }
-): Promise<Array<GetBillingProfileStateSyncingTaskMetadataRow>> {
+): Promise<Array<GetPaymentProfileStateSyncingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT BillingProfileStateSyncingTask.retryCount, BillingProfileStateSyncingTask.executionTimeMs FROM BillingProfileStateSyncingTask WHERE (BillingProfileStateSyncingTask.accountId = @billingProfileStateSyncingTaskAccountIdEq AND BillingProfileStateSyncingTask.version = @billingProfileStateSyncingTaskVersionEq)",
+    sql: "SELECT PaymentProfileStateSyncingTask.retryCount, PaymentProfileStateSyncingTask.executionTimeMs FROM PaymentProfileStateSyncingTask WHERE (PaymentProfileStateSyncingTask.accountId = @paymentProfileStateSyncingTaskAccountIdEq AND PaymentProfileStateSyncingTask.version = @paymentProfileStateSyncingTaskVersionEq)",
     params: {
-      billingProfileStateSyncingTaskAccountIdEq: args.billingProfileStateSyncingTaskAccountIdEq,
-      billingProfileStateSyncingTaskVersionEq: Spanner.float(args.billingProfileStateSyncingTaskVersionEq),
+      paymentProfileStateSyncingTaskAccountIdEq: args.paymentProfileStateSyncingTaskAccountIdEq,
+      paymentProfileStateSyncingTaskVersionEq: Spanner.float(args.paymentProfileStateSyncingTaskVersionEq),
     },
     types: {
-      billingProfileStateSyncingTaskAccountIdEq: { type: "string" },
-      billingProfileStateSyncingTaskVersionEq: { type: "float64" },
+      paymentProfileStateSyncingTaskAccountIdEq: { type: "string" },
+      paymentProfileStateSyncingTaskVersionEq: { type: "float64" },
     }
   });
-  let resRows = new Array<GetBillingProfileStateSyncingTaskMetadataRow>();
+  let resRows = new Array<GetPaymentProfileStateSyncingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileStateSyncingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
-      billingProfileStateSyncingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+      paymentProfileStateSyncingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      paymentProfileStateSyncingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updateBillingProfileStateSyncingTaskMetadataStatement(
+export function updatePaymentProfileStateSyncingTaskMetadataStatement(
   args: {
-    billingProfileStateSyncingTaskAccountIdEq: string,
-    billingProfileStateSyncingTaskVersionEq: number,
+    paymentProfileStateSyncingTaskAccountIdEq: string,
+    paymentProfileStateSyncingTaskVersionEq: number,
     setRetryCount?: number,
     setExecutionTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE BillingProfileStateSyncingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (BillingProfileStateSyncingTask.accountId = @billingProfileStateSyncingTaskAccountIdEq AND BillingProfileStateSyncingTask.version = @billingProfileStateSyncingTaskVersionEq)",
+    sql: "UPDATE PaymentProfileStateSyncingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentProfileStateSyncingTask.accountId = @paymentProfileStateSyncingTaskAccountIdEq AND PaymentProfileStateSyncingTask.version = @paymentProfileStateSyncingTaskVersionEq)",
     params: {
-      billingProfileStateSyncingTaskAccountIdEq: args.billingProfileStateSyncingTaskAccountIdEq,
-      billingProfileStateSyncingTaskVersionEq: Spanner.float(args.billingProfileStateSyncingTaskVersionEq),
+      paymentProfileStateSyncingTaskAccountIdEq: args.paymentProfileStateSyncingTaskAccountIdEq,
+      paymentProfileStateSyncingTaskVersionEq: Spanner.float(args.paymentProfileStateSyncingTaskVersionEq),
       setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
       setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      billingProfileStateSyncingTaskAccountIdEq: { type: "string" },
-      billingProfileStateSyncingTaskVersionEq: { type: "float64" },
+      paymentProfileStateSyncingTaskAccountIdEq: { type: "string" },
+      paymentProfileStateSyncingTaskVersionEq: { type: "float64" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
@@ -2374,80 +2374,80 @@ export function updatePayoutTaskMetadataStatement(
   };
 }
 
-export function updateBillingProfileStateStatement(
+export function updatePaymentProfileStateStatement(
   args: {
-    billingProfileAccountIdEq: string,
-    setStateInfo?: BillingProfileStateInfo,
+    paymentProfileAccountIdEq: string,
+    setStateInfo?: PaymentProfileStateInfo,
   }
 ): Statement {
   return {
-    sql: "UPDATE BillingProfile SET stateInfo = @setStateInfo WHERE (BillingProfile.accountId = @billingProfileAccountIdEq)",
+    sql: "UPDATE PaymentProfile SET stateInfo = @setStateInfo WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
     params: {
-      billingProfileAccountIdEq: args.billingProfileAccountIdEq,
-      setStateInfo: args.setStateInfo == null ? null : Buffer.from(serializeMessage(args.setStateInfo, BILLING_PROFILE_STATE_INFO).buffer),
+      paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
+      setStateInfo: args.setStateInfo == null ? null : Buffer.from(serializeMessage(args.setStateInfo, PAYMENT_PROFILE_STATE_INFO).buffer),
     },
     types: {
-      billingProfileAccountIdEq: { type: "string" },
+      paymentProfileAccountIdEq: { type: "string" },
       setStateInfo: { type: "bytes" },
     }
   };
 }
 
-export function updateBillingProfilePaymentCustomerStatement(
+export function updatePaymentProfilePaymentCustomerStatement(
   args: {
-    billingProfileAccountIdEq: string,
+    paymentProfileAccountIdEq: string,
     setStripePaymentCustomerId?: string,
   }
 ): Statement {
   return {
-    sql: "UPDATE BillingProfile SET stripePaymentCustomerId = @setStripePaymentCustomerId WHERE (BillingProfile.accountId = @billingProfileAccountIdEq)",
+    sql: "UPDATE PaymentProfile SET stripePaymentCustomerId = @setStripePaymentCustomerId WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
     params: {
-      billingProfileAccountIdEq: args.billingProfileAccountIdEq,
+      paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
       setStripePaymentCustomerId: args.setStripePaymentCustomerId == null ? null : args.setStripePaymentCustomerId,
     },
     types: {
-      billingProfileAccountIdEq: { type: "string" },
+      paymentProfileAccountIdEq: { type: "string" },
       setStripePaymentCustomerId: { type: "string" },
     }
   };
 }
 
-export function updateEarningsProfileConnectedAccountStatement(
+export function updatePayoutProfileConnectedAccountStatement(
   args: {
-    earningsProfileAccountIdEq: string,
+    payoutProfileAccountIdEq: string,
     setStripeConnectedAccountId?: string,
     setStripeConnectedAccountState?: StripeConnectedAccountState,
   }
 ): Statement {
   return {
-    sql: "UPDATE EarningsProfile SET stripeConnectedAccountId = @setStripeConnectedAccountId, stripeConnectedAccountState = @setStripeConnectedAccountState WHERE (EarningsProfile.accountId = @earningsProfileAccountIdEq)",
+    sql: "UPDATE PayoutProfile SET stripeConnectedAccountId = @setStripeConnectedAccountId, stripeConnectedAccountState = @setStripeConnectedAccountState WHERE (PayoutProfile.accountId = @payoutProfileAccountIdEq)",
     params: {
-      earningsProfileAccountIdEq: args.earningsProfileAccountIdEq,
+      payoutProfileAccountIdEq: args.payoutProfileAccountIdEq,
       setStripeConnectedAccountId: args.setStripeConnectedAccountId == null ? null : args.setStripeConnectedAccountId,
       setStripeConnectedAccountState: args.setStripeConnectedAccountState == null ? null : Spanner.float(args.setStripeConnectedAccountState),
     },
     types: {
-      earningsProfileAccountIdEq: { type: "string" },
+      payoutProfileAccountIdEq: { type: "string" },
       setStripeConnectedAccountId: { type: "string" },
       setStripeConnectedAccountState: { type: "float64" },
     }
   };
 }
 
-export function updateEarningsProfileConnectedAccountStateStatement(
+export function updatePayoutProfileConnectedAccountStateStatement(
   args: {
-    earningsProfileAccountIdEq: string,
+    payoutProfileAccountIdEq: string,
     setStripeConnectedAccountState?: StripeConnectedAccountState,
   }
 ): Statement {
   return {
-    sql: "UPDATE EarningsProfile SET stripeConnectedAccountState = @setStripeConnectedAccountState WHERE (EarningsProfile.accountId = @earningsProfileAccountIdEq)",
+    sql: "UPDATE PayoutProfile SET stripeConnectedAccountState = @setStripeConnectedAccountState WHERE (PayoutProfile.accountId = @payoutProfileAccountIdEq)",
     params: {
-      earningsProfileAccountIdEq: args.earningsProfileAccountIdEq,
+      payoutProfileAccountIdEq: args.payoutProfileAccountIdEq,
       setStripeConnectedAccountState: args.setStripeConnectedAccountState == null ? null : Spanner.float(args.setStripeConnectedAccountState),
     },
     types: {
-      earningsProfileAccountIdEq: { type: "string" },
+      payoutProfileAccountIdEq: { type: "string" },
       setStripeConnectedAccountState: { type: "float64" },
     }
   };
@@ -2547,47 +2547,47 @@ export function updatePayoutStateAndStripeTransferStatement(
   };
 }
 
-export interface GetBillingProfileFromStatementRow {
-  billingProfileAccountId?: string,
-  billingProfileStripePaymentCustomerId?: string,
-  billingProfileStateInfo?: BillingProfileStateInfo,
-  billingProfilePaymentAfterMs?: number,
-  billingProfileCreatedTimeMs?: number,
+export interface GetPaymentProfileFromStatementRow {
+  paymentProfileAccountId?: string,
+  paymentProfileStripePaymentCustomerId?: string,
+  paymentProfileStateInfo?: PaymentProfileStateInfo,
+  paymentProfilePaymentAfterMs?: number,
+  paymentProfileCreatedTimeMs?: number,
 }
 
-export let GET_BILLING_PROFILE_FROM_STATEMENT_ROW: MessageDescriptor<GetBillingProfileFromStatementRow> = {
-  name: 'GetBillingProfileFromStatementRow',
+export let GET_PAYMENT_PROFILE_FROM_STATEMENT_ROW: MessageDescriptor<GetPaymentProfileFromStatementRow> = {
+  name: 'GetPaymentProfileFromStatementRow',
   fields: [{
-    name: 'billingProfileAccountId',
+    name: 'paymentProfileAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileStripePaymentCustomerId',
+    name: 'paymentProfileStripePaymentCustomerId',
     index: 2,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'billingProfileStateInfo',
+    name: 'paymentProfileStateInfo',
     index: 3,
-    messageType: BILLING_PROFILE_STATE_INFO,
+    messageType: PAYMENT_PROFILE_STATE_INFO,
   }, {
-    name: 'billingProfilePaymentAfterMs',
+    name: 'paymentProfilePaymentAfterMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'billingProfileCreatedTimeMs',
+    name: 'paymentProfileCreatedTimeMs',
     index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getBillingProfileFromStatement(
+export async function getPaymentProfileFromStatement(
   runner: Database | Transaction,
   args: {
     transactionStatementStatementIdEq: string,
   }
-): Promise<Array<GetBillingProfileFromStatementRow>> {
+): Promise<Array<GetPaymentProfileFromStatementRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT b.accountId, b.stripePaymentCustomerId, b.stateInfo, b.paymentAfterMs, b.createdTimeMs FROM TransactionStatement AS t INNER JOIN BillingProfile AS b ON t.accountId = b.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
+    sql: "SELECT b.accountId, b.stripePaymentCustomerId, b.stateInfo, b.paymentAfterMs, b.createdTimeMs FROM TransactionStatement AS t INNER JOIN PaymentProfile AS b ON t.accountId = b.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
     params: {
       transactionStatementStatementIdEq: args.transactionStatementStatementIdEq,
     },
@@ -2595,55 +2595,55 @@ export async function getBillingProfileFromStatement(
       transactionStatementStatementIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetBillingProfileFromStatementRow>();
+  let resRows = new Array<GetPaymentProfileFromStatementRow>();
   for (let row of rows) {
     resRows.push({
-      billingProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      billingProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
-      billingProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, BILLING_PROFILE_STATE_INFO),
-      billingProfilePaymentAfterMs: row.at(3).value == null ? undefined : row.at(3).value.value,
-      billingProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+      paymentProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
+      paymentProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, PAYMENT_PROFILE_STATE_INFO),
+      paymentProfilePaymentAfterMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      paymentProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
     });
   }
   return resRows;
 }
 
-export interface GetEarningsProfileFromStatementRow {
-  earningsProfileAccountId?: string,
-  earningsProfileStripeConnectedAccountId?: string,
-  earningsProfileStripeConnectedAccountState?: StripeConnectedAccountState,
-  earningsProfileCreatedTimeMs?: number,
+export interface GetPayoutProfileFromStatementRow {
+  payoutProfileAccountId?: string,
+  payoutProfileStripeConnectedAccountId?: string,
+  payoutProfileStripeConnectedAccountState?: StripeConnectedAccountState,
+  payoutProfileCreatedTimeMs?: number,
 }
 
-export let GET_EARNINGS_PROFILE_FROM_STATEMENT_ROW: MessageDescriptor<GetEarningsProfileFromStatementRow> = {
-  name: 'GetEarningsProfileFromStatementRow',
+export let GET_PAYOUT_PROFILE_FROM_STATEMENT_ROW: MessageDescriptor<GetPayoutProfileFromStatementRow> = {
+  name: 'GetPayoutProfileFromStatementRow',
   fields: [{
-    name: 'earningsProfileAccountId',
+    name: 'payoutProfileAccountId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'earningsProfileStripeConnectedAccountId',
+    name: 'payoutProfileStripeConnectedAccountId',
     index: 2,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'earningsProfileStripeConnectedAccountState',
+    name: 'payoutProfileStripeConnectedAccountState',
     index: 3,
     enumType: STRIPE_CONNECTED_ACCOUNT_STATE,
   }, {
-    name: 'earningsProfileCreatedTimeMs',
+    name: 'payoutProfileCreatedTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getEarningsProfileFromStatement(
+export async function getPayoutProfileFromStatement(
   runner: Database | Transaction,
   args: {
     transactionStatementStatementIdEq: string,
   }
-): Promise<Array<GetEarningsProfileFromStatementRow>> {
+): Promise<Array<GetPayoutProfileFromStatementRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT e.accountId, e.stripeConnectedAccountId, e.stripeConnectedAccountState, e.createdTimeMs FROM TransactionStatement AS t INNER JOIN EarningsProfile AS e ON t.accountId = e.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
+    sql: "SELECT e.accountId, e.stripeConnectedAccountId, e.stripeConnectedAccountState, e.createdTimeMs FROM TransactionStatement AS t INNER JOIN PayoutProfile AS e ON t.accountId = e.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
     params: {
       transactionStatementStatementIdEq: args.transactionStatementStatementIdEq,
     },
@@ -2651,13 +2651,13 @@ export async function getEarningsProfileFromStatement(
       transactionStatementStatementIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetEarningsProfileFromStatementRow>();
+  let resRows = new Array<GetPayoutProfileFromStatementRow>();
   for (let row of rows) {
     resRows.push({
-      earningsProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      earningsProfileStripeConnectedAccountId: row.at(1).value == null ? undefined : row.at(1).value,
-      earningsProfileStripeConnectedAccountState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, STRIPE_CONNECTED_ACCOUNT_STATE),
-      earningsProfileCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      payoutProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutProfileStripeConnectedAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      payoutProfileStripeConnectedAccountState: row.at(2).value == null ? undefined : toEnumFromNumber(row.at(2).value.value, STRIPE_CONNECTED_ACCOUNT_STATE),
+      payoutProfileCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
     });
   }
   return resRows;

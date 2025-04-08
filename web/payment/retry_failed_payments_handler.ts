@@ -8,11 +8,11 @@ import {
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { Statement } from "@google-cloud/spanner/build/src/transaction";
-import { RetryFailedPaymentsHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
+import { RetryFailedPaymentsHandlerInterface } from "@phading/commerce_service_interface/web/payment/handler";
 import {
   RetryFailedPaymentsRequsetBody,
   RetryFailedPaymentsResponse,
-} from "@phading/commerce_service_interface/web/billing/interface";
+} from "@phading/commerce_service_interface/web/payment/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newUnauthorizedError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";

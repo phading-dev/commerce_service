@@ -4,25 +4,25 @@ import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
-  deleteBillingProfileSuspensionNotifyingTaskStatement,
-  getBillingProfileSuspensionNotifyingTaskMetadata,
-  updateBillingProfileSuspensionNotifyingTaskMetadataStatement,
+  deletePaymentProfileSuspensionNotifyingTaskStatement,
+  getPaymentProfileSuspensionNotifyingTaskMetadata,
+  updatePaymentProfileSuspensionNotifyingTaskMetadataStatement,
 } from "../db/sql";
 import { ENV_VARS } from "../env_vars";
 import { Database } from "@google-cloud/spanner";
-import { ProcessBillingProfileSuspensionNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { ProcessPaymentProfileSuspensionNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessBillingProfileSuspensionNotifyingTaskRequestBody,
-  ProcessBillingProfileSuspensionNotifyingTaskResponse,
+  ProcessPaymentProfileSuspensionNotifyingTaskRequestBody,
+  ProcessPaymentProfileSuspensionNotifyingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
 import { newBadRequestError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessBillingProfileSuspensionNotifyingTaskHandler extends ProcessBillingProfileSuspensionNotifyingTaskHandlerInterface {
-  public static create(): ProcessBillingProfileSuspensionNotifyingTaskHandler {
-    return new ProcessBillingProfileSuspensionNotifyingTaskHandler(
+export class ProcessPaymentProfileSuspensionNotifyingTaskHandler extends ProcessPaymentProfileSuspensionNotifyingTaskHandlerInterface {
+  public static create(): ProcessPaymentProfileSuspensionNotifyingTaskHandler {
+    return new ProcessPaymentProfileSuspensionNotifyingTaskHandler(
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       SENDGRID_CLIENT,
@@ -47,9 +47,9 @@ export class ProcessBillingProfileSuspensionNotifyingTaskHandler extends Process
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessBillingProfileSuspensionNotifyingTaskRequestBody,
-  ): Promise<ProcessBillingProfileSuspensionNotifyingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Billing profile suspension notifying task for account ${body.accountId} version ${body.version}:`;
+    body: ProcessPaymentProfileSuspensionNotifyingTaskRequestBody,
+  ): Promise<ProcessPaymentProfileSuspensionNotifyingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Payment profile suspension notifying task for account ${body.accountId} version ${body.version}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -60,14 +60,14 @@ export class ProcessBillingProfileSuspensionNotifyingTaskHandler extends Process
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessBillingProfileSuspensionNotifyingTaskRequestBody,
+    body: ProcessPaymentProfileSuspensionNotifyingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getBillingProfileSuspensionNotifyingTaskMetadata(
+      let rows = await getPaymentProfileSuspensionNotifyingTaskMetadata(
         transaction,
         {
-          billingProfileSuspensionNotifyingTaskAccountIdEq: body.accountId,
-          billingProfileSuspensionNotifyingTaskVersionEq: body.version,
+          paymentProfileSuspensionNotifyingTaskAccountIdEq: body.accountId,
+          paymentProfileSuspensionNotifyingTaskVersionEq: body.version,
         },
       );
       if (rows.length === 0) {
@@ -75,15 +75,15 @@ export class ProcessBillingProfileSuspensionNotifyingTaskHandler extends Process
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updateBillingProfileSuspensionNotifyingTaskMetadataStatement({
-          billingProfileSuspensionNotifyingTaskAccountIdEq: body.accountId,
-          billingProfileSuspensionNotifyingTaskVersionEq: body.version,
+        updatePaymentProfileSuspensionNotifyingTaskMetadataStatement({
+          paymentProfileSuspensionNotifyingTaskAccountIdEq: body.accountId,
+          paymentProfileSuspensionNotifyingTaskVersionEq: body.version,
           setRetryCount:
-            task.billingProfileSuspensionNotifyingTaskRetryCount + 1,
+            task.paymentProfileSuspensionNotifyingTaskRetryCount + 1,
           setExecutionTimeMs:
             this.getNow() +
             this.taskHandler.getBackoffTime(
-              task.billingProfileSuspensionNotifyingTaskRetryCount,
+              task.paymentProfileSuspensionNotifyingTaskRetryCount,
             ),
         }),
       ]);
@@ -93,7 +93,7 @@ export class ProcessBillingProfileSuspensionNotifyingTaskHandler extends Process
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessBillingProfileSuspensionNotifyingTaskRequestBody,
+    body: ProcessPaymentProfileSuspensionNotifyingTaskRequestBody,
   ): Promise<void> {
     let accountResponse = await this.serviceClient.send(
       newGetAccountContactRequest({
@@ -112,9 +112,9 @@ export class ProcessBillingProfileSuspensionNotifyingTaskHandler extends Process
     });
     await this.database.runTransactionAsync(async (transaction) => {
       await transaction.batchUpdate([
-        deleteBillingProfileSuspensionNotifyingTaskStatement({
-          billingProfileSuspensionNotifyingTaskAccountIdEq: body.accountId,
-          billingProfileSuspensionNotifyingTaskVersionEq: body.version,
+        deletePaymentProfileSuspensionNotifyingTaskStatement({
+          paymentProfileSuspensionNotifyingTaskAccountIdEq: body.accountId,
+          paymentProfileSuspensionNotifyingTaskVersionEq: body.version,
         }),
       ]);
       await transaction.commit();

@@ -5,8 +5,8 @@ import { PayoutState } from "../db/schema";
 import {
   GetPayoutRow,
   deletePayoutTaskStatement,
-  getEarningsProfileFromStatement,
   getPayout,
+  getPayoutProfileFromStatement,
   getPayoutTaskMetadata,
   getTransactionStatement,
   updatePayoutStateAndStripeTransferStatement,
@@ -91,7 +91,7 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
     body: ProcessPayoutTaskRequestBody,
   ): Promise<void> {
     let [profileRows, statementRows] = await Promise.all([
-      getEarningsProfileFromStatement(this.database, {
+      getPayoutProfileFromStatement(this.database, {
         transactionStatementStatementIdEq: body.statementId,
       }),
       getTransactionStatement(this.database, {
@@ -101,7 +101,7 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
     ]);
     if (profileRows.length === 0) {
       throw newBadRequestError(
-        `${loggingPrefix} Earnings profile for statement ${body.statementId} is not found.`,
+        `${loggingPrefix} Payout profile for statement ${body.statementId} is not found.`,
       );
     }
     if (statementRows.length === 0) {
@@ -119,7 +119,7 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
       );
     }
     let stripeConnectedAccountId =
-      profileRows[0].earningsProfileStripeConnectedAccountId;
+      profileRows[0].payoutProfileStripeConnectedAccountId;
     let connectedAccount = await this.stripeClient.val.accounts.retrieve(
       stripeConnectedAccountId,
     );

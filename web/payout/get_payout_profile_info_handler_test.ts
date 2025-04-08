@@ -2,14 +2,14 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { StripeConnectedAccountState } from "../../db/schema";
 import {
-  deleteEarningsProfileStatement,
-  insertEarningsProfileStatement,
+  deletePayoutProfileStatement,
+  insertPayoutProfileStatement,
 } from "../../db/sql";
-import { GetEarningsProfileInfoHandler } from "./get_earnings_profile_info_handler";
+import { GetPayoutProfileInfoHandler } from "./get_payout_profile_info_handler";
 import {
-  GET_EARNINGS_PROFILE_INFO_RESPONSE,
+  GET_PAYOUT_PROFILE_INFO_RESPONSE,
   LinkType,
-} from "@phading/commerce_service_interface/web/earnings/interface";
+} from "@phading/commerce_service_interface/web/payout/interface";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -19,7 +19,7 @@ import { assertThat, eq } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "GetEarningsProfileInfoHandlerTest",
+  name: "GetPayoutProfileInfoHandlerTest",
   cases: [
     {
       name: "OnboardingLink",
@@ -27,7 +27,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsProfileStatement({
+            insertPayoutProfileStatement({
               accountId: "account1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDING,
@@ -55,7 +55,7 @@ TEST_RUNNER.run({
           },
         } as FetchSessionAndCheckCapabilityResponse;
         let urlBuilder = new UrlBuilder("https://test.com");
-        let handler = new GetEarningsProfileInfoHandler(
+        let handler = new GetPayoutProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
@@ -73,7 +73,7 @@ TEST_RUNNER.run({
               connectedAccountLinkType: LinkType.ONBOARDING,
               connectedAccountUrl: "https://stripe.com/onboarding",
             },
-            GET_EARNINGS_PROFILE_INFO_RESPONSE,
+            GET_PAYOUT_PROFILE_INFO_RESPONSE,
           ),
           "response",
         );
@@ -100,8 +100,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsProfileStatement({
-              earningsProfileAccountIdEq: "account1",
+            deletePayoutProfileStatement({
+              payoutProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();
@@ -114,7 +114,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsProfileStatement({
+            insertPayoutProfileStatement({
               accountId: "account1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDED,
@@ -142,7 +142,7 @@ TEST_RUNNER.run({
           },
         } as FetchSessionAndCheckCapabilityResponse;
         let urlBuilder = new UrlBuilder("https://test.com");
-        let handler = new GetEarningsProfileInfoHandler(
+        let handler = new GetPayoutProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
@@ -160,7 +160,7 @@ TEST_RUNNER.run({
               connectedAccountLinkType: LinkType.LOGIN,
               connectedAccountUrl: "https://stripe.com/login",
             },
-            GET_EARNINGS_PROFILE_INFO_RESPONSE,
+            GET_PAYOUT_PROFILE_INFO_RESPONSE,
           ),
           "response",
         );
@@ -173,8 +173,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsProfileStatement({
-              earningsProfileAccountIdEq: "account1",
+            deletePayoutProfileStatement({
+              payoutProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();

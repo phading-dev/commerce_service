@@ -7,12 +7,12 @@ import { PaymentState } from "../db/schema";
 import {
   GetPaymentRow,
   deletePaymentTaskStatement,
-  getBillingProfileFromStatement,
   getPayment,
+  getPaymentProfileFromStatement,
   getPaymentTaskMetadata,
   getTransactionStatement,
-  insertBillingProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   updatePaymentStateAndStripeInvoiceStatement,
   updatePaymentStateStatement,
   updatePaymentTaskMetadataStatement,
@@ -95,7 +95,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     body: ProcessPaymentTaskRequestBody,
   ): Promise<void> {
     let [profileRows, statementRows] = await Promise.all([
-      getBillingProfileFromStatement(this.database, {
+      getPaymentProfileFromStatement(this.database, {
         transactionStatementStatementIdEq: body.statementId,
       }),
       getTransactionStatement(this.database, {
@@ -105,7 +105,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     ]);
     if (profileRows.length === 0) {
       throw newInternalServerErrorError(
-        `Billing profile for statement ${body.statementId} is not found.`,
+        `Payment profile for statement ${body.statementId} is not found.`,
       );
     }
     if (statementRows.length === 0) {
@@ -123,7 +123,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       );
     }
 
-    let stripeCustomerId = profileRows[0].billingProfileStripePaymentCustomerId;
+    let stripeCustomerId = profileRows[0].paymentProfileStripePaymentCustomerId;
     let stripeCustomer =
       await this.stripeClient.val.customers.retrieve(stripeCustomerId);
     if (
@@ -197,7 +197,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
           executionTimeMs: now,
           createdTimeMs: now,
         }),
-        insertBillingProfileSuspendingDueToPastDueTaskStatement({
+        insertPaymentProfileSuspendingDueToPastDueTaskStatement({
           statementId: statementId,
           retryCount: 0,
           executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,

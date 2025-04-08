@@ -2,13 +2,13 @@ import { EnumDescriptor, PrimitiveType, MessageDescriptor } from '@selfage/messa
 import { ProductID, PRODUCT_I_D } from '@phading/price/price';
 import { AmountType, AMOUNT_TYPE } from '@phading/price/amount_type';
 
-export enum BillingProfileState {
+export enum PaymentProfileState {
   HEALTHY = 1,
   SUSPENDED = 2,
 }
 
-export let BILLING_PROFILE_STATE: EnumDescriptor<BillingProfileState> = {
-  name: 'BillingProfileState',
+export let PAYMENT_PROFILE_STATE: EnumDescriptor<PaymentProfileState> = {
+  name: 'PaymentProfileState',
   values: [{
     name: 'HEALTHY',
     value: 1,
@@ -18,14 +18,14 @@ export let BILLING_PROFILE_STATE: EnumDescriptor<BillingProfileState> = {
   }]
 }
 
-export interface BillingProfileStateInfo {
+export interface PaymentProfileStateInfo {
   version?: number,
-  state?: BillingProfileState,
+  state?: PaymentProfileState,
   updatedTimeMs?: number,
 }
 
-export let BILLING_PROFILE_STATE_INFO: MessageDescriptor<BillingProfileStateInfo> = {
-  name: 'BillingProfileStateInfo',
+export let PAYMENT_PROFILE_STATE_INFO: MessageDescriptor<PaymentProfileStateInfo> = {
+  name: 'PaymentProfileStateInfo',
   fields: [{
     name: 'version',
     index: 1,
@@ -33,7 +33,7 @@ export let BILLING_PROFILE_STATE_INFO: MessageDescriptor<BillingProfileStateInfo
   }, {
     name: 'state',
     index: 2,
-    enumType: BILLING_PROFILE_STATE,
+    enumType: PAYMENT_PROFILE_STATE,
   }, {
     name: 'updatedTimeMs',
     index: 3,

@@ -1,40 +1,40 @@
 {
   "tables": [{
-    "name": "BillingProfile",
+    "name": "PaymentProfile",
     "columns": [{
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE BillingProfile ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN accountId STRING(MAX) NOT NULL"
     }, {
       "name": "stripePaymentCustomerId",
-      "addColumnDdl": "ALTER TABLE BillingProfile ADD COLUMN stripePaymentCustomerId STRING(MAX)"
+      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN stripePaymentCustomerId STRING(MAX)"
     }, {
       "name": "stateInfo",
-      "addColumnDdl": "ALTER TABLE BillingProfile ADD COLUMN stateInfo BYTES(MAX)"
+      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN stateInfo BYTES(MAX)"
     }, {
       "name": "paymentAfterMs",
-      "addColumnDdl": "ALTER TABLE BillingProfile ADD COLUMN paymentAfterMs FLOAT64"
+      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN paymentAfterMs FLOAT64"
     }, {
       "name": "createdTimeMs",
-      "addColumnDdl": "ALTER TABLE BillingProfile ADD COLUMN createdTimeMs FLOAT64"
+      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN createdTimeMs FLOAT64"
     }],
-    "createTableDdl": "CREATE TABLE BillingProfile (accountId STRING(MAX) NOT NULL, stripePaymentCustomerId STRING(MAX), stateInfo BYTES(MAX), paymentAfterMs FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (accountId ASC)",
+    "createTableDdl": "CREATE TABLE PaymentProfile (accountId STRING(MAX) NOT NULL, stripePaymentCustomerId STRING(MAX), stateInfo BYTES(MAX), paymentAfterMs FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (accountId ASC)",
     "indexes": []
   }, {
-    "name": "EarningsProfile",
+    "name": "PayoutProfile",
     "columns": [{
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE EarningsProfile ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE PayoutProfile ADD COLUMN accountId STRING(MAX) NOT NULL"
     }, {
       "name": "stripeConnectedAccountId",
-      "addColumnDdl": "ALTER TABLE EarningsProfile ADD COLUMN stripeConnectedAccountId STRING(MAX)"
+      "addColumnDdl": "ALTER TABLE PayoutProfile ADD COLUMN stripeConnectedAccountId STRING(MAX)"
     }, {
       "name": "stripeConnectedAccountState",
-      "addColumnDdl": "ALTER TABLE EarningsProfile ADD COLUMN stripeConnectedAccountState FLOAT64"
+      "addColumnDdl": "ALTER TABLE PayoutProfile ADD COLUMN stripeConnectedAccountState FLOAT64"
     }, {
       "name": "createdTimeMs",
-      "addColumnDdl": "ALTER TABLE EarningsProfile ADD COLUMN createdTimeMs FLOAT64"
+      "addColumnDdl": "ALTER TABLE PayoutProfile ADD COLUMN createdTimeMs FLOAT64"
     }],
-    "createTableDdl": "CREATE TABLE EarningsProfile (accountId STRING(MAX) NOT NULL, stripeConnectedAccountId STRING(MAX), stripeConnectedAccountState FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (accountId ASC)",
+    "createTableDdl": "CREATE TABLE PayoutProfile (accountId STRING(MAX) NOT NULL, stripeConnectedAccountId STRING(MAX), stripeConnectedAccountState FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (accountId ASC)",
     "indexes": []
   }, {
     "name": "TransactionStatement",
@@ -212,70 +212,70 @@
       "createIndexDdl": "CREATE INDEX PaymentMethodNeedsUpdateNotifyingTaskByExecutionTime ON PaymentMethodNeedsUpdateNotifyingTask(executionTimeMs)"
     }]
   }, {
-    "name": "BillingProfileSuspendingDueToPastDueTask",
+    "name": "PaymentProfileSuspendingDueToPastDueTask",
     "columns": [{
       "name": "statementId",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspendingDueToPastDueTask ADD COLUMN statementId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspendingDueToPastDueTask ADD COLUMN statementId STRING(MAX) NOT NULL"
     }, {
       "name": "retryCount",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspendingDueToPastDueTask ADD COLUMN retryCount FLOAT64"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspendingDueToPastDueTask ADD COLUMN retryCount FLOAT64"
     }, {
       "name": "executionTimeMs",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspendingDueToPastDueTask ADD COLUMN executionTimeMs TIMESTAMP"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspendingDueToPastDueTask ADD COLUMN executionTimeMs TIMESTAMP"
     }, {
       "name": "createdTimeMs",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspendingDueToPastDueTask ADD COLUMN createdTimeMs TIMESTAMP"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspendingDueToPastDueTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE BillingProfileSuspendingDueToPastDueTask (statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (statementId ASC)",
+    "createTableDdl": "CREATE TABLE PaymentProfileSuspendingDueToPastDueTask (statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (statementId ASC)",
     "indexes": [{
-      "name": "BillingProfileSuspendingDueToPastDueTaskByExecutionTime",
-      "createIndexDdl": "CREATE INDEX BillingProfileSuspendingDueToPastDueTaskByExecutionTime ON BillingProfileSuspendingDueToPastDueTask(executionTimeMs)"
+      "name": "PaymentProfileSuspendingDueToPastDueTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX PaymentProfileSuspendingDueToPastDueTaskByExecutionTime ON PaymentProfileSuspendingDueToPastDueTask(executionTimeMs)"
     }]
   }, {
-    "name": "BillingProfileSuspensionNotifyingTask",
+    "name": "PaymentProfileSuspensionNotifyingTask",
     "columns": [{
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspensionNotifyingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspensionNotifyingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
     }, {
       "name": "version",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspensionNotifyingTask ADD COLUMN version FLOAT64 NOT NULL"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspensionNotifyingTask ADD COLUMN version FLOAT64 NOT NULL"
     }, {
       "name": "retryCount",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspensionNotifyingTask ADD COLUMN retryCount FLOAT64"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspensionNotifyingTask ADD COLUMN retryCount FLOAT64"
     }, {
       "name": "executionTimeMs",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspensionNotifyingTask ADD COLUMN executionTimeMs TIMESTAMP"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspensionNotifyingTask ADD COLUMN executionTimeMs TIMESTAMP"
     }, {
       "name": "createdTimeMs",
-      "addColumnDdl": "ALTER TABLE BillingProfileSuspensionNotifyingTask ADD COLUMN createdTimeMs TIMESTAMP"
+      "addColumnDdl": "ALTER TABLE PaymentProfileSuspensionNotifyingTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE BillingProfileSuspensionNotifyingTask (accountId STRING(MAX) NOT NULL, version FLOAT64 NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (accountId ASC, version ASC)",
+    "createTableDdl": "CREATE TABLE PaymentProfileSuspensionNotifyingTask (accountId STRING(MAX) NOT NULL, version FLOAT64 NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (accountId ASC, version ASC)",
     "indexes": [{
-      "name": "BillingProfileSuspensionNotifyingTaskByExecutionTime",
-      "createIndexDdl": "CREATE INDEX BillingProfileSuspensionNotifyingTaskByExecutionTime ON BillingProfileSuspensionNotifyingTask(executionTimeMs)"
+      "name": "PaymentProfileSuspensionNotifyingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX PaymentProfileSuspensionNotifyingTaskByExecutionTime ON PaymentProfileSuspensionNotifyingTask(executionTimeMs)"
     }]
   }, {
-    "name": "BillingProfileStateSyncingTask",
+    "name": "PaymentProfileStateSyncingTask",
     "columns": [{
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE BillingProfileStateSyncingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE PaymentProfileStateSyncingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
     }, {
       "name": "version",
-      "addColumnDdl": "ALTER TABLE BillingProfileStateSyncingTask ADD COLUMN version FLOAT64 NOT NULL"
+      "addColumnDdl": "ALTER TABLE PaymentProfileStateSyncingTask ADD COLUMN version FLOAT64 NOT NULL"
     }, {
       "name": "retryCount",
-      "addColumnDdl": "ALTER TABLE BillingProfileStateSyncingTask ADD COLUMN retryCount FLOAT64"
+      "addColumnDdl": "ALTER TABLE PaymentProfileStateSyncingTask ADD COLUMN retryCount FLOAT64"
     }, {
       "name": "executionTimeMs",
-      "addColumnDdl": "ALTER TABLE BillingProfileStateSyncingTask ADD COLUMN executionTimeMs TIMESTAMP"
+      "addColumnDdl": "ALTER TABLE PaymentProfileStateSyncingTask ADD COLUMN executionTimeMs TIMESTAMP"
     }, {
       "name": "createdTimeMs",
-      "addColumnDdl": "ALTER TABLE BillingProfileStateSyncingTask ADD COLUMN createdTimeMs TIMESTAMP"
+      "addColumnDdl": "ALTER TABLE PaymentProfileStateSyncingTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE BillingProfileStateSyncingTask (accountId STRING(MAX) NOT NULL, version FLOAT64 NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (accountId ASC, version ASC)",
+    "createTableDdl": "CREATE TABLE PaymentProfileStateSyncingTask (accountId STRING(MAX) NOT NULL, version FLOAT64 NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (accountId ASC, version ASC)",
     "indexes": [{
-      "name": "BillingProfileStateSyncingTaskByExecutionTime",
-      "createIndexDdl": "CREATE INDEX BillingProfileStateSyncingTaskByExecutionTime ON BillingProfileStateSyncingTask(executionTimeMs)"
+      "name": "PaymentProfileStateSyncingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX PaymentProfileStateSyncingTaskByExecutionTime ON PaymentProfileStateSyncingTask(executionTimeMs)"
     }]
   }, {
     "name": "PayoutTask",

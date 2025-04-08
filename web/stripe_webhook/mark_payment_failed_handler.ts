@@ -7,8 +7,8 @@ import { PaymentState } from "../../db/schema";
 import {
   getPayment,
   getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
-  insertBillingProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   updatePaymentStateStatement,
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
@@ -70,7 +70,7 @@ export class MarkPaymentFailedHandler extends MarkPaymentDoneHandlerInterface {
       ]);
       if (paymentRows.length === 0) {
         throw newInternalServerErrorError(
-          `Billing ${invoice.metadata.statementId} is not found.`,
+          `Payment ${invoice.metadata.statementId} is not found.`,
         );
       }
       let payment = paymentRows[0];
@@ -88,7 +88,7 @@ export class MarkPaymentFailedHandler extends MarkPaymentDoneHandlerInterface {
             executionTimeMs: now,
             createdTimeMs: now,
           }),
-          insertBillingProfileSuspendingDueToPastDueTaskStatement({
+          insertPaymentProfileSuspendingDueToPastDueTaskStatement({
             statementId,
             retryCount: 0,
             executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,

@@ -2,13 +2,13 @@ import Stripe from "stripe";
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
-import { getBillingProfile } from "../../db/sql";
+import { getPaymentProfile } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { ReplacePrimaryPaymentMethodHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
+import { ReplacePrimaryPaymentMethodHandlerInterface } from "@phading/commerce_service_interface/web/payment/handler";
 import {
   ReplacePrimaryPaymentMethodRequestBody,
   ReplacePrimaryPaymentMethodResponse,
-} from "@phading/commerce_service_interface/web/billing/interface";
+} from "@phading/commerce_service_interface/web/payment/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import {
   newInternalServerErrorError,
@@ -55,15 +55,15 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
         `Account ${accountId} is not allowed to replace primary payment method.`,
       );
     }
-    let profileRows = await getBillingProfile(this.database, {
-      billingProfileAccountIdEq: accountId,
+    let profileRows = await getPaymentProfile(this.database, {
+      paymentProfileAccountIdEq: accountId,
     });
     if (profileRows.length === 0) {
       throw newInternalServerErrorError(
-        `Billing account ${accountId} is not found.`,
+        `Payment account ${accountId} is not found.`,
       );
     }
-    let stripeCustomerId = profileRows[0].billingProfileStripePaymentCustomerId;
+    let stripeCustomerId = profileRows[0].paymentProfileStripePaymentCustomerId;
     let session = await this.stripeClient.val.checkout.sessions.retrieve(
       body.checkoutSessionId,
       {

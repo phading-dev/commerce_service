@@ -2,16 +2,16 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PayoutState, StripeConnectedAccountState } from "../../db/schema";
 import {
-  GET_EARNINGS_PROFILE_ROW,
+  GET_PAYOUT_PROFILE_ROW,
   GET_PAYOUT_ROW,
   GET_PAYOUT_TASK_ROW,
-  deleteEarningsProfileStatement,
+  deletePayoutProfileStatement,
   deletePayoutStatement,
   deletePayoutTaskStatement,
-  getEarningsProfile,
   getPayout,
+  getPayoutProfile,
   getPayoutTask,
-  insertEarningsProfileStatement,
+  insertPayoutProfileStatement,
   insertPayoutStatement,
 } from "../../db/sql";
 import { SetConnectedAccountOnboardedHandler } from "./set_connected_account_onboarded_handler";
@@ -26,8 +26,8 @@ import { TEST_RUNNER } from "@selfage/test_runner";
 async function cleanupAll() {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      deleteEarningsProfileStatement({
-        earningsProfileAccountIdEq: "account1",
+      deletePayoutProfileStatement({
+        payoutProfileAccountIdEq: "account1",
       }),
       deletePayoutStatement({ payoutStatementIdEq: "statement1" }),
       deletePayoutStatement({ payoutStatementIdEq: "statement2" }),
@@ -51,7 +51,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsProfileStatement({
+            insertPayoutProfileStatement({
               accountId: "account1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDING,
@@ -83,20 +83,20 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getEarningsProfile(SPANNER_DATABASE, {
-            earningsProfileAccountIdEq: "account1",
+          await getPayoutProfile(SPANNER_DATABASE, {
+            payoutProfileAccountIdEq: "account1",
           }),
           isArray([
             eqMessage(
               {
-                earningsProfileAccountId: "account1",
-                earningsProfileStripeConnectedAccountState:
+                payoutProfileAccountId: "account1",
+                payoutProfileStripeConnectedAccountState:
                   StripeConnectedAccountState.ONBOARDED,
               },
-              GET_EARNINGS_PROFILE_ROW,
+              GET_PAYOUT_PROFILE_ROW,
             ),
           ]),
-          "EarningsProfile",
+          "PayoutProfile",
         );
       },
       tearDown: async () => {
@@ -109,7 +109,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsProfileStatement({
+            insertPayoutProfileStatement({
               accountId: "account1",
               stripeConnectedAccountState:
                 StripeConnectedAccountState.ONBOARDING,
@@ -161,20 +161,20 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getEarningsProfile(SPANNER_DATABASE, {
-            earningsProfileAccountIdEq: "account1",
+          await getPayoutProfile(SPANNER_DATABASE, {
+            payoutProfileAccountIdEq: "account1",
           }),
           isArray([
             eqMessage(
               {
-                earningsProfileAccountId: "account1",
-                earningsProfileStripeConnectedAccountState:
+                payoutProfileAccountId: "account1",
+                payoutProfileStripeConnectedAccountState:
                   StripeConnectedAccountState.ONBOARDED,
               },
-              GET_EARNINGS_PROFILE_ROW,
+              GET_PAYOUT_PROFILE_ROW,
             ),
           ]),
-          "EarningsProfile",
+          "PayoutProfile",
         );
         assertThat(
           await getPayout(SPANNER_DATABASE, {
@@ -314,7 +314,7 @@ TEST_RUNNER.run({
           error,
           eqHttpError(
             newUnauthorizedError(
-              "Earnings profile account1 cannot be updated by the logged-in account account2.",
+              "Payout profile account1 cannot be updated by the logged-in account account2.",
             ),
           ),
           "Error",

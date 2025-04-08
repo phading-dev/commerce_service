@@ -4,15 +4,15 @@ import { PaymentState } from "../../db/schema";
 import { listPaymentsWithStatements } from "../../db/sql";
 import { getMonthDifference } from "../common/date_helper";
 import { Database } from "@google-cloud/spanner";
-import { ListPaymentsHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
+import { ListPaymentsHandlerInterface } from "@phading/commerce_service_interface/web/payment/handler";
 import {
   ListPaymentsRequestBody,
   ListPaymentsResponse,
-} from "@phading/commerce_service_interface/web/billing/interface";
+} from "@phading/commerce_service_interface/web/payment/interface";
 import {
   Payment,
   PaymentState as PaymentStateResponse,
-} from "@phading/commerce_service_interface/web/billing/payment";
+} from "@phading/commerce_service_interface/web/payment/payment";
 import { MAX_MONTH_RANGE } from "@phading/constants/commerce";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newBadRequestError, newUnauthorizedError } from "@selfage/http_error";

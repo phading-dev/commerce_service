@@ -3,15 +3,15 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
   GET_PAYMENT_ROW,
-  deleteBillingProfileSuspendingDueToPastDueTaskStatement,
   deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deletePaymentProfileSuspendingDueToPastDueTaskStatement,
   deletePaymentStatement,
   getPayment,
-  insertBillingProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentStatement,
-  listPendingBillingProfileSuspendingDueToPastDueTasks,
   listPendingPaymentMethodNeedsUpdateNotifyingTasks,
+  listPendingPaymentProfileSuspendingDueToPastDueTasks,
 } from "../../db/sql";
 import { MarkPaymentDoneHandler } from "./mark_payment_done_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -34,7 +34,7 @@ TEST_RUNNER.run({
               statementId: "statement1",
               state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
             }),
-            insertBillingProfileSuspendingDueToPastDueTaskStatement({
+            insertPaymentProfileSuspendingDueToPastDueTaskStatement({
               statementId: "statement1",
               retryCount: 0,
               executionTimeMs: 1000,
@@ -113,14 +113,14 @@ TEST_RUNNER.run({
           "payment",
         );
         assertThat(
-          await listPendingBillingProfileSuspendingDueToPastDueTasks(
+          await listPendingPaymentProfileSuspendingDueToPastDueTasks(
             SPANNER_DATABASE,
             {
-              billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: 1000000,
+              paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe: 1000000,
             },
           ),
           isArray([]),
-          "billingProfileSuspendingDueToPastDueTasks",
+          "paymentProfileSuspendingDueToPastDueTasks",
         );
         assertThat(
           await listPendingPaymentMethodNeedsUpdateNotifyingTasks(
@@ -137,8 +137,8 @@ TEST_RUNNER.run({
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
             deletePaymentStatement({ paymentStatementIdEq: "statement1" }),
-            deleteBillingProfileSuspendingDueToPastDueTaskStatement({
-              billingProfileSuspendingDueToPastDueTaskStatementIdEq:
+            deletePaymentProfileSuspendingDueToPastDueTaskStatement({
+              paymentProfileSuspendingDueToPastDueTaskStatementIdEq:
                 "statement1",
             }),
             deletePaymentMethodNeedsUpdateNotifyingTaskStatement({

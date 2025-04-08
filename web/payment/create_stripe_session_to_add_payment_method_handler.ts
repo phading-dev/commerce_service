@@ -3,14 +3,14 @@ import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { URL_BUILDER } from "../../common/url_builder";
-import { getBillingProfile } from "../../db/sql";
+import { getPaymentProfile } from "../../db/sql";
 import { ENV_VARS } from "../../env_vars";
 import { Database } from "@google-cloud/spanner";
-import { CreateStripeSessionToAddPaymentMethodHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
+import { CreateStripeSessionToAddPaymentMethodHandlerInterface } from "@phading/commerce_service_interface/web/payment/handler";
 import {
   CreateStripeSessionToAddPaymentMethodRequestBody,
   CreateStripeSessionToAddPaymentMethodResponse,
-} from "@phading/commerce_service_interface/web/billing/interface";
+} from "@phading/commerce_service_interface/web/payment/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { newNotFoundError, newUnauthorizedError } from "@selfage/http_error";
@@ -54,18 +54,18 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
         `Account ${accountId} cannot create stripe session to add payment method.`,
       );
     }
-    let rows = await getBillingProfile(this.database, {
-      billingProfileAccountIdEq: accountId,
+    let rows = await getPaymentProfile(this.database, {
+      paymentProfileAccountIdEq: accountId,
     });
     if (rows.length === 0) {
-      throw newNotFoundError(`Billing account ${accountId} is not found.`);
+      throw newNotFoundError(`Payment account ${accountId} is not found.`);
     }
     let row = rows[0];
     let session = await this.stripeClient.val.checkout.sessions.create({
       billing_address_collection: "required",
       mode: "setup",
       currency: ENV_VARS.defaultCurrency.toLocaleLowerCase(),
-      customer: row.billingProfileStripePaymentCustomerId,
+      customer: row.paymentProfileStripePaymentCustomerId,
       payment_method_types: ["card"],
       success_url: this.urlBuilder.build(
         {

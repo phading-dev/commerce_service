@@ -4,13 +4,13 @@ import { PayoutState } from "../db/schema";
 import {
   GET_PAYOUT_ROW,
   GET_PAYOUT_TASK_METADATA_ROW,
-  deleteEarningsProfileStatement,
+  deletePayoutProfileStatement,
   deletePayoutStatement,
   deletePayoutTaskStatement,
   deleteTransactionStatementStatement,
   getPayout,
   getPayoutTaskMetadata,
-  insertEarningsProfileStatement,
+  insertPayoutProfileStatement,
   insertPayoutStatement,
   insertPayoutTaskStatement,
   insertTransactionStatementStatement,
@@ -34,7 +34,7 @@ import { TEST_RUNNER } from "@selfage/test_runner";
 async function insertPayout(): Promise<void> {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      insertEarningsProfileStatement({
+      insertPayoutProfileStatement({
         accountId: "account1",
         stripeConnectedAccountId: "stripConnectedAccount1",
       }),
@@ -65,8 +65,8 @@ async function insertPayout(): Promise<void> {
 async function cleanupAll(): Promise<void> {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      deleteEarningsProfileStatement({
-        earningsProfileAccountIdEq: "account1",
+      deletePayoutProfileStatement({
+        payoutProfileAccountIdEq: "account1",
       }),
       deleteTransactionStatementStatement({
         transactionStatementStatementIdEq: "statement1",

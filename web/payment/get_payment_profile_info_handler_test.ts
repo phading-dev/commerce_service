@@ -1,16 +1,16 @@
 import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
-import { BillingProfileState, PaymentState } from "../../db/schema";
+import { PaymentProfileState, PaymentState } from "../../db/schema";
 import {
-  deleteBillingProfileStatement,
+  deletePaymentProfileStatement,
   deletePaymentStatement,
-  insertBillingProfileStatement,
+  insertPaymentProfileStatement,
   insertPaymentStatement,
 } from "../../db/sql";
-import { GetBillingProfileInfoHandler } from "./get_billing_profile_info_handler";
-import { BillingProfileState as BillingProfileStateResponse } from "@phading/commerce_service_interface/web/billing/billing_profile_state";
-import { GET_BILLING_PROFILE_INFO_RESPONSE } from "@phading/commerce_service_interface/web/billing/interface";
-import { CardBrand } from "@phading/commerce_service_interface/web/billing/payment_method_masked";
+import { GetPaymentProfileInfoHandler } from "./get_payment_profile_info_handler";
+import { GET_PAYMENT_PROFILE_INFO_RESPONSE } from "@phading/commerce_service_interface/web/payment/interface";
+import { CardBrand } from "@phading/commerce_service_interface/web/payment/payment_method_masked";
+import { PaymentProfileState as PaymentProfileStateResponse } from "@phading/commerce_service_interface/web/payment/payment_profile_state";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
@@ -19,7 +19,7 @@ import { assertThat, eq } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "GetBillingProfileInfosHandlerTest",
+  name: "GetPaymentProfileInfosHandlerTest",
   cases: [
     {
       name: "WithPrimaryPaymentMethodAndHealthyAndNoFailedPayment",
@@ -27,10 +27,10 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
               stateInfo: {
-                state: BillingProfileState.HEALTHY,
+                state: PaymentProfileState.HEALTHY,
               },
               paymentAfterMs: 1000,
               stripePaymentCustomerId: "stripeCustomer1",
@@ -77,7 +77,7 @@ TEST_RUNNER.run({
             canBeBilled: true,
           },
         } as FetchSessionAndCheckCapabilityResponse;
-        let handler = new GetBillingProfileInfoHandler(
+        let handler = new GetPaymentProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
@@ -114,10 +114,10 @@ TEST_RUNNER.run({
                   expYear: 2023,
                 },
               },
-              state: BillingProfileStateResponse.HEALTHY,
+              state: PaymentProfileStateResponse.HEALTHY,
               paymentAfterMs: 1000,
             },
-            GET_BILLING_PROFILE_INFO_RESPONSE,
+            GET_PAYMENT_PROFILE_INFO_RESPONSE,
           ),
           "response",
         );
@@ -125,8 +125,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();
@@ -139,10 +139,10 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
               stateInfo: {
-                state: BillingProfileState.HEALTHY,
+                state: PaymentProfileState.HEALTHY,
               },
               paymentAfterMs: 1000,
               stripePaymentCustomerId: "stripeCustomer1",
@@ -171,7 +171,7 @@ TEST_RUNNER.run({
             canBeBilled: true,
           },
         } as FetchSessionAndCheckCapabilityResponse;
-        let handler = new GetBillingProfileInfoHandler(
+        let handler = new GetPaymentProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
@@ -185,10 +185,10 @@ TEST_RUNNER.run({
           response,
           eqMessage(
             {
-              state: BillingProfileStateResponse.WITH_FAILED_PAYMENTS,
+              state: PaymentProfileStateResponse.WITH_FAILED_PAYMENTS,
               paymentAfterMs: 1000,
             },
-            GET_BILLING_PROFILE_INFO_RESPONSE,
+            GET_PAYMENT_PROFILE_INFO_RESPONSE,
           ),
           "response",
         );
@@ -196,8 +196,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
             deletePaymentStatement({
               paymentStatementIdEq: "statement1",
@@ -213,10 +213,10 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
               stateInfo: {
-                state: BillingProfileState.SUSPENDED,
+                state: PaymentProfileState.SUSPENDED,
               },
               paymentAfterMs: 1000,
               stripePaymentCustomerId: "stripeCustomer1",
@@ -240,7 +240,7 @@ TEST_RUNNER.run({
             canBeBilled: true,
           },
         } as FetchSessionAndCheckCapabilityResponse;
-        let handler = new GetBillingProfileInfoHandler(
+        let handler = new GetPaymentProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
@@ -254,10 +254,10 @@ TEST_RUNNER.run({
           response,
           eqMessage(
             {
-              state: BillingProfileStateResponse.SUSPENDED,
+              state: PaymentProfileStateResponse.SUSPENDED,
               paymentAfterMs: 1000,
             },
-            GET_BILLING_PROFILE_INFO_RESPONSE,
+            GET_PAYMENT_PROFILE_INFO_RESPONSE,
           ),
           "response",
         );
@@ -265,8 +265,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();

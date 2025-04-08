@@ -4,8 +4,8 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
 import {
-  deleteBillingProfileSuspendingDueToPastDueTaskStatement,
   deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deletePaymentProfileSuspendingDueToPastDueTaskStatement,
   getPayment,
   updatePaymentStateStatement,
 } from "../../db/sql";
@@ -79,8 +79,8 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
           setState: PaymentState.PAID,
           setUpdatedTimeMs: this.getNow(),
         }),
-        deleteBillingProfileSuspendingDueToPastDueTaskStatement({
-          billingProfileSuspendingDueToPastDueTaskStatementIdEq: statementId,
+        deletePaymentProfileSuspendingDueToPastDueTaskStatement({
+          paymentProfileSuspendingDueToPastDueTaskStatementIdEq: statementId,
         }),
         deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
           paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: statementId,

@@ -1,18 +1,18 @@
 - kind: Enum
-  name: BillingProfileState
+  name: PaymentProfileState
   values:
     - name: HEALTHY
       value: 1
     - name: SUSPENDED
       value: 2
 - kind: Message
-  name: BillingProfileStateInfo
+  name: PaymentProfileStateInfo
   fields:
     - name: version
       type: number
       index: 1
     - name: state
-      type: BillingProfileState
+      type: PaymentProfileState
       index: 2
     - name: updatedTimeMs
       type: number
@@ -85,7 +85,7 @@
   name: CommerceDatabase
   tables:
     - kind: Table
-      name: BillingProfile
+      name: PaymentProfile
       columns:
         - name: accountId
           type: string
@@ -93,7 +93,7 @@
           type: string
           nullable: true
         - name: stateInfo
-          type: BillingProfileStateInfo
+          type: PaymentProfileStateInfo
           nullable: true
         - name: paymentAfterMs
           type: float64
@@ -103,11 +103,11 @@
           nullable: true
       primaryKeys:
         - accountId
-      insert: InsertBillingProfile
-      delete: DeleteBillingProfile
-      get: GetBillingProfile
+      insert: InsertPaymentProfile
+      delete: DeletePaymentProfile
+      get: GetPaymentProfile
     - kind: Table
-      name: EarningsProfile
+      name: PayoutProfile
       columns:
         - name: accountId
           type: string
@@ -122,9 +122,9 @@
           nullable: true
       primaryKeys:
         - accountId
-      insert: InsertEarningsProfile
-      delete: DeleteEarningsProfile
-      get: GetEarningsProfile
+      insert: InsertPayoutProfile
+      delete: DeletePayoutProfile
+      get: GetPayoutProfile
     - kind: Table
       name: TransactionStatement
       columns:
@@ -304,7 +304,7 @@
       getMetadata: GetPaymentMethodNeedsUpdateNotifyingTaskMetadata
       updateMetadata: UpdatePaymentMethodNeedsUpdateNotifyingTaskMetadata
     - kind: TaskTable
-      name: BillingProfileSuspendingDueToPastDueTask
+      name: PaymentProfileSuspendingDueToPastDueTask
       columns:
         - name: statementId
           type: string
@@ -313,15 +313,15 @@
       createdTimeColumn: createdTimeMs
       primaryKeys:
         - statementId
-      executionTimeIndex: BillingProfileSuspendingDueToPastDueTaskByExecutionTime
-      insert: InsertBillingProfileSuspendingDueToPastDueTask
-      delete: DeleteBillingProfileSuspendingDueToPastDueTask
-      get: GetBillingProfileSuspendingDueToPastDueTask
-      listPendingTasks: ListPendingBillingProfileSuspendingDueToPastDueTasks
-      getMetadata: GetBillingProfileSuspendingDueToPastDueTaskMetadata
-      updateMetadata: UpdateBillingProfileSuspendingDueToPastDueTaskMetadata
+      executionTimeIndex: PaymentProfileSuspendingDueToPastDueTaskByExecutionTime
+      insert: InsertPaymentProfileSuspendingDueToPastDueTask
+      delete: DeletePaymentProfileSuspendingDueToPastDueTask
+      get: GetPaymentProfileSuspendingDueToPastDueTask
+      listPendingTasks: ListPendingPaymentProfileSuspendingDueToPastDueTasks
+      getMetadata: GetPaymentProfileSuspendingDueToPastDueTaskMetadata
+      updateMetadata: UpdatePaymentProfileSuspendingDueToPastDueTaskMetadata
     - kind: TaskTable
-      name: BillingProfileSuspensionNotifyingTask
+      name: PaymentProfileSuspensionNotifyingTask
       columns:
         - name: accountId
           type: string
@@ -333,15 +333,15 @@
       primaryKeys:
         - accountId
         - version
-      executionTimeIndex: BillingProfileSuspensionNotifyingTaskByExecutionTime
-      insert: InsertBillingProfileSuspensionNotifyingTask
-      delete: DeleteBillingProfileSuspensionNotifyingTask
-      get: GetBillingProfileSuspensionNotifyingTask
-      listPendingTasks: ListPendingBillingProfileSuspensionNotifyingTasks
-      getMetadata: GetBillingProfileSuspensionNotifyingTaskMetadata
-      updateMetadata: UpdateBillingProfileSuspensionNotifyingTaskMetadata
+      executionTimeIndex: PaymentProfileSuspensionNotifyingTaskByExecutionTime
+      insert: InsertPaymentProfileSuspensionNotifyingTask
+      delete: DeletePaymentProfileSuspensionNotifyingTask
+      get: GetPaymentProfileSuspensionNotifyingTask
+      listPendingTasks: ListPendingPaymentProfileSuspensionNotifyingTasks
+      getMetadata: GetPaymentProfileSuspensionNotifyingTaskMetadata
+      updateMetadata: UpdatePaymentProfileSuspensionNotifyingTaskMetadata
     - kind: TaskTable
-      name: BillingProfileStateSyncingTask
+      name: PaymentProfileStateSyncingTask
       columns:
         - name: accountId
           type: string
@@ -353,13 +353,13 @@
       primaryKeys:
         - accountId
         - version
-      executionTimeIndex: BillingProfileStateSyncingTaskByExecutionTime
-      insert: InsertBillingProfileStateSyncingTask
-      delete: DeleteBillingProfileStateSyncingTask
-      get: GetBillingProfileStateSyncingTask
-      listPendingTasks: ListPendingBillingProfileStateSyncingTasks
-      getMetadata: GetBillingProfileStateSyncingTaskMetadata
-      updateMetadata: UpdateBillingProfileStateSyncingTaskMetadata
+      executionTimeIndex: PaymentProfileStateSyncingTaskByExecutionTime
+      insert: InsertPaymentProfileStateSyncingTask
+      delete: DeletePaymentProfileStateSyncingTask
+      get: GetPaymentProfileStateSyncingTask
+      listPendingTasks: ListPendingPaymentProfileStateSyncingTasks
+      getMetadata: GetPaymentProfileStateSyncingTaskMetadata
+      updateMetadata: UpdatePaymentProfileStateSyncingTaskMetadata
     - kind: TaskTable
       name: PayoutTask
       columns:
@@ -378,8 +378,8 @@
       getMetadata: GetPayoutTaskMetadata
       updateMetadata: UpdatePayoutTaskMetadata
   updates:
-    - name: UpdateBillingProfileState
-      table: BillingProfile
+    - name: UpdatePaymentProfileState
+      table: PaymentProfile
       where:
         op: AND
         exprs:
@@ -387,8 +387,8 @@
             lColumn: accountId
       set:
         - stateInfo
-    - name: UpdateBillingProfilePaymentCustomer
-      table: BillingProfile
+    - name: UpdatePaymentProfilePaymentCustomer
+      table: PaymentProfile
       where:
         op: AND
         exprs:
@@ -396,8 +396,8 @@
             lColumn: accountId
       set:
         - stripePaymentCustomerId
-    - name: UpdateEarningsProfileConnectedAccount
-      table: EarningsProfile
+    - name: UpdatePayoutProfileConnectedAccount
+      table: PayoutProfile
       where:
         op: AND
         exprs:
@@ -406,8 +406,8 @@
       set:
         - stripeConnectedAccountId
         - stripeConnectedAccountState
-    - name: UpdateEarningsProfileConnectedAccountState
-      table: EarningsProfile
+    - name: UpdatePayoutProfileConnectedAccountState
+      table: PayoutProfile
       where:
         op: AND
         exprs:
@@ -458,12 +458,12 @@
         - stripeTransferId
         - updatedTimeMs
   selects:
-    - name: GetBillingProfileFromStatement
+    - name: GetPaymentProfileFromStatement
       from: TransactionStatement
       as: t
       join:
         - type: INNER
-          with: BillingProfile
+          with: PaymentProfile
           as: b
           on:
             op: =
@@ -478,12 +478,12 @@
       get:
         - all: true
           table: b
-    - name: GetEarningsProfileFromStatement
+    - name: GetPayoutProfileFromStatement
       from: TransactionStatement
       as: t
       join:
         - type: INNER
-          with: EarningsProfile
+          with: PayoutProfile
           as: e
           on:
             op: =

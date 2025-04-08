@@ -1,15 +1,15 @@
 import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
-import { PayoutState } from "../../db/schema";
+import { PaymentState } from "../../db/schema";
 import {
-  deletePayoutStatement,
+  deletePaymentStatement,
   deleteTransactionStatementStatement,
-  insertPayoutStatement,
+  insertPaymentStatement,
   insertTransactionStatementStatement,
 } from "../../db/sql";
-import { ListPayoutsHandler } from "./list_payouts_handler";
-import { LIST_PAYOUTS_RESPONSE } from "@phading/commerce_service_interface/web/earnings/interface";
-import { PayoutState as PayoutStateResponse } from "@phading/commerce_service_interface/web/earnings/payout";
+import { ListPaymentsHandler } from "./list_payments_handler";
+import { LIST_PAYMENTS_RESPONSE } from "@phading/commerce_service_interface/web/payment/interface";
+import { PaymentState as PaymentStateResponse } from "@phading/commerce_service_interface/web/payment/payment";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
@@ -17,7 +17,7 @@ import { assertThat } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "ListPayoutsHandlerTest",
+  name: "ListPaymentsHandlerTest",
   cases: [
     {
       name: "MixedData",
@@ -34,10 +34,10 @@ TEST_RUNNER.run({
                 totalAmount: 1300,
               },
             }),
-            insertPayoutStatement({
+            insertPaymentStatement({
               statementId: "statement1",
               accountId: "account1",
-              state: PayoutState.PAID,
+              state: PaymentState.PAID,
               updatedTimeMs: 1000,
             }),
             insertTransactionStatementStatement({
@@ -49,10 +49,10 @@ TEST_RUNNER.run({
                 totalAmount: 1400,
               },
             }),
-            insertPayoutStatement({
+            insertPaymentStatement({
               statementId: "statement2",
               accountId: "account1",
-              state: PayoutState.DISABLED,
+              state: PaymentState.FAILED,
               updatedTimeMs: 2000,
             }),
             insertTransactionStatementStatement({
@@ -64,10 +64,10 @@ TEST_RUNNER.run({
                 totalAmount: 1500,
               },
             }),
-            insertPayoutStatement({
+            insertPaymentStatement({
               statementId: "statement3",
               accountId: "account1",
-              state: PayoutState.PROCESSING,
+              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
               updatedTimeMs: 3000,
             }),
             insertTransactionStatementStatement({
@@ -88,10 +88,10 @@ TEST_RUNNER.run({
                 totalAmount: 1700,
               },
             }),
-            insertPayoutStatement({
+            insertPaymentStatement({
               statementId: "statement5",
               accountId: "account1",
-              state: PayoutState.PAID,
+              state: PaymentState.PROCESSING,
               updatedTimeMs: 5000,
             }),
             insertTransactionStatementStatement({
@@ -103,11 +103,26 @@ TEST_RUNNER.run({
                 totalAmount: 1800,
               },
             }),
-            insertPayoutStatement({
+            insertPaymentStatement({
               statementId: "statement6",
               accountId: "account1",
-              state: PayoutState.PAID,
+              state: PaymentState.PAID,
               updatedTimeMs: 6000,
+            }),
+            insertPaymentStatement({
+              statementId: "statement7",
+              accountId: "account1",
+              state: PaymentState.PAID,
+              updatedTimeMs: 7000,
+            }),
+            insertTransactionStatementStatement({
+              statementId: "statement7",
+              accountId: "account1",
+              month: "2023-04",
+              statement: {
+                currency: "USD",
+                totalAmount: 1900,
+              },
             }),
           ]);
           await transaction.commit();
@@ -116,10 +131,10 @@ TEST_RUNNER.run({
         let serviceClientMock = new NodeServiceClientMock();
         serviceClientMock.response = {
           accountId: "account1",
-          capabilities: { canEarn: true },
+          capabilities: { canBeBilled: true },
         } as FetchSessionAndCheckCapabilityResponse;
 
-        let handler = new ListPayoutsHandler(
+        let handler = new ListPaymentsHandler(
           SPANNER_DATABASE,
           serviceClientMock,
         );
@@ -129,7 +144,7 @@ TEST_RUNNER.run({
           "",
           {
             startMonth: "2022-11",
-            endMonth: "2023-02",
+            endMonth: "2023-03",
           },
           "session1",
         );
@@ -139,31 +154,38 @@ TEST_RUNNER.run({
           response,
           eqMessage(
             {
-              payouts: [
+              payments: [
+                {
+                  month: "2023-03",
+                  amount: 1800,
+                  currency: "USD",
+                  state: PaymentStateResponse.PAID,
+                  updatedTimeMs: 6000,
+                },
                 {
                   month: "2023-02",
                   amount: 1700,
                   currency: "USD",
-                  state: PayoutStateResponse.PAID,
+                  state: PaymentStateResponse.PROCESSING,
                   updatedTimeMs: 5000,
                 },
                 {
                   month: "2022-12",
                   amount: 1500,
                   currency: "USD",
-                  state: PayoutStateResponse.PROCESSING,
+                  state: PaymentStateResponse.PROCESSING,
                   updatedTimeMs: 3000,
                 },
                 {
                   month: "2022-11",
                   amount: 1400,
                   currency: "USD",
-                  state: PayoutStateResponse.DISABLED,
+                  state: PaymentStateResponse.FAILED,
                   updatedTimeMs: 2000,
                 },
               ],
             },
-            LIST_PAYOUTS_RESPONSE,
+            LIST_PAYMENTS_RESPONSE,
           ),
           "response",
         );
@@ -171,12 +193,13 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deletePayoutStatement({ payoutStatementIdEq: "statement1" }),
-            deletePayoutStatement({ payoutStatementIdEq: "statement2" }),
-            deletePayoutStatement({ payoutStatementIdEq: "statement3" }),
-            deletePayoutStatement({ payoutStatementIdEq: "statement4" }),
-            deletePayoutStatement({ payoutStatementIdEq: "statement5" }),
-            deletePayoutStatement({ payoutStatementIdEq: "statement6" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement1" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement2" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement3" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement4" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement5" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement6" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement7" }),
             deleteTransactionStatementStatement({
               transactionStatementStatementIdEq: "statement1",
             }),
@@ -194,6 +217,9 @@ TEST_RUNNER.run({
             }),
             deleteTransactionStatementStatement({
               transactionStatementStatementIdEq: "statement6",
+            }),
+            deleteTransactionStatementStatement({
+              transactionStatementStatementIdEq: "statement7",
             }),
           ]);
           await transaction.commit();

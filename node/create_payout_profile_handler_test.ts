@@ -1,26 +1,26 @@
 import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
-  GET_EARNINGS_PROFILE_ROW,
+  GET_PAYOUT_PROFILE_ROW,
   GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW,
-  deleteEarningsProfileStatement,
+  deletePayoutProfileStatement,
   deleteStripeConnectedAccountCreatingTaskStatement,
-  getEarningsProfile,
+  getPayoutProfile,
   getStripeConnectedAccountCreatingTask,
 } from "../db/sql";
-import { CreateEarningsProfileHandler } from "./create_earnings_profile_handler";
+import { CreatePayoutProfileHandler } from "./create_payout_profile_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { assertThat, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 TEST_RUNNER.run({
-  name: "CreateEarningsProfileHandlerTest",
+  name: "CreatePayoutProfileHandlerTest",
   cases: [
     {
       name: "Success",
       execute: async () => {
         // Prepare
-        let handler = new CreateEarningsProfileHandler(
+        let handler = new CreatePayoutProfileHandler(
           SPANNER_DATABASE,
           () => 1000,
         );
@@ -30,16 +30,16 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await getEarningsProfile(SPANNER_DATABASE, {
-            earningsProfileAccountIdEq: "account1",
+          await getPayoutProfile(SPANNER_DATABASE, {
+            payoutProfileAccountIdEq: "account1",
           }),
           isArray([
             eqMessage(
               {
-                earningsProfileAccountId: "account1",
-                earningsProfileCreatedTimeMs: 1000,
+                payoutProfileAccountId: "account1",
+                payoutProfileCreatedTimeMs: 1000,
               },
-              GET_EARNINGS_PROFILE_ROW,
+              GET_PAYOUT_PROFILE_ROW,
             ),
           ]),
           "account",
@@ -70,8 +70,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsProfileStatement({
-              earningsProfileAccountIdEq: "account1",
+            deletePayoutProfileStatement({
+              payoutProfileAccountIdEq: "account1",
             }),
             deleteStripeConnectedAccountCreatingTaskStatement({
               stripeConnectedAccountCreatingTaskAccountIdEq: "account1",

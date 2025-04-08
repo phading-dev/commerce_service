@@ -2,14 +2,14 @@ import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { StripeConnectedAccountState } from "../db/schema";
 import {
-  GET_EARNINGS_PROFILE_ROW,
+  GET_PAYOUT_PROFILE_ROW,
   GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_METADATA_ROW,
-  deleteEarningsProfileStatement,
+  deletePayoutProfileStatement,
   deleteStripeConnectedAccountCreatingTaskStatement,
   deleteStripeConnectedAccountNeedsSetupNotifyingTaskStatement,
-  getEarningsProfile,
+  getPayoutProfile,
   getStripeConnectedAccountCreatingTaskMetadata,
-  insertEarningsProfileStatement,
+  insertPayoutProfileStatement,
   insertStripeConnectedAccountCreatingTaskStatement,
   listPendingStripeConnectedAccountCreatingTasks,
 } from "../db/sql";
@@ -41,7 +41,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsProfileStatement({
+            insertPayoutProfileStatement({
               accountId: "account1",
             }),
             insertStripeConnectedAccountCreatingTaskStatement({
@@ -95,18 +95,18 @@ TEST_RUNNER.run({
           "options.idempotencyKey",
         );
         assertThat(
-          await getEarningsProfile(SPANNER_DATABASE, {
-            earningsProfileAccountIdEq: "account1",
+          await getPayoutProfile(SPANNER_DATABASE, {
+            payoutProfileAccountIdEq: "account1",
           }),
           isArray([
             eqMessage(
               {
-                earningsProfileAccountId: "account1",
-                earningsProfileStripeConnectedAccountId: "stripeAccount1",
-                earningsProfileStripeConnectedAccountState:
+                payoutProfileAccountId: "account1",
+                payoutProfileStripeConnectedAccountId: "stripeAccount1",
+                payoutProfileStripeConnectedAccountState:
                   StripeConnectedAccountState.ONBOARDING,
               },
-              GET_EARNINGS_PROFILE_ROW,
+              GET_PAYOUT_PROFILE_ROW,
             ),
           ]),
           "profile",
@@ -123,8 +123,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsProfileStatement({
-              earningsProfileAccountIdEq: "account1",
+            deletePayoutProfileStatement({
+              payoutProfileAccountIdEq: "account1",
             }),
             deleteStripeConnectedAccountNeedsSetupNotifyingTaskStatement({
               stripeConnectedAccountNeedsSetupNotifyingTaskAccountIdEq:
@@ -144,7 +144,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsProfileStatement({
+            insertPayoutProfileStatement({
               accountId: "account1",
               stripeConnectedAccountId: "stripeAccount1",
               stripeConnectedAccountState:
@@ -186,7 +186,7 @@ TEST_RUNNER.run({
           error,
           eqHttpError(
             newBadRequestError(
-              "Earnings profile account1 already has a stripe connected account id stripeAccount1.",
+              "Payout profile account1 already has a stripe connected account id stripeAccount1.",
             ),
           ),
           "error",
@@ -195,8 +195,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsProfileStatement({
-              earningsProfileAccountIdEq: "account1",
+            deletePayoutProfileStatement({
+              payoutProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();
@@ -209,7 +209,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsProfileStatement({
+            insertPayoutProfileStatement({
               accountId: "account1",
               stripeConnectedAccountId: "stripeAccount1",
               stripeConnectedAccountState:
@@ -251,7 +251,7 @@ TEST_RUNNER.run({
           error,
           eqHttpError(
             newInternalServerErrorError(
-              "Earnings profile account1 already has a stripe connected account id stripeAccount1 which is different from the new one stripeAccount2.",
+              "Payout profile account1 already has a stripe connected account id stripeAccount1 which is different from the new one stripeAccount2.",
             ),
           ),
           "error",
@@ -260,8 +260,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsProfileStatement({
-              earningsProfileAccountIdEq: "account1",
+            deletePayoutProfileStatement({
+              payoutProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();
@@ -274,7 +274,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertEarningsProfileStatement({
+            insertPayoutProfileStatement({
               accountId: "account1",
             }),
             insertStripeConnectedAccountCreatingTaskStatement({
@@ -318,8 +318,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteEarningsProfileStatement({
-              earningsProfileAccountIdEq: "account1",
+            deletePayoutProfileStatement({
+              payoutProfileAccountIdEq: "account1",
             }),
             deleteStripeConnectedAccountCreatingTaskStatement({
               stripeConnectedAccountCreatingTaskAccountIdEq: "account1",

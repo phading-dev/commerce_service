@@ -2,20 +2,20 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
-  GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
   GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_METADATA_ROW,
   GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
+  GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
   GET_PAYMENT_ROW,
-  deleteBillingProfileSuspendingDueToPastDueTaskStatement,
   deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deletePaymentProfileSuspendingDueToPastDueTaskStatement,
   deletePaymentStatement,
-  getBillingProfileSuspendingDueToPastDueTask,
   getPayment,
   getPaymentMethodNeedsUpdateNotifyingTask,
   getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
+  getPaymentProfileSuspendingDueToPastDueTask,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentStatement,
-  listPendingBillingProfileSuspendingDueToPastDueTasks,
+  listPendingPaymentProfileSuspendingDueToPastDueTasks,
 } from "../../db/sql";
 import { MarkPaymentFailedHandler } from "./mark_payment_failed_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -33,8 +33,8 @@ async function cleanupAll() {
       deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
         paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
       }),
-      deleteBillingProfileSuspendingDueToPastDueTaskStatement({
-        billingProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+      deletePaymentProfileSuspendingDueToPastDueTaskStatement({
+        paymentProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
       }),
     ]);
     await transaction.commit();
@@ -119,7 +119,7 @@ TEST_RUNNER.run({
               GET_PAYMENT_ROW,
             ),
           ]),
-          "billing",
+          "payment",
         );
         assertThat(
           await getPaymentMethodNeedsUpdateNotifyingTask(SPANNER_DATABASE, {
@@ -139,19 +139,19 @@ TEST_RUNNER.run({
           "notifyingTasks",
         );
         assertThat(
-          await getBillingProfileSuspendingDueToPastDueTask(SPANNER_DATABASE, {
-            billingProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+          await getPaymentProfileSuspendingDueToPastDueTask(SPANNER_DATABASE, {
+            paymentProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
           }),
           isArray([
             eqMessage(
               {
-                billingProfileSuspendingDueToPastDueTaskStatementId:
+                paymentProfileSuspendingDueToPastDueTaskStatementId:
                   "statement1",
-                billingProfileSuspendingDueToPastDueTaskRetryCount: 0,
-                billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
-                billingProfileSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
+                paymentProfileSuspendingDueToPastDueTaskRetryCount: 0,
+                paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
+                paymentProfileSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
               },
-              GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
+              GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
             ),
           ]),
           "accountSuspendingTasks",
@@ -223,7 +223,7 @@ TEST_RUNNER.run({
               GET_PAYMENT_ROW,
             ),
           ]),
-          "billing",
+          "payment",
         );
         assertThat(
           await getPaymentMethodNeedsUpdateNotifyingTask(SPANNER_DATABASE, {
@@ -243,10 +243,10 @@ TEST_RUNNER.run({
           "notifyingTasks",
         );
         assertThat(
-          await listPendingBillingProfileSuspendingDueToPastDueTasks(
+          await listPendingPaymentProfileSuspendingDueToPastDueTasks(
             SPANNER_DATABASE,
             {
-              billingProfileSuspendingDueToPastDueTaskExecutionTimeMsLe:
+              paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe:
                 FUTURE_TIME_MS,
             },
           ),

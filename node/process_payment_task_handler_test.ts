@@ -2,21 +2,21 @@ import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PaymentState } from "../db/schema";
 import {
-  GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
   GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
+  GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
   GET_PAYMENT_ROW,
   GET_PAYMENT_TASK_METADATA_ROW,
-  deleteBillingProfileStatement,
-  deleteBillingProfileSuspendingDueToPastDueTaskStatement,
   deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deletePaymentProfileStatement,
+  deletePaymentProfileSuspendingDueToPastDueTaskStatement,
   deletePaymentStatement,
   deletePaymentTaskStatement,
   deleteTransactionStatementStatement,
-  getBillingProfileSuspendingDueToPastDueTask,
   getPayment,
   getPaymentMethodNeedsUpdateNotifyingTask,
+  getPaymentProfileSuspendingDueToPastDueTask,
   getPaymentTaskMetadata,
-  insertBillingProfileStatement,
+  insertPaymentProfileStatement,
   insertPaymentStatement,
   insertPaymentTaskStatement,
   insertTransactionStatementStatement,
@@ -42,7 +42,7 @@ let ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 async function insertPayment(): Promise<void> {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      insertBillingProfileStatement({
+      insertPaymentProfileStatement({
         accountId: "account1",
         stripePaymentCustomerId: "stripeCustomer1",
       }),
@@ -74,7 +74,7 @@ async function insertPayment(): Promise<void> {
 async function cleanupAll(): Promise<void> {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      deleteBillingProfileStatement({ billingProfileAccountIdEq: "account1" }),
+      deletePaymentProfileStatement({ paymentProfileAccountIdEq: "account1" }),
       deleteTransactionStatementStatement({
         transactionStatementStatementIdEq: "statement1",
       }),
@@ -85,8 +85,8 @@ async function cleanupAll(): Promise<void> {
       deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
         paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
       }),
-      deleteBillingProfileSuspendingDueToPastDueTaskStatement({
-        billingProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+      deletePaymentProfileSuspendingDueToPastDueTaskStatement({
+        paymentProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
       }),
     ]);
     await transaction.commit();
@@ -381,22 +381,22 @@ TEST_RUNNER.run({
           "updatePaymentMethodNotifyingTasks",
         );
         assertThat(
-          await getBillingProfileSuspendingDueToPastDueTask(SPANNER_DATABASE, {
-            billingProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+          await getPaymentProfileSuspendingDueToPastDueTask(SPANNER_DATABASE, {
+            paymentProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
           }),
           isArray([
             eqMessage(
               {
-                billingProfileSuspendingDueToPastDueTaskStatementId:
+                paymentProfileSuspendingDueToPastDueTaskStatementId:
                   "statement1",
-                billingProfileSuspendingDueToPastDueTaskRetryCount: 0,
-                billingProfileSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
-                billingProfileSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
+                paymentProfileSuspendingDueToPastDueTaskRetryCount: 0,
+                paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
+                paymentProfileSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
               },
-              GET_BILLING_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
+              GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
             ),
           ]),
-          "billingProfileSuspendingDueToPastDueTasks",
+          "paymentProfileSuspendingDueToPastDueTasks",
         );
       },
       tearDown: async () => {

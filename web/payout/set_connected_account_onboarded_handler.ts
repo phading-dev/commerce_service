@@ -2,19 +2,19 @@ import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PayoutState, StripeConnectedAccountState } from "../../db/schema";
 import {
-  getEarningsProfile,
+  getPayoutProfile,
   insertPayoutTaskStatement,
   listPayoutsByState,
-  updateEarningsProfileConnectedAccountStateStatement,
+  updatePayoutProfileConnectedAccountStateStatement,
   updatePayoutStateStatement,
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { Statement } from "@google-cloud/spanner/build/src/transaction";
-import { SetConnectedAccountOnboardedHandlerInterface } from "@phading/commerce_service_interface/web/earnings/handler";
+import { SetConnectedAccountOnboardedHandlerInterface } from "@phading/commerce_service_interface/web/payout/handler";
 import {
   SetConnectedAccountOnboardedRequestBody,
   SetConnectedAccountOnboardedResponse,
-} from "@phading/commerce_service_interface/web/earnings/interface";
+} from "@phading/commerce_service_interface/web/payout/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import {
   newBadRequestError,
@@ -63,13 +63,13 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
     }
     if (accountId !== body.accountId) {
       throw newUnauthorizedError(
-        `Earnings profile ${body.accountId} cannot be updated by the logged-in account ${accountId}.`,
+        `Payout profile ${body.accountId} cannot be updated by the logged-in account ${accountId}.`,
       );
     }
     await this.database.runTransactionAsync(async (transaction) => {
       let [profileRows, payoutRows] = await Promise.all([
-        getEarningsProfile(transaction, {
-          earningsProfileAccountIdEq: accountId,
+        getPayoutProfile(transaction, {
+          payoutProfileAccountIdEq: accountId,
         }),
         listPayoutsByState(transaction, {
           payoutAccountIdEq: accountId,
@@ -78,12 +78,12 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
       ]);
       if (profileRows.length === 0) {
         throw newInternalServerErrorError(
-          `Earnings account ${accountId} is not found.`,
+          `Payout profile ${accountId} is not found.`,
         );
       }
       let statements: Array<Statement> = [
-        updateEarningsProfileConnectedAccountStateStatement({
-          earningsProfileAccountIdEq: accountId,
+        updatePayoutProfileConnectedAccountStateStatement({
+          payoutProfileAccountIdEq: accountId,
           setStripeConnectedAccountState: StripeConnectedAccountState.ONBOARDED,
         }),
       ];

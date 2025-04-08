@@ -4,35 +4,35 @@ import { initSendgridClient } from "./common/sendgrid_client";
 import { STORAGE_CLIENT } from "./common/storage_client";
 import { initStripeClient } from "./common/stripe_client";
 import { ENV_VARS } from "./env_vars";
-import { CreateBillingProfileHandler } from "./node/create_billing_profile_handler";
-import { CreateEarningsProfileHandler } from "./node/create_earnings_profile_handler";
+import { CreatePaymentProfileHandler } from "./node/create_payment_profile_handler";
+import { CreatePayoutProfileHandler } from "./node/create_payout_profile_handler";
 import { GenerateTransactionStatementHandler } from "./node/generate_transaction_statement_handler";
-import { ListBillingProfileStateSyncingTasksHandler } from "./node/list_billing_profile_state_syncing_tasks_handler";
-import { ListBillingProfileSuspendingDueToPastDueTasksHandler } from "./node/list_billing_profile_suspending_due_to_past_due_tasks_handler";
-import { ListBillingProfileSuspensionNotifyingTasksHandler } from "./node/list_billing_profile_suspension_notifying_tasks_handler";
 import { ListPaymentMethodNeedsUpdateNotifyingTasksHandler } from "./node/list_payment_method_needs_update_notifying_tasks_handler";
+import { ListPaymentProfileStateSyncingTasksHandler } from "./node/list_payment_profile_state_syncing_tasks_handler";
+import { ListPaymentProfileSuspendingDueToPastDueTasksHandler } from "./node/list_payment_profile_suspending_due_to_past_due_tasks_handler";
+import { ListPaymentProfileSuspensionNotifyingTasksHandler } from "./node/list_payment_profile_suspension_notifying_tasks_handler";
 import { ListPaymentTasksHandler } from "./node/list_payment_tasks_handler";
 import { ListPayoutTasksHandler } from "./node/list_payout_tasks_handler";
 import { ListStripeConnectedAccountCreatingTasksHandler } from "./node/list_stripe_connected_account_creating_tasks_handler";
 import { ListStripeConnectedAccountNeedsSetupNotifyingTasksHandler } from "./node/list_stripe_connected_account_needs_setup_notifying_tasks_handler";
 import { ListStripePaymentCustomerCreatingTasksHandler } from "./node/list_stripe_payment_customer_creating_tasks_handler";
-import { ProcessBillingProfileStateSyncingTaskHandler } from "./node/process_billing_profile_state_syncing_task_handler";
-import { ProcessBillingProfileSuspendingDueToPastDueTaskHandler } from "./node/process_billing_profile_suspending_due_to_past_due_task_handler";
-import { ProcessBillingProfileSuspensionNotifyingTaskHandler } from "./node/process_billing_profile_suspension_notifying_task_handler";
 import { ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler } from "./node/process_payment_method_needs_update_notifying_task_handler";
+import { ProcessPaymentProfileStateSyncingTaskHandler } from "./node/process_payment_profile_state_syncing_task_handler";
+import { ProcessPaymentProfileSuspendingDueToPastDueTaskHandler } from "./node/process_payment_profile_suspending_due_to_past_due_task_handler";
+import { ProcessPaymentProfileSuspensionNotifyingTaskHandler } from "./node/process_payment_profile_suspension_notifying_task_handler";
 import { ProcessPaymentTaskHandler } from "./node/process_payment_task_handler";
 import { ProcessPayoutTaskHandler } from "./node/process_payout_task_handler";
 import { ProcessStripeConnectedAccountCreatingTaskHandler } from "./node/process_stripe_connected_account_creating_task_handler";
 import { ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler } from "./node/process_stripe_connected_account_needs_setup_notifying_task_handler";
 import { ProcessStripePaymentCustomerCreatingTaskHandler } from "./node/process_stripe_payment_customer_creating_task_handler";
-import { CreateStripeSessionToAddPaymentMethodHandler } from "./web/billing/create_stripe_session_to_add_payment_method_handler";
-import { GetBillingProfileInfoHandler } from "./web/billing/get_billing_profile_info_handler";
-import { ListPaymentsHandler } from "./web/billing/list_payments_handler";
-import { ReplacePrimaryPaymentMethodHandler } from "./web/billing/replace_primary_payment_method_handler";
-import { RetryFailedPaymentsHandler } from "./web/billing/retry_failed_payments_handler";
-import { GetEarningsProfileInfoHandler } from "./web/earnings/get_earnings_profile_info_handler";
-import { ListPayoutsHandler } from "./web/earnings/list_payouts_handler";
-import { SetConnectedAccountOnboardedHandler } from "./web/earnings/set_connected_account_onboarded_handler";
+import { CreateStripeSessionToAddPaymentMethodHandler } from "./web/payment/create_stripe_session_to_add_payment_method_handler";
+import { GetPaymentProfileInfoHandler } from "./web/payment/get_payment_profile_info_handler";
+import { ListPaymentsHandler } from "./web/payment/list_payments_handler";
+import { ReplacePrimaryPaymentMethodHandler } from "./web/payment/replace_primary_payment_method_handler";
+import { RetryFailedPaymentsHandler } from "./web/payment/retry_failed_payments_handler";
+import { GetPayoutProfileInfoHandler } from "./web/payout/get_payout_profile_info_handler";
+import { ListPayoutsHandler } from "./web/payout/list_payouts_handler";
+import { SetConnectedAccountOnboardedHandler } from "./web/payout/set_connected_account_onboarded_handler";
 import { ListTransactionStatementsHandler } from "./web/statements/list_transaction_statements_handler";
 import { MarkPaymentDoneHandler } from "./web/stripe_webhook/mark_payment_done_handler";
 import { MarkPaymentFailedHandler } from "./web/stripe_webhook/mark_payment_failed_handler";
@@ -70,22 +70,22 @@ async function main() {
     .addMetricsHandler();
   service
     .addHandlerRegister(COMMERCE_NODE_SERVICE)
-    .add(CreateBillingProfileHandler.create())
-    .add(CreateEarningsProfileHandler.create())
+    .add(CreatePaymentProfileHandler.create())
+    .add(CreatePayoutProfileHandler.create())
     .add(GenerateTransactionStatementHandler.create())
-    .add(ListBillingProfileStateSyncingTasksHandler.create())
-    .add(ListBillingProfileSuspendingDueToPastDueTasksHandler.create())
-    .add(ListBillingProfileSuspensionNotifyingTasksHandler.create())
     .add(ListPaymentMethodNeedsUpdateNotifyingTasksHandler.create())
+    .add(ListPaymentProfileStateSyncingTasksHandler.create())
+    .add(ListPaymentProfileSuspendingDueToPastDueTasksHandler.create())
+    .add(ListPaymentProfileSuspensionNotifyingTasksHandler.create())
     .add(ListPaymentTasksHandler.create())
     .add(ListPayoutTasksHandler.create())
     .add(ListStripeConnectedAccountCreatingTasksHandler.create())
     .add(ListStripeConnectedAccountNeedsSetupNotifyingTasksHandler.create())
     .add(ListStripePaymentCustomerCreatingTasksHandler.create())
-    .add(ProcessBillingProfileStateSyncingTaskHandler.create())
-    .add(ProcessBillingProfileSuspendingDueToPastDueTaskHandler.create())
-    .add(ProcessBillingProfileSuspensionNotifyingTaskHandler.create())
     .add(ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler.create())
+    .add(ProcessPaymentProfileStateSyncingTaskHandler.create())
+    .add(ProcessPaymentProfileSuspendingDueToPastDueTaskHandler.create())
+    .add(ProcessPaymentProfileSuspensionNotifyingTaskHandler.create())
     .add(ProcessPaymentTaskHandler.create())
     .add(ProcessPayoutTaskHandler.create())
     .add(ProcessStripeConnectedAccountCreatingTaskHandler.create())
@@ -94,11 +94,11 @@ async function main() {
   service
     .addHandlerRegister(COMMERCE_WEB_SERVICE)
     .add(CreateStripeSessionToAddPaymentMethodHandler.create())
-    .add(GetBillingProfileInfoHandler.create())
+    .add(GetPaymentProfileInfoHandler.create())
     .add(ListPaymentsHandler.create())
     .add(ReplacePrimaryPaymentMethodHandler.create())
     .add(RetryFailedPaymentsHandler.create())
-    .add(GetEarningsProfileInfoHandler.create())
+    .add(GetPayoutProfileInfoHandler.create())
     .add(ListPayoutsHandler.create())
     .add(SetConnectedAccountOnboardedHandler.create())
     .add(ListTransactionStatementsHandler.create())

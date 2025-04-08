@@ -52,7 +52,7 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
     loggingPrefix: string,
     body: ProcessStripeConnectedAccountNeedsSetupNotifyingTaskRequestBody,
   ): Promise<ProcessStripeConnectedAccountNeedsSetupNotifyingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Stripe connected account needs setup notifying task for earnings profile ${body.accountId}:`;
+    loggingPrefix = `${loggingPrefix} Stripe connected account needs setup notifying task for payout profile ${body.accountId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),

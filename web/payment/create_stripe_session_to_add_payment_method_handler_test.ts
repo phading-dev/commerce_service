@@ -1,11 +1,11 @@
 import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import {
-  deleteBillingProfileStatement,
-  insertBillingProfileStatement,
+  deletePaymentProfileStatement,
+  insertPaymentProfileStatement,
 } from "../../db/sql";
 import { CreateStripeSessionToAddPaymentMethodHandler } from "./create_stripe_session_to_add_payment_method_handler";
-import { CREATE_STRIPE_SESSION_TO_ADD_PAYMENT_METHOD_RESPONSE } from "@phading/commerce_service_interface/web/billing/interface";
+import { CREATE_STRIPE_SESSION_TO_ADD_PAYMENT_METHOD_RESPONSE } from "@phading/commerce_service_interface/web/payment/interface";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -23,7 +23,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
               stripePaymentCustomerId: "stripeCustomer1",
             }),
@@ -100,8 +100,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();

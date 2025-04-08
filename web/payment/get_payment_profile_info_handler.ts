@@ -2,25 +2,28 @@ import Stripe from "stripe";
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
-import { BillingProfileState, PaymentState } from "../../db/schema";
-import { getBillingProfile, listPaymentsByState } from "../../db/sql";
+import { PaymentProfileState, PaymentState } from "../../db/schema";
+import { getPaymentProfile, listPaymentsByState } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { BillingProfileState as BillingProfileStateResponse } from "@phading/commerce_service_interface/web/billing/billing_profile_state";
-import { GetBillingProfileInfoHandlerInterface } from "@phading/commerce_service_interface/web/billing/handler";
+import { GetPaymentProfileInfoHandlerInterface } from "@phading/commerce_service_interface/web/payment/handler";
 import {
-  GetBillingProfileInfoRequestBody,
-  GetBillingProfileInfoResponse,
-} from "@phading/commerce_service_interface/web/billing/interface";
-import { CARD_BRAND } from "@phading/commerce_service_interface/web/billing/payment_method_masked";
+  GetPaymentProfileInfoRequestBody,
+  GetPaymentProfileInfoResponse,
+} from "@phading/commerce_service_interface/web/payment/interface";
+import { CARD_BRAND } from "@phading/commerce_service_interface/web/payment/payment_method_masked";
+import { PaymentProfileState as PaymentProfileStateResponse } from "@phading/commerce_service_interface/web/payment/payment_profile_state";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
-import { newInternalServerErrorError, newUnauthorizedError } from "@selfage/http_error";
+import {
+  newInternalServerErrorError,
+  newUnauthorizedError,
+} from "@selfage/http_error";
 import { parseEnum } from "@selfage/message/parser";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
 
-export class GetBillingProfileInfoHandler extends GetBillingProfileInfoHandlerInterface {
-  public static create(): GetBillingProfileInfoHandler {
-    return new GetBillingProfileInfoHandler(
+export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerInterface {
+  public static create(): GetPaymentProfileInfoHandler {
+    return new GetPaymentProfileInfoHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       SERVICE_CLIENT,
@@ -37,9 +40,9 @@ export class GetBillingProfileInfoHandler extends GetBillingProfileInfoHandlerIn
 
   public async handle(
     loggingPrefix: string,
-    body: GetBillingProfileInfoRequestBody,
+    body: GetPaymentProfileInfoRequestBody,
     sessionStr: string,
-  ): Promise<GetBillingProfileInfoResponse> {
+  ): Promise<GetPaymentProfileInfoResponse> {
     let { accountId, capabilities } = await this.serviceClient.send(
       newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
@@ -50,12 +53,12 @@ export class GetBillingProfileInfoHandler extends GetBillingProfileInfoHandlerIn
     );
     if (!capabilities.canBeBilled) {
       throw newUnauthorizedError(
-        `Account ${accountId} is not allowed to get billing profile info.`,
+        `Account ${accountId} is not allowed to get payment profile info.`,
       );
     }
     let [profileRows, paymentRows] = await Promise.all([
-      getBillingProfile(this.database, {
-        billingProfileAccountIdEq: accountId,
+      getPaymentProfile(this.database, {
+        paymentProfileAccountIdEq: accountId,
       }),
       listPaymentsByState(this.database, {
         paymentAccountIdEq: accountId,
@@ -64,17 +67,17 @@ export class GetBillingProfileInfoHandler extends GetBillingProfileInfoHandlerIn
     ]);
     if (profileRows.length === 0) {
       throw newInternalServerErrorError(
-        `Billing account ${accountId} is not found.`,
+        `Payment account ${accountId} is not found.`,
       );
     }
     let profile = profileRows[0];
-    if (!profile.billingProfileStripePaymentCustomerId) {
+    if (!profile.paymentProfileStripePaymentCustomerId) {
       throw newInternalServerErrorError(
-        `Billing account ${accountId} does not have a Stripe customer.`,
+        `Payment account ${accountId} does not have a Stripe customer.`,
       );
     }
     let stripeCustomer = await this.stripeClient.val.customers.retrieve(
-      profile.billingProfileStripePaymentCustomerId,
+      profile.paymentProfileStripePaymentCustomerId,
     );
     let primaryPaymentMethodId = (stripeCustomer as Stripe.Customer)
       .invoice_settings.default_payment_method as string;
@@ -82,7 +85,7 @@ export class GetBillingProfileInfoHandler extends GetBillingProfileInfoHandlerIn
     if (primaryPaymentMethodId) {
       paymentMethod =
         await this.stripeClient.val.customers.retrievePaymentMethod(
-          profile.billingProfileStripePaymentCustomerId,
+          profile.paymentProfileStripePaymentCustomerId,
           primaryPaymentMethodId,
         );
     }
@@ -101,24 +104,24 @@ export class GetBillingProfileInfoHandler extends GetBillingProfileInfoHandlerIn
           }
         : undefined,
       state: this.getState(
-        profile.billingProfileStateInfo.state,
+        profile.paymentProfileStateInfo.state,
         paymentRows.length > 0,
       ),
-      paymentAfterMs: profile.billingProfilePaymentAfterMs,
+      paymentAfterMs: profile.paymentProfilePaymentAfterMs,
     };
   }
 
   private getState(
-    state: BillingProfileState,
+    state: PaymentProfileState,
     hasFailedPayment: boolean,
-  ): BillingProfileStateResponse {
+  ): PaymentProfileStateResponse {
     switch (state) {
-      case BillingProfileState.HEALTHY:
+      case PaymentProfileState.HEALTHY:
         return hasFailedPayment
-          ? BillingProfileStateResponse.WITH_FAILED_PAYMENTS
-          : BillingProfileStateResponse.HEALTHY;
-      case BillingProfileState.SUSPENDED:
-        return BillingProfileStateResponse.SUSPENDED;
+          ? PaymentProfileStateResponse.WITH_FAILED_PAYMENTS
+          : PaymentProfileStateResponse.HEALTHY;
+      case PaymentProfileState.SUSPENDED:
+        return PaymentProfileStateResponse.SUSPENDED;
     }
   }
 }

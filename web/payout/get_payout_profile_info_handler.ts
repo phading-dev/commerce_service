@@ -4,14 +4,14 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { URL_BUILDER } from "../../common/url_builder";
 import { StripeConnectedAccountState } from "../../db/schema";
-import { getEarningsProfile } from "../../db/sql";
+import { getPayoutProfile } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { GetEarningsProfileInfoHandlerInterface } from "@phading/commerce_service_interface/web/earnings/handler";
+import { GetPayoutProfileInfoHandlerInterface } from "@phading/commerce_service_interface/web/payout/handler";
 import {
-  GetEarningsProfileInfoRequestBody,
-  GetEarningsProfileInfoResponse,
+  GetPayoutProfileInfoRequestBody,
+  GetPayoutProfileInfoResponse,
   LinkType,
-} from "@phading/commerce_service_interface/web/earnings/interface";
+} from "@phading/commerce_service_interface/web/payout/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { UrlBuilder } from "@phading/web_interface/url_builder";
 import {
@@ -22,9 +22,9 @@ import {
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
 
-export class GetEarningsProfileInfoHandler extends GetEarningsProfileInfoHandlerInterface {
-  public static create(): GetEarningsProfileInfoHandler {
-    return new GetEarningsProfileInfoHandler(
+export class GetPayoutProfileInfoHandler extends GetPayoutProfileInfoHandlerInterface {
+  public static create(): GetPayoutProfileInfoHandler {
+    return new GetPayoutProfileInfoHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       SERVICE_CLIENT,
@@ -43,9 +43,9 @@ export class GetEarningsProfileInfoHandler extends GetEarningsProfileInfoHandler
 
   public async handle(
     loggingPrefix: string,
-    body: GetEarningsProfileInfoRequestBody,
+    body: GetPayoutProfileInfoRequestBody,
     sessionStr: string,
-  ): Promise<GetEarningsProfileInfoResponse> {
+  ): Promise<GetPayoutProfileInfoResponse> {
     let { accountId, capabilities } = await this.serviceClient.send(
       newFetchSessionAndCheckCapabilityRequest({
         signedSession: sessionStr,
@@ -56,27 +56,27 @@ export class GetEarningsProfileInfoHandler extends GetEarningsProfileInfoHandler
     );
     if (!capabilities.canEarn) {
       throw newUnauthorizedError(
-        `Account ${accountId} is not allowed to get earnings profile info.`,
+        `Account ${accountId} is not allowed to get payout profile info.`,
       );
     }
-    let rows = await getEarningsProfile(this.database, {
-      earningsProfileAccountIdEq: accountId,
+    let rows = await getPayoutProfile(this.database, {
+      payoutProfileAccountIdEq: accountId,
     });
     if (rows.length === 0) {
-      throw newBadRequestError(`Earnings account ${accountId} not found.`);
+      throw newBadRequestError(`Payout account ${accountId} not found.`);
     }
     let profile = rows[0];
-    if (!profile.earningsProfileStripeConnectedAccountId) {
+    if (!profile.payoutProfileStripeConnectedAccountId) {
       throw newInternalServerErrorError(
-        `Earnings account ${accountId} does not have a Stripe connected account.`,
+        `Payout account ${accountId} does not have a Stripe connected account.`,
       );
     }
     if (
-      profile.earningsProfileStripeConnectedAccountState ===
+      profile.payoutProfileStripeConnectedAccountState ===
       StripeConnectedAccountState.ONBOARDING
     ) {
       let onboardingLink = await this.stripeClient.val.accountLinks.create({
-        account: profile.earningsProfileStripeConnectedAccountId,
+        account: profile.payoutProfileStripeConnectedAccountId,
         return_url: this.urlBuilder.build({
           setConnectedAccountOnboarded: {
             accountId,
@@ -97,11 +97,11 @@ export class GetEarningsProfileInfoHandler extends GetEarningsProfileInfoHandler
         connectedAccountUrl: onboardingLink.url,
       };
     } else if (
-      profile.earningsProfileStripeConnectedAccountState ===
+      profile.payoutProfileStripeConnectedAccountState ===
       StripeConnectedAccountState.ONBOARDED
     ) {
       let loginLink = await this.stripeClient.val.accounts.createLoginLink(
-        profile.earningsProfileStripeConnectedAccountId,
+        profile.payoutProfileStripeConnectedAccountId,
       );
       return {
         connectedAccountLinkType: LinkType.LOGIN,
@@ -109,7 +109,7 @@ export class GetEarningsProfileInfoHandler extends GetEarningsProfileInfoHandler
       };
     } else {
       throw newInternalServerErrorError(
-        `StripeConnectedAccountState ${StripeConnectedAccountState[profile.earningsProfileStripeConnectedAccountState]} is not handled.`,
+        `StripeConnectedAccountState ${StripeConnectedAccountState[profile.payoutProfileStripeConnectedAccountState]} is not handled.`,
       );
     }
   }

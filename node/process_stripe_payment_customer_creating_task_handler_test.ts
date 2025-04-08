@@ -1,13 +1,13 @@
 import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
-  GET_BILLING_PROFILE_ROW,
+  GET_PAYMENT_PROFILE_ROW,
   GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_METADATA_ROW,
-  deleteBillingProfileStatement,
+  deletePaymentProfileStatement,
   deleteStripePaymentCustomerCreatingTaskStatement,
-  getBillingProfile,
+  getPaymentProfile,
   getStripePaymentCustomerCreatingTaskMetadata,
-  insertBillingProfileStatement,
+  insertPaymentProfileStatement,
   insertStripePaymentCustomerCreatingTaskStatement,
   listPendingStripePaymentCustomerCreatingTasks,
 } from "../db/sql";
@@ -39,7 +39,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
             }),
             insertStripePaymentCustomerCreatingTaskStatement({
@@ -98,19 +98,19 @@ TEST_RUNNER.run({
           "options.idempotencyKey",
         );
         assertThat(
-          await getBillingProfile(SPANNER_DATABASE, {
-            billingProfileAccountIdEq: "account1",
+          await getPaymentProfile(SPANNER_DATABASE, {
+            paymentProfileAccountIdEq: "account1",
           }),
           isArray([
             eqMessage(
               {
-                billingProfileAccountId: "account1",
-                billingProfileStripePaymentCustomerId: "stripeCustomer1",
+                paymentProfileAccountId: "account1",
+                paymentProfileStripePaymentCustomerId: "stripeCustomer1",
               },
-              GET_BILLING_PROFILE_ROW,
+              GET_PAYMENT_PROFILE_ROW,
             ),
           ]),
-          "billingAccount",
+          "paymentAccount",
         );
         assertThat(
           await listPendingStripePaymentCustomerCreatingTasks(
@@ -124,8 +124,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
             deleteStripePaymentCustomerCreatingTaskStatement({
               stripePaymentCustomerCreatingTaskAccountIdEq: "account1",
@@ -141,7 +141,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
               stripePaymentCustomerId: "stripeCustomer1",
             }),
@@ -181,7 +181,7 @@ TEST_RUNNER.run({
           error,
           eqHttpError(
             newBadRequestError(
-              "Billing profile account1 already has a stripe customer id stripeCustomer1.",
+              "Payment profile account1 already has a stripe customer id stripeCustomer1.",
             ),
           ),
           "error",
@@ -190,8 +190,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();
@@ -204,7 +204,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
               stripePaymentCustomerId: "stripeCustomer1",
             }),
@@ -244,7 +244,7 @@ TEST_RUNNER.run({
           error,
           eqHttpError(
             newInternalServerErrorError(
-              "Billing profile account1 already has a stripe customer id stripeCustomer1 which is different from the new one stripeCustomer2.",
+              "Payment profile account1 already has a stripe customer id stripeCustomer1 which is different from the new one stripeCustomer2.",
             ),
           ),
           "error",
@@ -253,8 +253,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
           ]);
           await transaction.commit();
@@ -267,7 +267,7 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertBillingProfileStatement({
+            insertPaymentProfileStatement({
               accountId: "account1",
             }),
             insertStripePaymentCustomerCreatingTaskStatement({
@@ -311,8 +311,8 @@ TEST_RUNNER.run({
       tearDown: async () => {
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            deleteBillingProfileStatement({
-              billingProfileAccountIdEq: "account1",
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
             }),
             deleteStripePaymentCustomerCreatingTaskStatement({
               stripePaymentCustomerCreatingTaskAccountIdEq: "account1",
