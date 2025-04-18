@@ -2,7 +2,7 @@ import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import { listPaymentsWithStatements } from "../../db/sql";
-import { getMonthDifference } from "../common/date_helper";
+import { ENV_VARS } from "../../env_vars";
 import { Database } from "@google-cloud/spanner";
 import { ListPaymentsHandlerInterface } from "@phading/commerce_service_interface/web/payment/handler";
 import {
@@ -17,6 +17,7 @@ import { MAX_MONTH_RANGE } from "@phading/constants/commerce";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newBadRequestError, newUnauthorizedError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
+import { TzDate } from "@selfage/tz_date";
 
 export class ListPaymentsHandler extends ListPaymentsHandlerInterface {
   public static create(): ListPaymentsHandler {
@@ -41,10 +42,24 @@ export class ListPaymentsHandler extends ListPaymentsHandlerInterface {
     if (!body.endMonth) {
       throw newBadRequestError(`"endMonth" is required.`);
     }
-    if (
-      getMonthDifference(new Date(body.startMonth), new Date(body.endMonth)) >
-      MAX_MONTH_RANGE
-    ) {
+    let startMonth = TzDate.fromLocalDateString(
+      body.startMonth,
+      ENV_VARS.timezoneNegativeOffset,
+    );
+    if (isNaN(startMonth.toTimestampMs())) {
+      throw newBadRequestError(`"startMonth" is not a valid date.`);
+    }
+    let endMonth = TzDate.fromLocalDateString(
+      body.endMonth,
+      ENV_VARS.timezoneNegativeOffset,
+    );
+    if (isNaN(endMonth.toTimestampMs())) {
+      throw newBadRequestError(`"endMonth" is not a valid date.`);
+    }
+    if (startMonth.toTimestampMs() > endMonth.toTimestampMs()) {
+      throw newBadRequestError(`"startMonth" must be smaller than "endMonth".`);
+    }
+    if (endMonth.minusDateInMonths(startMonth) + 1 > MAX_MONTH_RANGE) {
       throw newBadRequestError(`The range of months is too long.`);
     }
     let { accountId, capabilities } = await this.serviceClient.send(
