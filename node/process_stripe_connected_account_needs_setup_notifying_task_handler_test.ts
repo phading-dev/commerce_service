@@ -9,7 +9,6 @@ import {
 } from "../db/sql";
 import { ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler } from "./process_stripe_connected_account_needs_setup_notifying_task_handler";
 import { GetAccountContactResponse } from "@phading/user_service_interface/node/interface";
-import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
 import {
@@ -50,13 +49,12 @@ TEST_RUNNER.run({
             sendParamsCapture = sendParams;
           },
         };
-        let urlBuilder = new UrlBuilder("http://test.com");
         let handler =
           new ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler(
             SPANNER_DATABASE,
             clientMock,
             sendgridClientMock,
-            urlBuilder,
+            "http://test.com",
             () => 1000,
           );
 
@@ -79,7 +77,7 @@ TEST_RUNNER.run({
         assertThat(
           sendParamsCapture.dynamicTemplateData.completeSetupUrl,
           eq(
-            "http://test.com/?e=%7B%221%22%3A%7B%221%22%3A%22account1%22%2C%222%22%3A%7B%223%22%3A%7B%7D%7D%7D%7D",
+            "http://test.com/?e=%7B%221%22%3A%7B%221%22%3A%7B%221%22%3A%22account1%22%7D%2C%222%22%3A%7B%223%22%3A%7B%7D%7D%7D%7D",
           ),
           "sendParams.dynamicTemplateData.completeSetupUrl",
         );
@@ -131,13 +129,12 @@ TEST_RUNNER.run({
             throw new Error("Fake error");
           },
         };
-        let urlBuilder = new UrlBuilder("http://test.com");
         let handler =
           new ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler(
             SPANNER_DATABASE,
             clientMock,
             sendgridClientMock,
-            urlBuilder,
+            "http://test.com",
             () => 1000,
           );
 

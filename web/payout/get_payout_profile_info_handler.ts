@@ -2,9 +2,9 @@ import Stripe from "stripe";
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
-import { URL_BUILDER } from "../../common/url_builder";
 import { StripeConnectedAccountState } from "../../db/schema";
 import { getPayoutProfile } from "../../db/sql";
+import { ENV_VARS } from "../../env_vars";
 import { Database } from "@google-cloud/spanner";
 import { GetPayoutProfileInfoHandlerInterface } from "@phading/commerce_service_interface/web/payout/handler";
 import {
@@ -13,7 +13,7 @@ import {
   LinkType,
 } from "@phading/commerce_service_interface/web/payout/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
-import { UrlBuilder } from "@phading/web_interface/url_builder";
+import { buildUrl } from "@phading/web_interface/url_builder";
 import {
   newBadRequestError,
   newInternalServerErrorError,
@@ -28,7 +28,7 @@ export class GetPayoutProfileInfoHandler extends GetPayoutProfileInfoHandlerInte
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       SERVICE_CLIENT,
-      URL_BUILDER,
+      ENV_VARS.externalOrigin,
     );
   }
 
@@ -36,7 +36,7 @@ export class GetPayoutProfileInfoHandler extends GetPayoutProfileInfoHandlerInte
     private database: Database,
     private stripeClient: Ref<Stripe>,
     private serviceClient: NodeServiceClient,
-    private urlBuilder: UrlBuilder,
+    private externalOrigin: string,
   ) {
     super();
   }
@@ -77,16 +77,18 @@ export class GetPayoutProfileInfoHandler extends GetPayoutProfileInfoHandlerInte
     ) {
       let onboardingLink = await this.stripeClient.val.accountLinks.create({
         account: profile.payoutProfileStripeConnectedAccountId,
-        return_url: this.urlBuilder.build({
+        return_url: buildUrl(this.externalOrigin, {
           setConnectedAccountOnboarded: {
             accountId,
           },
         }),
-        refresh_url: this.urlBuilder.build({
+        refresh_url: buildUrl(this.externalOrigin, {
           main: {
-            accountId,
+            chooseAccount: {
+              accountId,
+            },
             account: {
-              earnings: {},
+              payout: {},
             },
           },
         }),

@@ -15,7 +15,6 @@ import {
   GET_ACCOUNT_CONTACT_REQUEST_BODY,
   GetAccountContactResponse,
 } from "@phading/user_service_interface/node/interface";
-import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
 import {
@@ -61,12 +60,11 @@ TEST_RUNNER.run({
             emailParamsCaptured = emailParams;
           },
         };
-        let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           sendgridClientMock,
-          urlBuilder,
+          "https://test.com",
           () => 1000,
         );
 
@@ -94,7 +92,7 @@ TEST_RUNNER.run({
         assertThat(
           emailParamsCaptured.dynamicTemplateData.updatePaymentMethodUrl,
           eq(
-            "https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%22account1%22%2C%222%22%3A%7B%222%22%3A%7B%7D%7D%7D%7D",
+            "https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%7B%221%22%3A%22account1%22%7D%2C%222%22%3A%7B%222%22%3A%7B%7D%7D%7D%7D",
           ),
           "emailParamsCaptured.dynamicTemplateData.updatePaymentMethodUrl",
         );
@@ -164,12 +162,11 @@ TEST_RUNNER.run({
             throw new Error("Fake error");
           },
         };
-        let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           sendgridClientMock,
-          urlBuilder,
+          "https://test.com",
           () => 1000,
         );
 

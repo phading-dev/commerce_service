@@ -3,7 +3,6 @@ import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { URL_BUILDER } from "../common/url_builder";
 import {
   deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
   getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
@@ -18,7 +17,7 @@ import {
   ProcessPaymentMethodNeedsUpdateNotifyingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
-import { UrlBuilder } from "@phading/web_interface/url_builder";
+import { buildUrl } from "@phading/web_interface/url_builder";
 import {
   newBadRequestError,
   newInternalServerErrorError,
@@ -32,7 +31,7 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       SENDGRID_CLIENT,
-      URL_BUILDER,
+      ENV_VARS.externalOrigin,
       () => Date.now(),
     );
   }
@@ -47,7 +46,7 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
     private database: Database,
     private serviceClient: NodeServiceClient,
     private sendgridClient: any,
-    private urlBuilder: UrlBuilder,
+    private externalOrigin: string,
     private getNow: () => number,
   ) {
     super();
@@ -123,11 +122,13 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
         month: transactionStatement.transactionStatementMonth,
         name: naturalName,
         gradePeriodDays: GRACE_PERIOD_DAYS,
-        updatePaymentMethodUrl: this.urlBuilder.build({
+        updatePaymentMethodUrl: buildUrl(this.externalOrigin, {
           main: {
-            accountId: transactionStatement.transactionStatementAccountId,
+            chooseAccount: {
+              accountId: transactionStatement.transactionStatementAccountId,
+            },
             account: {
-              billing: {},
+              payment: {},
             },
           },
         }),

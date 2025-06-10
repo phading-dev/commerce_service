@@ -11,7 +11,6 @@ import {
   LinkType,
 } from "@phading/commerce_service_interface/web/payout/interface";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
-import { UrlBuilder } from "@phading/web_interface/url_builder";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
 import { Ref } from "@selfage/ref";
@@ -54,12 +53,11 @@ TEST_RUNNER.run({
             canEarn: true,
           },
         } as FetchSessionAndCheckCapabilityResponse;
-        let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new GetPayoutProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
-          urlBuilder,
+          "https://test.com",
         );
 
         // Execute
@@ -92,7 +90,7 @@ TEST_RUNNER.run({
         assertThat(
           paramsCaptured.refresh_url,
           eq(
-            "https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%22account1%22%2C%222%22%3A%7B%223%22%3A%7B%7D%7D%7D%7D",
+            "https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%7B%221%22%3A%22account1%22%7D%2C%222%22%3A%7B%223%22%3A%7B%7D%7D%7D%7D",
           ),
           "paramsCaptured.refresh_url",
         );
@@ -141,12 +139,11 @@ TEST_RUNNER.run({
             canEarn: true,
           },
         } as FetchSessionAndCheckCapabilityResponse;
-        let urlBuilder = new UrlBuilder("https://test.com");
         let handler = new GetPayoutProfileInfoHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           clientMock,
-          urlBuilder,
+          "https://test.com",
         );
 
         // Execute

@@ -2,7 +2,6 @@ import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { URL_BUILDER } from "../common/url_builder";
 import {
   deleteStripeConnectedAccountNeedsSetupNotifyingTaskStatement,
   getStripeConnectedAccountNeedsSetupNotifyingTaskMetadata,
@@ -16,7 +15,7 @@ import {
   ProcessStripeConnectedAccountNeedsSetupNotifyingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
-import { UrlBuilder } from "@phading/web_interface/url_builder";
+import { buildUrl } from "@phading/web_interface/url_builder";
 import { newBadRequestError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
@@ -27,7 +26,7 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       SENDGRID_CLIENT,
-      URL_BUILDER,
+      ENV_VARS.externalOrigin,
       () => Date.now(),
     );
   }
@@ -42,7 +41,7 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
     private database: Database,
     private serviceClient: NodeServiceClient,
     private sendgridClient: any,
-    private urlBuilder: UrlBuilder,
+    private externalOrigin: string,
     private getNow: () => number,
   ) {
     super();
@@ -109,11 +108,13 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
       templateId: LOCALIZATION.setupStripeConnectedAccountEmailTemplateId,
       dynamicTemplateData: {
         name: contactResponse.naturalName,
-        completeSetupUrl: this.urlBuilder.build({
+        completeSetupUrl: buildUrl(this.externalOrigin, {
           main: {
-            accountId: body.accountId,
+            chooseAccount: {
+              accountId: body.accountId,
+            },
             account: {
-              earnings: {},
+              payout: {},
             },
           },
         }),

@@ -2,7 +2,6 @@ import Stripe from "stripe";
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
-import { URL_BUILDER } from "../../common/url_builder";
 import { getPaymentProfile } from "../../db/sql";
 import { ENV_VARS } from "../../env_vars";
 import { Database } from "@google-cloud/spanner";
@@ -12,7 +11,7 @@ import {
   CreateStripeSessionToAddPaymentMethodResponse,
 } from "@phading/commerce_service_interface/web/payment/interface";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
-import { UrlBuilder } from "@phading/web_interface/url_builder";
+import { buildUrl } from "@phading/web_interface/url_builder";
 import { newNotFoundError, newUnauthorizedError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
@@ -23,7 +22,7 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       SERVICE_CLIENT,
-      URL_BUILDER,
+      ENV_VARS.externalOrigin,
     );
   }
 
@@ -31,7 +30,7 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
     private database: Database,
     private stripeClient: Ref<Stripe>,
     private serviceClient: NodeServiceClient,
-    private urlBuilder: UrlBuilder,
+    private externalOrigin: string,
   ) {
     super();
   }
@@ -67,19 +66,23 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
       currency: ENV_VARS.defaultCurrency.toLocaleLowerCase(),
       customer: row.paymentProfileStripePaymentCustomerId,
       payment_method_types: ["card"],
-      success_url: this.urlBuilder.build(
+      success_url: buildUrl(
+        this.externalOrigin,
         {
-          replacePrimaryPaymnetMethod: {
+          replacePrimaryPaymentMethod: {
             accountId,
           },
         },
+        // TODO: Figure out a way to define it in the APP message.
         [["session_id", "{CHECKOUT_SESSION_ID}"]],
       ),
-      cancel_url: this.urlBuilder.build({
+      cancel_url: buildUrl(this.externalOrigin, {
         main: {
-          accountId,
+          chooseAccount: {
+            accountId,
+          },
           account: {
-            billing: {},
+            payment: {},
           },
         },
       }),
