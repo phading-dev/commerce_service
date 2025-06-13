@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: commerce-service-deployment
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: commerce-service-pod

@@ -9,4 +9,4 @@ ENV_VARS.accountSuspensionEnEmailTemplateId =
   "d-a52bef48f029473498cc69c5a29c4b23";
 ENV_VARS.setupStripeConnectedAccountEnEmailTemplateId =
   "d-355d950b920a4557a5c0ee35a40f1020";
-ENV_VARS.replicas = 2;
+ENV_VARS.replicas = 1;
