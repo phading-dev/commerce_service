@@ -44,7 +44,7 @@
     "@selfage/message": "^3.5.8",
     "@selfage/node_service_client": "^2.2.2",
     "@selfage/ref": "^1.0.4",
-    "@selfage/service_handler": "^7.4.0",
+    "@selfage/service_handler": "^7.5.0",
     "@selfage/tz_date": "^1.0.2",
     "@sendgrid/mail": "^8.1.5",
     "express": "^4.21.0",
