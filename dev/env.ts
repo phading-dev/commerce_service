@@ -10,3 +10,5 @@ ENV_VARS.accountSuspensionEnEmailTemplateId =
 ENV_VARS.setupStripeConnectedAccountEnEmailTemplateId =
   "d-355d950b920a4557a5c0ee35a40f1020";
 ENV_VARS.replicas = 1;
+ENV_VARS.cpu = "400m";
+ENV_VARS.memory = "512Mi";
