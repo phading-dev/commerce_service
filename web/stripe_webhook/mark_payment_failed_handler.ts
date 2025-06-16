@@ -12,7 +12,7 @@ import {
   updatePaymentStateStatement,
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { MarkPaymentDoneHandlerInterface } from "@phading/commerce_service_interface/web/stripe_webhook/handler";
+import { MarkPaymentFailedHandlerInterface } from "@phading/commerce_service_interface/web/stripe_webhook/handler";
 import { EventReceivedResponse } from "@phading/commerce_service_interface/web/stripe_webhook/interface";
 import {
   newBadRequestError,
@@ -22,7 +22,7 @@ import {
 import { Ref } from "@selfage/ref";
 import { Readable } from "stream";
 
-export class MarkPaymentFailedHandler extends MarkPaymentDoneHandlerInterface {
+export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface {
   public static create(
     stripePaymentIntentFailedSecretKey: string,
   ): MarkPaymentFailedHandler {

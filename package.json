@@ -38,7 +38,7 @@
     "@phading/price_config": "^0.7.5",
     "@phading/user_service_interface": "^1.2.10",
     "@phading/user_session_service_interface": "^1.1.1",
-    "@phading/web_interface": "^1.1.1",
+    "@phading/web_interface": "^1.1.2",
     "@selfage/env_var_getter": "^1.0.2",
     "@selfage/http_error": "^1.1.2",
     "@selfage/message": "^3.5.10",
