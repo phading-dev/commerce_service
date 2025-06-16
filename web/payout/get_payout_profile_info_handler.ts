@@ -15,7 +15,6 @@ import {
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { buildUrl } from "@phading/web_interface/url_builder";
 import {
-  newBadRequestError,
   newInternalServerErrorError,
   newUnauthorizedError,
 } from "@selfage/http_error";
@@ -63,14 +62,17 @@ export class GetPayoutProfileInfoHandler extends GetPayoutProfileInfoHandlerInte
       payoutProfileAccountIdEq: accountId,
     });
     if (rows.length === 0) {
-      throw newBadRequestError(`Payout account ${accountId} not found.`);
+      return {
+        notAvailable: true,
+      };
     }
     let profile = rows[0];
     if (!profile.payoutProfileStripeConnectedAccountId) {
-      throw newInternalServerErrorError(
-        `Payout account ${accountId} does not have a Stripe connected account.`,
-      );
+      return {
+        notAvailable: true,
+      };
     }
+
     if (
       profile.payoutProfileStripeConnectedAccountState ===
       StripeConnectedAccountState.ONBOARDING

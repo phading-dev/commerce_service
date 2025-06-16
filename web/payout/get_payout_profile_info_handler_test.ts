@@ -178,5 +178,91 @@ TEST_RUNNER.run({
         });
       },
     },
+    {
+      name: "NoStripeConnectedAccountId",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertPayoutProfileStatement({
+              accountId: "account1",
+            }),
+          ]);
+          await transaction.commit();
+        });
+        let clientMock = new NodeServiceClientMock();
+        clientMock.response = {
+          accountId: "account1",
+          capabilities: {
+            canEarn: true,
+          },
+        } as FetchSessionAndCheckCapabilityResponse;
+        let handler = new GetPayoutProfileInfoHandler(
+          SPANNER_DATABASE,
+          new Ref(),
+          clientMock,
+          "https://test.com",
+        );
+
+        // Execute
+        let response = await handler.handle("", {}, "session1");
+
+        // Verify
+        assertThat(
+          response,
+          eqMessage(
+            {
+              notAvailable: true,
+            },
+            GET_PAYOUT_PROFILE_INFO_RESPONSE,
+          ),
+          "response",
+        );
+      },
+      tearDown: async () => {
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            deletePayoutProfileStatement({
+              payoutProfileAccountIdEq: "account1",
+            }),
+          ]);
+          await transaction.commit();
+        });
+      },
+    },
+    {
+      name: "NoPayoutProfile",
+      execute: async () => {
+        // Prepare
+        let clientMock = new NodeServiceClientMock();
+        clientMock.response = {
+          accountId: "account1",
+          capabilities: {
+            canEarn: true,
+          },
+        } as FetchSessionAndCheckCapabilityResponse;
+        let handler = new GetPayoutProfileInfoHandler(
+          SPANNER_DATABASE,
+          new Ref(),
+          clientMock,
+          "https://test.com",
+        );
+
+        // Execute
+        let response = await handler.handle("", {}, "session1");
+
+        // Verify
+        assertThat(
+          response,
+          eqMessage(
+            {
+              notAvailable: true,
+            },
+            GET_PAYOUT_PROFILE_INFO_RESPONSE,
+          ),
+          "response",
+        );
+      },
+    },
   ],
 });

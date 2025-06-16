@@ -13,10 +13,7 @@ import {
 import { CARD_BRAND } from "@phading/commerce_service_interface/web/payment/payment_method_masked";
 import { PaymentProfileState as PaymentProfileStateResponse } from "@phading/commerce_service_interface/web/payment/payment_profile_state";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
-import {
-  newInternalServerErrorError,
-  newUnauthorizedError,
-} from "@selfage/http_error";
+import { newUnauthorizedError } from "@selfage/http_error";
 import { parseEnum } from "@selfage/message/parser";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
@@ -66,16 +63,17 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
       }),
     ]);
     if (profileRows.length === 0) {
-      throw newInternalServerErrorError(
-        `Payment account ${accountId} is not found.`,
-      );
+      return {
+        notAvailable: true,
+      };
     }
     let profile = profileRows[0];
     if (!profile.paymentProfileStripePaymentCustomerId) {
-      throw newInternalServerErrorError(
-        `Payment account ${accountId} does not have a Stripe customer.`,
-      );
+      return {
+        notAvailable: true,
+      };
     }
+
     let stripeCustomer = await this.stripeClient.val.customers.retrieve(
       profile.paymentProfileStripePaymentCustomerId,
     );

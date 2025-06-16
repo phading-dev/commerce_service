@@ -273,5 +273,89 @@ TEST_RUNNER.run({
         });
       },
     },
+    {
+      name: "NoStripePaymentCustomerId",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertPaymentProfileStatement({
+              accountId: "account1",
+            }),
+          ]);
+          await transaction.commit();
+        });
+        let clientMock = new NodeServiceClientMock();
+        clientMock.response = {
+          accountId: "account1",
+          capabilities: {
+            canBeBilled: true,
+          },
+        } as FetchSessionAndCheckCapabilityResponse;
+        let handler = new GetPaymentProfileInfoHandler(
+          SPANNER_DATABASE,
+          new Ref(),
+          clientMock,
+        );
+
+        // Execute
+        let response = await handler.handle("", {}, "session1");
+
+        // Verify
+        assertThat(
+          response,
+          eqMessage(
+            {
+              notAvailable: true,
+            },
+            GET_PAYMENT_PROFILE_INFO_RESPONSE,
+          ),
+          "response",
+        );
+      },
+      tearDown: async () => {
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            deletePaymentProfileStatement({
+              paymentProfileAccountIdEq: "account1",
+            }),
+          ]);
+          await transaction.commit();
+        });
+      },
+    },
+    {
+      name: "NoPaymentProfile",
+      execute: async () => {
+        // Prepare
+        let clientMock = new NodeServiceClientMock();
+        clientMock.response = {
+          accountId: "account1",
+          capabilities: {
+            canBeBilled: true,
+          },
+        } as FetchSessionAndCheckCapabilityResponse;
+        let handler = new GetPaymentProfileInfoHandler(
+          SPANNER_DATABASE,
+          new Ref(),
+          clientMock,
+        );
+
+        // Execute
+        let response = await handler.handle("", {}, "session1");
+
+        // Verify
+        assertThat(
+          response,
+          eqMessage(
+            {
+              notAvailable: true,
+            },
+            GET_PAYMENT_PROFILE_INFO_RESPONSE,
+          ),
+          "response",
+        );
+      },
+    },
   ],
 });

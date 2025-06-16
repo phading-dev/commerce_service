@@ -71,7 +71,7 @@ TEST_RUNNER.run({
           lineItems: [
             {
               productID: ProductID.SHOW,
-              quantity: 10 * 3600,
+              quantity: 100 * 3600,
             },
           ],
         });
@@ -94,8 +94,8 @@ TEST_RUNNER.run({
                   items: [
                     {
                       productID: ProductID.SHOW,
-                      unit: "seconds",
-                      quantity: 10 * 3600,
+                      unit: "second",
+                      quantity: 100 * 3600,
                       amount: 10,
                       amountType: AmountType.DEBIT,
                     },
@@ -165,7 +165,7 @@ TEST_RUNNER.run({
           lineItems: [
             {
               productID: ProductID.SHOW_CREDIT,
-              quantity: 20 * 10 * 3600,
+              quantity: 20 * 100 * 3600,
             },
             {
               productID: ProductID.STORAGE,
@@ -192,13 +192,13 @@ TEST_RUNNER.run({
                 transactionStatementStatement: {
                   currency: "USD",
                   totalAmountType: AmountType.CREDIT,
-                  totalAmount: 91,
+                  totalAmount: 71,
                   items: [
                     {
                       productID: ProductID.SHOW_CREDIT,
-                      unit: "seconds",
-                      quantity: 20 * 10 * 3600,
-                      amount: 160,
+                      unit: "second",
+                      quantity: 20 * 100 * 3600,
+                      amount: 140,
                       amountType: AmountType.CREDIT,
                     },
                     {
@@ -281,7 +281,7 @@ TEST_RUNNER.run({
           lineItems: [
             {
               productID: ProductID.SHOW_CREDIT,
-              quantity: 2 * 10 * 3600,
+              quantity: 2 * 100 * 3600,
             },
             {
               productID: ProductID.STORAGE,
@@ -308,13 +308,13 @@ TEST_RUNNER.run({
                 transactionStatementStatement: {
                   currency: "USD",
                   totalAmountType: AmountType.DEBIT,
-                  totalAmount: 53,
+                  totalAmount: 55,
                   items: [
                     {
                       productID: ProductID.SHOW_CREDIT,
-                      unit: "seconds",
-                      quantity: 2 * 10 * 3600,
-                      amount: 16,
+                      unit: "second",
+                      quantity: 2 * 100 * 3600,
+                      amount: 14,
                       amountType: AmountType.CREDIT,
                     },
                     {
@@ -397,11 +397,11 @@ TEST_RUNNER.run({
           lineItems: [
             {
               productID: ProductID.SHOW_CREDIT,
-              quantity: 3 * 10 * 3600,
+              quantity: 3 * 100 * 3600,
             },
             {
               productID: ProductID.UPLOAD,
-              quantity: 2 * 1024,
+              quantity: 1.75 * 1024,
             },
           ],
         });
@@ -424,16 +424,16 @@ TEST_RUNNER.run({
                   items: [
                     {
                       productID: ProductID.SHOW_CREDIT,
-                      unit: "seconds",
-                      quantity: 3 * 10 * 3600,
-                      amount: 24,
+                      unit: "second",
+                      quantity: 3 * 100 * 3600,
+                      amount: 21,
                       amountType: AmountType.CREDIT,
                     },
                     {
                       productID: ProductID.UPLOAD,
                       unit: "MiB",
-                      quantity: 2 * 1024,
-                      amount: 24,
+                      quantity: 1.75 * 1024,
+                      amount: 21,
                       amountType: AmountType.DEBIT,
                     },
                   ],
