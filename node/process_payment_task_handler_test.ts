@@ -190,7 +190,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           createInvoiceOptionCaptured.idempotencyKey,
-          eq("statement1"),
+          eq("cstatement1"),
           "createInvoiceOption.idempotencyKey",
         );
         assertThat(
@@ -210,7 +210,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           addLinesOptionCaptured.idempotencyKey,
-          eq("statement1"),
+          eq("astatement1"),
           "addLinesOption.idempotencyKey",
         );
         assertThat(
@@ -225,7 +225,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           finalizeInvoiceOptionCaptured.idempotencyKey,
-          eq("statement1"),
+          eq("fstatement1"),
           "finalizeInvoiceOption.idempotencyKey",
         );
         assertThat(

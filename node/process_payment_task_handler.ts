@@ -148,7 +148,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
           transactionStatement.transactionStatementStatement.currency.toLowerCase(),
       },
       {
-        idempotencyKey: body.statementId,
+        idempotencyKey: `c${body.statementId}`,
       },
     );
     await this.stripeClient.val.invoices.addLines(
@@ -163,7 +163,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         ],
       },
       {
-        idempotencyKey: body.statementId,
+        idempotencyKey: `a${body.statementId}`,
       },
     );
     await this.stripeClient.val.invoices.finalizeInvoice(
@@ -172,7 +172,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         auto_advance: true,
       },
       {
-        idempotencyKey: body.statementId,
+        idempotencyKey: `f${body.statementId}`,
       },
     );
     await this.finalize(loggingPrefix, body.statementId, invoice.id);

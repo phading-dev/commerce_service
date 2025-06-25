@@ -133,7 +133,7 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
         },
       },
       {
-        idempotencyKey: body.accountId,
+        idempotencyKey: `a${body.accountId}`,
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {

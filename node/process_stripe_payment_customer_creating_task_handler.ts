@@ -110,7 +110,7 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
         },
       },
       {
-        idempotencyKey: body.accountId,
+        idempotencyKey: `c${body.accountId}`,
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {
