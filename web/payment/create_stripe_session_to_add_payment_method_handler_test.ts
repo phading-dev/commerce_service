@@ -73,7 +73,7 @@ TEST_RUNNER.run({
         assertThat(
           createSessionParamsCaptured.success_url,
           eq(
-            "https://test.com/?e=%7B%222%22%3A%7B%221%22%3A%22account1%22%7D%7D&session_id=%7BCHECKOUT_SESSION_ID%7D",
+            "https://test.com/?e=%7B%222%22%3A%7B%221%22%3A%22account1%22%7D%7D&session_id={CHECKOUT_SESSION_ID}",
           ),
           "createSessionParams.success_url",
         );

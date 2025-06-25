@@ -66,16 +66,12 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
       currency: ENV_VARS.defaultCurrency.toLocaleLowerCase(),
       customer: row.paymentProfileStripePaymentCustomerId,
       payment_method_types: ["card"],
-      success_url: buildUrl(
-        this.externalOrigin,
-        {
+      success_url:
+        buildUrl(this.externalOrigin, {
           replacePrimaryPaymentMethod: {
             accountId,
           },
-        },
-        // TODO: Figure out a way to define it in the APP message.
-        [["session_id", "{CHECKOUT_SESSION_ID}"]],
-      ),
+        }) + "&session_id={CHECKOUT_SESSION_ID}",
       cancel_url: buildUrl(this.externalOrigin, {
         main: {
           chooseAccount: {
