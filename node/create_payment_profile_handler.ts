@@ -17,7 +17,8 @@ export class CreatePaymentProfileHandler extends CreatePaymentProfileHandlerInte
     return new CreatePaymentProfileHandler(SPANNER_DATABASE, () => Date.now());
   }
 
-  private static DELAYED_PAYMENT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  // TODO: Switch back to 30 days after testing
+  private static DELAYED_PAYMENT_MS = 1 * 24 * 60 * 60 * 1000; // 1 day
 
   public constructor(
     private database: Database,
