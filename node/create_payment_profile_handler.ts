@@ -48,6 +48,7 @@ export class CreatePaymentProfileHandler extends CreatePaymentProfileHandlerInte
             updatedTimeMs: now,
           },
           paymentAfterMs: now + CreatePaymentProfileHandler.DELAYED_PAYMENT_MS,
+          createdTimeMs: now,
         }),
         insertStripePaymentCustomerCreatingTaskStatement({
           accountId: body.accountId,

@@ -44,6 +44,7 @@ TEST_RUNNER.run({
                   updatedTimeMs: 1000,
                 },
                 paymentProfilePaymentAfterMs: 2592001000,
+                paymentProfileCreatedTimeMs: 1000,
               },
               GET_PAYMENT_PROFILE_ROW,
             ),
