@@ -9,24 +9,24 @@ export function insertPaymentProfileStatement(
     accountId: string,
     stripePaymentCustomerId?: string,
     stateInfo?: PaymentProfileStateInfo,
-    paymentAfterMs?: number,
+    firstPaymentTimeMs?: number,
     createdTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "INSERT PaymentProfile (accountId, stripePaymentCustomerId, stateInfo, paymentAfterMs, createdTimeMs) VALUES (@accountId, @stripePaymentCustomerId, @stateInfo, @paymentAfterMs, @createdTimeMs)",
+    sql: "INSERT PaymentProfile (accountId, stripePaymentCustomerId, stateInfo, firstPaymentTimeMs, createdTimeMs) VALUES (@accountId, @stripePaymentCustomerId, @stateInfo, @firstPaymentTimeMs, @createdTimeMs)",
     params: {
       accountId: args.accountId,
       stripePaymentCustomerId: args.stripePaymentCustomerId == null ? null : args.stripePaymentCustomerId,
       stateInfo: args.stateInfo == null ? null : Buffer.from(serializeMessage(args.stateInfo, PAYMENT_PROFILE_STATE_INFO).buffer),
-      paymentAfterMs: args.paymentAfterMs == null ? null : Spanner.float(args.paymentAfterMs),
+      firstPaymentTimeMs: args.firstPaymentTimeMs == null ? null : Spanner.float(args.firstPaymentTimeMs),
       createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
     },
     types: {
       accountId: { type: "string" },
       stripePaymentCustomerId: { type: "string" },
       stateInfo: { type: "bytes" },
-      paymentAfterMs: { type: "float64" },
+      firstPaymentTimeMs: { type: "float64" },
       createdTimeMs: { type: "float64" },
     }
   };
@@ -52,7 +52,7 @@ export interface GetPaymentProfileRow {
   paymentProfileAccountId?: string,
   paymentProfileStripePaymentCustomerId?: string,
   paymentProfileStateInfo?: PaymentProfileStateInfo,
-  paymentProfilePaymentAfterMs?: number,
+  paymentProfileFirstPaymentTimeMs?: number,
   paymentProfileCreatedTimeMs?: number,
 }
 
@@ -71,7 +71,7 @@ export let GET_PAYMENT_PROFILE_ROW: MessageDescriptor<GetPaymentProfileRow> = {
     index: 3,
     messageType: PAYMENT_PROFILE_STATE_INFO,
   }, {
-    name: 'paymentProfilePaymentAfterMs',
+    name: 'paymentProfileFirstPaymentTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }, {
@@ -88,7 +88,7 @@ export async function getPaymentProfile(
   }
 ): Promise<Array<GetPaymentProfileRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PaymentProfile.accountId, PaymentProfile.stripePaymentCustomerId, PaymentProfile.stateInfo, PaymentProfile.paymentAfterMs, PaymentProfile.createdTimeMs FROM PaymentProfile WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
+    sql: "SELECT PaymentProfile.accountId, PaymentProfile.stripePaymentCustomerId, PaymentProfile.stateInfo, PaymentProfile.firstPaymentTimeMs, PaymentProfile.createdTimeMs FROM PaymentProfile WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
     params: {
       paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
     },
@@ -102,7 +102,7 @@ export async function getPaymentProfile(
       paymentProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
       paymentProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
       paymentProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, PAYMENT_PROFILE_STATE_INFO),
-      paymentProfilePaymentAfterMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      paymentProfileFirstPaymentTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
       paymentProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
     });
   }
@@ -2551,7 +2551,7 @@ export interface GetPaymentProfileFromStatementRow {
   paymentProfileAccountId?: string,
   paymentProfileStripePaymentCustomerId?: string,
   paymentProfileStateInfo?: PaymentProfileStateInfo,
-  paymentProfilePaymentAfterMs?: number,
+  paymentProfileFirstPaymentTimeMs?: number,
   paymentProfileCreatedTimeMs?: number,
 }
 
@@ -2570,7 +2570,7 @@ export let GET_PAYMENT_PROFILE_FROM_STATEMENT_ROW: MessageDescriptor<GetPaymentP
     index: 3,
     messageType: PAYMENT_PROFILE_STATE_INFO,
   }, {
-    name: 'paymentProfilePaymentAfterMs',
+    name: 'paymentProfileFirstPaymentTimeMs',
     index: 4,
     primitiveType: PrimitiveType.NUMBER,
   }, {
@@ -2587,7 +2587,7 @@ export async function getPaymentProfileFromStatement(
   }
 ): Promise<Array<GetPaymentProfileFromStatementRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT b.accountId, b.stripePaymentCustomerId, b.stateInfo, b.paymentAfterMs, b.createdTimeMs FROM TransactionStatement AS t INNER JOIN PaymentProfile AS b ON t.accountId = b.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
+    sql: "SELECT b.accountId, b.stripePaymentCustomerId, b.stateInfo, b.firstPaymentTimeMs, b.createdTimeMs FROM TransactionStatement AS t INNER JOIN PaymentProfile AS b ON t.accountId = b.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
     params: {
       transactionStatementStatementIdEq: args.transactionStatementStatementIdEq,
     },
@@ -2601,7 +2601,7 @@ export async function getPaymentProfileFromStatement(
       paymentProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
       paymentProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
       paymentProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, PAYMENT_PROFILE_STATE_INFO),
-      paymentProfilePaymentAfterMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      paymentProfileFirstPaymentTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
       paymentProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
     });
   }

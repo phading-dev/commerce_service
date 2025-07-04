@@ -2,7 +2,6 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
-  GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_METADATA_ROW,
   GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
   GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
   GET_PAYMENT_ROW,
@@ -11,11 +10,10 @@ import {
   deletePaymentStatement,
   getPayment,
   getPaymentMethodNeedsUpdateNotifyingTask,
-  getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
   getPaymentProfileSuspendingDueToPastDueTask,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentStatement,
-  listPendingPaymentProfileSuspendingDueToPastDueTasks,
 } from "../../db/sql";
 import { MarkPaymentFailedHandler } from "./mark_payment_failed_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -23,8 +21,6 @@ import { Ref } from "@selfage/ref";
 import { assertThat, eq, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 import { Readable } from "stream";
-
-let FUTURE_TIME_MS = 364 * 24 * 60 * 60 * 1000;
 
 async function cleanupAll() {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -162,7 +158,7 @@ TEST_RUNNER.run({
       },
     },
     {
-      name: "MarkFailureWheAlreadyFailedAndNotify",
+      name: "MarkFailureWithExistingTasks",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -170,7 +166,19 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               accountId: "account1",
               statementId: "statement1",
-              state: PaymentState.FAILED,
+              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+            }),
+            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
+            insertPaymentProfileSuspendingDueToPastDueTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
             }),
           ]);
           await transaction.commit();
@@ -219,6 +227,7 @@ TEST_RUNNER.run({
                 paymentAccountId: "account1",
                 paymentStatementId: "statement1",
                 paymentState: PaymentState.FAILED,
+                paymentUpdatedTimeMs: 1000,
               },
               GET_PAYMENT_ROW,
             ),
@@ -243,92 +252,22 @@ TEST_RUNNER.run({
           "notifyingTasks",
         );
         assertThat(
-          await listPendingPaymentProfileSuspendingDueToPastDueTasks(
-            SPANNER_DATABASE,
-            {
-              paymentProfileSuspendingDueToPastDueTaskExecutionTimeMsLe:
-                FUTURE_TIME_MS,
-            },
-          ),
-          isArray([]),
-          "accountSuspendingTasks",
-        );
-      },
-      tearDown: async () => {
-        await cleanupAll();
-      },
-    },
-    {
-      name: "MarkFailureWhenAlreadyFailedAndNotifyingTaskExists",
-      execute: async () => {
-        // Prepare
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            insertPaymentStatement({
-              accountId: "account1",
-              statementId: "statement1",
-              state: PaymentState.FAILED,
-            }),
-            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
-              statementId: "statement1",
-              retryCount: 0,
-              executionTimeMs: 100,
-              createdTimeMs: 100,
-            }),
-          ]);
-          await transaction.commit();
-        });
-        let stripeClientMock: any = {
-          webhooks: {
-            constructEvent: () => {
-              return {
-                type: "payment_intent.payment_failed",
-                data: {
-                  object: {
-                    invoice: "invoice1",
-                  },
-                },
-              };
-            },
-          },
-          invoices: {
-            retrieve: async (invoiceId: string) => {
-              return {
-                metadata: {
-                  statementId: "statement1",
-                },
-              };
-            },
-          },
-        };
-        let handler = new MarkPaymentFailedHandler(
-          SPANNER_DATABASE,
-          new Ref(stripeClientMock),
-          "secret1",
-          () => 1000,
-        );
-
-        // Execute
-        await handler.handle("", Readable.from("event_input"), "sig1");
-
-        // Verify
-        assertThat(
-          await getPaymentMethodNeedsUpdateNotifyingTaskMetadata(
-            SPANNER_DATABASE,
-            {
-              paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
-            },
-          ),
+          await getPaymentProfileSuspendingDueToPastDueTask(SPANNER_DATABASE, {
+            paymentProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+          }),
           isArray([
             eqMessage(
               {
-                paymentMethodNeedsUpdateNotifyingTaskRetryCount: 0,
-                paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: 100,
+                paymentProfileSuspendingDueToPastDueTaskStatementId:
+                  "statement1",
+                paymentProfileSuspendingDueToPastDueTaskRetryCount: 0,
+                paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs: 100,
+                paymentProfileSuspendingDueToPastDueTaskCreatedTimeMs: 100,
               },
-              GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_METADATA_ROW,
+              GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
             ),
           ]),
-          "notifyingTasks",
+          "accountSuspendingTasks",
         );
       },
       tearDown: async () => {

@@ -1,6 +1,7 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PaymentState, PayoutState, TransactionStatement } from "../db/schema";
 import {
+  getPaymentProfile,
   getTransactionStatementByMonth,
   insertPaymentStatement,
   insertPaymentTaskStatement,
@@ -41,10 +42,20 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
     body: GenerateTransactionStatementRequestBody,
   ): Promise<GenerateTransactionStatementResponse> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let statementRows = await getTransactionStatementByMonth(transaction, {
-        transactionStatementAccountIdEq: body.accountId,
-        transactionStatementMonthEq: body.month,
-      });
+      let [profileRows, statementRows] = await Promise.all([
+        getPaymentProfile(transaction, {
+          paymentProfileAccountIdEq: body.accountId,
+        }),
+        getTransactionStatementByMonth(transaction, {
+          transactionStatementAccountIdEq: body.accountId,
+          transactionStatementMonthEq: body.month,
+        }),
+      ]);
+      if (profileRows.length === 0) {
+        throw newInternalServerErrorError(
+          `Account ${body.accountId} does not have a payment profile.`,
+        );
+      }
       if (statementRows.length > 0) {
         return;
       }
@@ -88,6 +99,7 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
         debitAmount >= creditAmount ? AmountType.DEBIT : AmountType.CREDIT;
       transactionStatement.totalAmount = Math.abs(debitAmount - creditAmount);
 
+      let profile = profileRows[0];
       let now = this.getNow();
       let statementId = this.generateUuid();
       await transaction.batchUpdate([
@@ -127,7 +139,10 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
                 insertPaymentTaskStatement({
                   statementId,
                   retryCount: 0,
-                  executionTimeMs: now,
+                  executionTimeMs:
+                    now > profile.paymentProfileFirstPaymentTimeMs
+                      ? now
+                      : profile.paymentProfileFirstPaymentTimeMs,
                   createdTimeMs: now,
                 }),
               ]),

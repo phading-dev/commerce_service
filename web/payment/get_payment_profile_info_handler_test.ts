@@ -32,7 +32,7 @@ TEST_RUNNER.run({
               stateInfo: {
                 state: PaymentProfileState.HEALTHY,
               },
-              paymentAfterMs: 1000,
+              firstPaymentTimeMs: 1000,
               stripePaymentCustomerId: "stripeCustomer1",
             }),
           ]);
@@ -115,7 +115,7 @@ TEST_RUNNER.run({
                 },
               },
               state: PaymentProfileStateResponse.HEALTHY,
-              paymentAfterMs: 1000,
+              firstPaymentTimeMs: 1000,
             },
             GET_PAYMENT_PROFILE_INFO_RESPONSE,
           ),
@@ -144,7 +144,7 @@ TEST_RUNNER.run({
               stateInfo: {
                 state: PaymentProfileState.HEALTHY,
               },
-              paymentAfterMs: 1000,
+              firstPaymentTimeMs: 1000,
               stripePaymentCustomerId: "stripeCustomer1",
             }),
             insertPaymentStatement({
@@ -186,7 +186,7 @@ TEST_RUNNER.run({
           eqMessage(
             {
               state: PaymentProfileStateResponse.WITH_FAILED_PAYMENTS,
-              paymentAfterMs: 1000,
+              firstPaymentTimeMs: 1000,
             },
             GET_PAYMENT_PROFILE_INFO_RESPONSE,
           ),
@@ -218,7 +218,7 @@ TEST_RUNNER.run({
               stateInfo: {
                 state: PaymentProfileState.SUSPENDED,
               },
-              paymentAfterMs: 1000,
+              firstPaymentTimeMs: 1000,
               stripePaymentCustomerId: "stripeCustomer1",
             }),
           ]);
@@ -255,7 +255,7 @@ TEST_RUNNER.run({
           eqMessage(
             {
               state: PaymentProfileStateResponse.SUSPENDED,
-              paymentAfterMs: 1000,
+              firstPaymentTimeMs: 1000,
             },
             GET_PAYMENT_PROFILE_INFO_RESPONSE,
           ),

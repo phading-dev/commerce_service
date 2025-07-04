@@ -5,8 +5,9 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
 import {
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
   getPayment,
-  getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
+  getPaymentProfileSuspendingDueToPastDueTask,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   updatePaymentStateStatement,
@@ -62,58 +63,51 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
     let invoice = await this.stripeClient.val.invoices.retrieve(invoiceId);
     await this.database.runTransactionAsync(async (transaction) => {
       let statementId = invoice.metadata.statementId;
-      let [paymentRows, notifyingTasks] = await Promise.all([
+      let [paymentRows, suspendingTaskRows] = await Promise.all([
         getPayment(transaction, { paymentStatementIdEq: statementId }),
-        getPaymentMethodNeedsUpdateNotifyingTaskMetadata(transaction, {
-          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: statementId,
+        getPaymentProfileSuspendingDueToPastDueTask(transaction, {
+          paymentProfileSuspendingDueToPastDueTaskStatementIdEq: statementId,
         }),
       ]);
       if (paymentRows.length === 0) {
         throw newInternalServerErrorError(
-          `Payment ${invoice.metadata.statementId} is not found.`,
+          `Payment ${statementId} is not found.`,
         );
       }
       let payment = paymentRows[0];
-      let now = this.getNow();
-      if (payment.paymentState === PaymentState.CHARGING_VIA_STRIPE_INVOICE) {
-        await transaction.batchUpdate([
-          updatePaymentStateStatement({
-            paymentStatementIdEq: statementId,
-            setState: PaymentState.FAILED,
-            setUpdatedTimeMs: now,
-          }),
-          insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
-            statementId,
-            retryCount: 0,
-            executionTimeMs: now,
-            createdTimeMs: now,
-          }),
-          insertPaymentProfileSuspendingDueToPastDueTaskStatement({
-            statementId,
-            retryCount: 0,
-            executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,
-            createdTimeMs: now,
-          }),
-        ]);
-        await transaction.commit();
-      } else if (payment.paymentState === PaymentState.FAILED) {
-        if (notifyingTasks.length === 0) {
-          // This may happen after payment method is updated and payment retried but failed again.
-          await transaction.batchUpdate([
-            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
-              statementId,
-              retryCount: 0,
-              executionTimeMs: now,
-              createdTimeMs: now,
-            }),
-          ]);
-          await transaction.commit();
-        }
-      } else {
+      if (payment.paymentState !== PaymentState.CHARGING_VIA_STRIPE_INVOICE) {
         throw newConflictError(
-          `Payment ${statementId} is in unexpected state: ${PaymentState[payment.paymentState]}`,
+          `Payment ${statementId} is not in CHARGING_VIA_STRIPE_INVOICE state.`,
         );
       }
+      let now = this.getNow();
+      await transaction.batchUpdate([
+        updatePaymentStateStatement({
+          paymentStatementIdEq: statementId,
+          setState: PaymentState.FAILED,
+          setUpdatedTimeMs: now,
+        }),
+        deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: statementId,
+        }),
+        insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+          statementId,
+          retryCount: 0,
+          executionTimeMs: now,
+          createdTimeMs: now,
+        }),
+        ...(suspendingTaskRows.length === 0
+          ? [
+              insertPaymentProfileSuspendingDueToPastDueTaskStatement({
+                statementId,
+                retryCount: 0,
+                executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,
+                createdTimeMs: now,
+              }),
+            ]
+          : []),
+      ]);
+      await transaction.commit();
     });
     return { received: true };
   }

@@ -16,7 +16,9 @@ import {
   getPaymentMethodNeedsUpdateNotifyingTask,
   getPaymentProfileSuspendingDueToPastDueTask,
   getPaymentTaskMetadata,
+  insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentProfileStatement,
+  insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentStatement,
   insertPaymentTaskStatement,
   insertTransactionStatementStatement,
@@ -392,6 +394,113 @@ TEST_RUNNER.run({
                 paymentProfileSuspendingDueToPastDueTaskRetryCount: 0,
                 paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs: 864001000,
                 paymentProfileSuspendingDueToPastDueTaskCreatedTimeMs: 1000,
+              },
+              GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
+            ),
+          ]),
+          "paymentProfileSuspendingDueToPastDueTasks",
+        );
+      },
+      tearDown: async () => {
+        await cleanupAll();
+      },
+    },
+    {
+      name: "MissingDefaultPaymentMethodAndReportFailureWithExistingTask",
+      execute: async () => {
+        // Prepare
+        await insertPayment();
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
+            insertPaymentProfileSuspendingDueToPastDueTaskStatement({
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
+          ]);
+          await transaction.commit();
+        });
+        let stripeClientMock: any = {
+          customers: {
+            retrieve: async () => {
+              return {
+                invoice_settings: {
+                  default_payment_method: null,
+                },
+              } as any;
+            },
+          },
+        };
+        let handler = new ProcessPaymentTaskHandler(
+          SPANNER_DATABASE,
+          new Ref(stripeClientMock),
+          () => 1000,
+        );
+
+        // Execute
+        await handler.processTask("", { statementId: "statement1" });
+
+        // Verify
+        assertThat(
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
+          isArray([
+            eqMessage(
+              {
+                paymentStatementId: "statement1",
+                paymentAccountId: "account1",
+                paymentState: PaymentState.FAILED,
+                paymentUpdatedTimeMs: 1000,
+              },
+              GET_PAYMENT_ROW,
+            ),
+          ]),
+          "payment",
+        );
+        assertThat(
+          await listPendingPaymentTasks(SPANNER_DATABASE, {
+            paymentTaskExecutionTimeMsLe: ONE_YEAR_MS,
+          }),
+          isArray([]),
+          "tasks",
+        );
+        assertThat(
+          await getPaymentMethodNeedsUpdateNotifyingTask(SPANNER_DATABASE, {
+            paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
+          }),
+          isArray([
+            eqMessage(
+              {
+                paymentMethodNeedsUpdateNotifyingTaskStatementId: "statement1",
+                paymentMethodNeedsUpdateNotifyingTaskRetryCount: 0,
+                paymentMethodNeedsUpdateNotifyingTaskExecutionTimeMs: 1000,
+                paymentMethodNeedsUpdateNotifyingTaskCreatedTimeMs: 1000,
+              },
+              GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
+            ),
+          ]),
+          "updatePaymentMethodNotifyingTasks",
+        );
+        assertThat(
+          await getPaymentProfileSuspendingDueToPastDueTask(SPANNER_DATABASE, {
+            paymentProfileSuspendingDueToPastDueTaskStatementIdEq: "statement1",
+          }),
+          isArray([
+            eqMessage(
+              {
+                paymentProfileSuspendingDueToPastDueTaskStatementId:
+                  "statement1",
+                paymentProfileSuspendingDueToPastDueTaskRetryCount: 0,
+                paymentProfileSuspendingDueToPastDueTaskExecutionTimeMs: 100,
+                paymentProfileSuspendingDueToPastDueTaskCreatedTimeMs: 100,
               },
               GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
             ),

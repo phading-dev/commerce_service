@@ -105,7 +105,7 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
         profile.paymentProfileStateInfo.state,
         paymentRows.length > 0,
       ),
-      paymentAfterMs: profile.paymentProfilePaymentAfterMs,
+      firstPaymentTimeMs: profile.paymentProfileFirstPaymentTimeMs,
     };
   }
 

@@ -11,13 +11,13 @@
       "name": "stateInfo",
       "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN stateInfo BYTES(MAX)"
     }, {
-      "name": "paymentAfterMs",
-      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN paymentAfterMs FLOAT64"
+      "name": "firstPaymentTimeMs",
+      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN firstPaymentTimeMs FLOAT64"
     }, {
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN createdTimeMs FLOAT64"
     }],
-    "createTableDdl": "CREATE TABLE PaymentProfile (accountId STRING(MAX) NOT NULL, stripePaymentCustomerId STRING(MAX), stateInfo BYTES(MAX), paymentAfterMs FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (accountId ASC)",
+    "createTableDdl": "CREATE TABLE PaymentProfile (accountId STRING(MAX) NOT NULL, stripePaymentCustomerId STRING(MAX), stateInfo BYTES(MAX), firstPaymentTimeMs FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (accountId ASC)",
     "indexes": []
   }, {
     "name": "PayoutProfile",

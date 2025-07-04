@@ -95,7 +95,7 @@
         - name: stateInfo
           type: PaymentProfileStateInfo
           nullable: true
-        - name: paymentAfterMs
+        - name: firstPaymentTimeMs
           type: float64
           nullable: true
         - name: createdTimeMs

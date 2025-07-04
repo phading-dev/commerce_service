@@ -6,9 +6,11 @@ import { STRIPE_CLIENT } from "../common/stripe_client";
 import { PaymentState } from "../db/schema";
 import {
   GetPaymentRow,
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
   deletePaymentTaskStatement,
   getPayment,
   getPaymentProfileFromStatement,
+  getPaymentProfileSuspendingDueToPastDueTask,
   getPaymentTaskMetadata,
   getTransactionStatement,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
@@ -183,7 +185,12 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
     statementId: string,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      await this.getValidPayment(transaction, statementId);
+      let [_, suspendingTaskRows] = await Promise.all([
+        this.getValidPayment(transaction, statementId),
+        getPaymentProfileSuspendingDueToPastDueTask(transaction, {
+          paymentProfileSuspendingDueToPastDueTaskStatementIdEq: statementId,
+        }),
+      ]);
       let now = this.getNow();
       await transaction.batchUpdate([
         updatePaymentStateStatement({
@@ -191,18 +198,25 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
           setState: PaymentState.FAILED,
           setUpdatedTimeMs: now,
         }),
+        deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: statementId,
+        }),
         insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
           statementId: statementId,
           retryCount: 0,
           executionTimeMs: now,
           createdTimeMs: now,
         }),
-        insertPaymentProfileSuspendingDueToPastDueTaskStatement({
-          statementId: statementId,
-          retryCount: 0,
-          executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,
-          createdTimeMs: now,
-        }),
+        ...(suspendingTaskRows.length === 0
+          ? [
+              insertPaymentProfileSuspendingDueToPastDueTaskStatement({
+                statementId: statementId,
+                retryCount: 0,
+                executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,
+                createdTimeMs: now,
+              }),
+            ]
+          : []),
         deletePaymentTaskStatement({
           paymentTaskStatementIdEq: statementId,
         }),
