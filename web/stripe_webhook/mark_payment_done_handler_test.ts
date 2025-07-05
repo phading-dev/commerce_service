@@ -83,8 +83,8 @@ TEST_RUNNER.run({
         let handler = new MarkPaymentDoneHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
-          "secret1",
           () => 1000,
+          "secret1",
         );
 
         // Execute

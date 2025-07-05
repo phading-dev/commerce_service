@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { CUSTOMER_METADATA_ACCOUNT_ID_KEY } from "../common/constants";
 import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
@@ -107,6 +108,9 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
         test_clock: this.testClockId,
         tax: {
           validate_location: "deferred",
+        },
+        metadata: {
+          [CUSTOMER_METADATA_ACCOUNT_ID_KEY]: body.accountId,
         },
       },
       {

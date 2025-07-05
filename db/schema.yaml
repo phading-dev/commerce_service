@@ -18,6 +18,15 @@
       type: number
       index: 3
 - kind: Enum
+  name: InitCreditGrantingState
+  values:
+    - name: NOT_GRANTED
+      value: 1
+    - name: GRANTING
+      value: 2
+    - name: GRANTED
+      value: 3
+- kind: Enum
   name: StripeConnectedAccountState
   values:
     - name: ONBOARDING
@@ -95,8 +104,8 @@
         - name: stateInfo
           type: PaymentProfileStateInfo
           nullable: true
-        - name: firstPaymentTimeMs
-          type: float64
+        - name: initCreditGrantingState
+          type: InitCreditGrantingState
           nullable: true
         - name: createdTimeMs
           type: float64
@@ -106,6 +115,19 @@
       insert: InsertPaymentProfile
       delete: DeletePaymentProfile
       get: GetPaymentProfile
+    - kind: Table
+      name: PaymentCardGrantedInitCredit
+      columns:
+        - name: fingerprint
+          type: string
+        - name: createdTimeMs
+          type: float64
+          nullable: true
+      primaryKeys:
+        - fingerprint
+      insert: InsertPaymentCardGrantedInitCredit
+      delete: DeletePaymentCardGrantedInitCredit
+      get: GetPaymentCardGrantedInitCredit
     - kind: Table
       name: PayoutProfile
       columns:
@@ -235,6 +257,23 @@
       listPendingTasks: ListPendingStripePaymentCustomerCreatingTasks
       getMetadata: GetStripePaymentCustomerCreatingTaskMetadata
       updateMetadata: UpdateStripePaymentCustomerCreatingTaskMetadata
+    - kind: TaskTable
+      name: InitPaymentCreditGrantingTask
+      columns:
+        - name: accountId
+          type: string
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - accountId
+      executionTimeIndex: InitPaymentCreditGrantingTaskByExecutionTime
+      insert: InsertInitPaymentCreditGrantingTask
+      delete: DeleteInitPaymentCreditGrantingTask
+      get: GetInitPaymentCreditGrantingTask
+      listPendingTasks: ListPendingInitPaymentCreditGrantingTasks
+      getMetadata: GetInitPaymentCreditGrantingTaskMetadata
+      updateMetadata: UpdateInitPaymentCreditGrantingTaskMetadata
     - kind: TaskTable
       name: StripeConnectedAccountCreatingTask
       columns:
@@ -381,57 +420,52 @@
     - name: UpdatePaymentProfileState
       table: PaymentProfile
       where:
-        op: AND
-        exprs:
-          - op: =
-            lColumn: accountId
+        op: =
+        lColumn: accountId
       set:
         - stateInfo
     - name: UpdatePaymentProfilePaymentCustomer
       table: PaymentProfile
       where:
-        op: AND
-        exprs:
-          - op: =
-            lColumn: accountId
+        op: =
+        lColumn: accountId
       set:
         - stripePaymentCustomerId
+    - name: UpdatePaymentProfileInitCreditGrantingState
+      table: PaymentProfile
+      where:
+        op: =
+        lColumn: accountId
+      set:
+        - initCreditGrantingState
     - name: UpdatePayoutProfileConnectedAccount
       table: PayoutProfile
       where:
-        op: AND
-        exprs:
-          - op: =
-            lColumn: accountId
+        op: =
+        lColumn: accountId
       set:
         - stripeConnectedAccountId
         - stripeConnectedAccountState
     - name: UpdatePayoutProfileConnectedAccountState
       table: PayoutProfile
       where:
-        op: AND
-        exprs:
-          - op: =
-            lColumn: accountId
+        op: =
+        lColumn: accountId
       set:
         - stripeConnectedAccountState
     - name: UpdatePaymentState
       table: Payment
       where:
-        op: AND
-        exprs:
-          - op: =
-            lColumn: statementId
+        op: =
+        lColumn: statementId
       set:
         - state
         - updatedTimeMs
     - name: UpdatePaymentStateAndStripeInvoice
       table: Payment
       where:
-        op: AND
-        exprs:
-          - op: =
-            lColumn: statementId
+        op: =
+        lColumn: statementId
       set:
         - state
         - stripeInvoiceId
@@ -439,20 +473,16 @@
     - name: UpdatePayoutState
       table: Payout
       where:
-        op: AND
-        exprs:
-          - op: =
-            lColumn: statementId
+        op: =
+        lColumn: statementId
       set:
         - state
         - updatedTimeMs
     - name: UpdatePayoutStateAndStripeTransfer
       table: Payout
       where:
-        op: AND
-        exprs:
-          - op: =
-            lColumn: statementId
+        op: =
+        lColumn: statementId
       set:
         - state
         - stripeTransferId

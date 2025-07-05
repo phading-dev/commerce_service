@@ -1,6 +1,9 @@
 import getStream from "get-stream";
 import Stripe from "stripe";
-import { GRACE_PERIOD_DAYS_IN_MS } from "../../common/constants";
+import {
+  GRACE_PERIOD_DAYS_IN_MS,
+  PAYMENT_METADATA_STATEMENT_ID_KEY,
+} from "../../common/constants";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
@@ -14,7 +17,7 @@ import {
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { MarkPaymentFailedHandlerInterface } from "@phading/commerce_service_interface/web/stripe_webhook/handler";
-import { EventReceivedResponse } from "@phading/commerce_service_interface/web/stripe_webhook/interface";
+import { Empty } from "@phading/commerce_service_interface/web/stripe_webhook/interface";
 import {
   newBadRequestError,
   newConflictError,
@@ -30,16 +33,16 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
     return new MarkPaymentFailedHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
-      stripePaymentIntentFailedSecretKey,
       () => Date.now(),
+      stripePaymentIntentFailedSecretKey,
     );
   }
 
   public constructor(
     private database: Database,
     private stripeClient: Ref<Stripe>,
-    private stripeSecretKey: string,
     private getNow: () => number,
+    private stripeSecretKey: string,
   ) {
     super();
   }
@@ -48,7 +51,7 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
     loggingPrefix: string,
     body: Readable,
     sessionStr: string,
-  ): Promise<EventReceivedResponse> {
+  ): Promise<Empty> {
     let event = this.stripeClient.val.webhooks.constructEvent(
       await getStream(body),
       sessionStr,
@@ -62,7 +65,7 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
     let invoiceId = event.data.object.invoice as string;
     let invoice = await this.stripeClient.val.invoices.retrieve(invoiceId);
     await this.database.runTransactionAsync(async (transaction) => {
-      let statementId = invoice.metadata.statementId;
+      let statementId = invoice.metadata[PAYMENT_METADATA_STATEMENT_ID_KEY];
       let [paymentRows, suspendingTaskRows] = await Promise.all([
         getPayment(transaction, { paymentStatementIdEq: statementId }),
         getPaymentProfileSuspendingDueToPastDueTask(transaction, {
@@ -109,6 +112,6 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
       ]);
       await transaction.commit();
     });
-    return { received: true };
+    return {};
   }
 }

@@ -60,6 +60,11 @@ export class CreateStripeSessionToAddPaymentMethodHandler extends CreateStripeSe
       throw newNotFoundError(`Payment account ${accountId} is not found.`);
     }
     let row = rows[0];
+    if (!row.paymentProfileStripePaymentCustomerId) {
+      throw newNotFoundError(
+        `Payment customer for account ${accountId} is not found.`,
+      );
+    }
     let session = await this.stripeClient.val.checkout.sessions.create({
       billing_address_collection: "required",
       mode: "setup",

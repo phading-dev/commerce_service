@@ -2,6 +2,8 @@ import { ENV_VARS } from "./env_vars";
 
 ENV_VARS.spannerDatabaseId = "commerce-db";
 ENV_VARS.stripeSecretKeyFile = "stripe_secret_key";
+ENV_VARS.stripeCustomerUpdatedSecretKeyFile =
+  "stripe_customer_updated_secret_key";
 ENV_VARS.stripePaymentIntentSuccessSecretKeyFile =
   "stripe_payment_intent_success_secret_key";
 ENV_VARS.stripePaymentIntentFailedSecretKeyFile =

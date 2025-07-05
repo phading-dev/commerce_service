@@ -7,12 +7,12 @@ import { Ref } from "@selfage/ref";
 export let STRIPE_CLIENT = new Ref<Stripe>();
 
 export async function initStripeClient(): Promise<void> {
-  let [stripeSecretKey] = await Promise.all([
+  let [secretKey] = await Promise.all([
     getStream(
       STORAGE_CLIENT.bucket(ENV_VARS.gcsSecretBucketName)
         .file(ENV_VARS.stripeSecretKeyFile)
         .createReadStream(),
     ),
   ]);
-  STRIPE_CLIENT.val = new Stripe(stripeSecretKey);
+  STRIPE_CLIENT.val = new Stripe(secretKey);
 }

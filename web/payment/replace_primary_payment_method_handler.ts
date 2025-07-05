@@ -26,6 +26,8 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
     );
   }
 
+  public detachedCallbackFn = () => {};
+
   public constructor(
     private database: Database,
     private stripeClient: Ref<Stripe>,
@@ -63,46 +65,53 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
         `Payment account ${accountId} is not found.`,
       );
     }
-    let stripeCustomerId = profileRows[0].paymentProfileStripePaymentCustomerId;
-    let session = await this.stripeClient.val.checkout.sessions.retrieve(
-      body.checkoutSessionId,
-      {
+    let profile = profileRows[0];
+    if (!profile.paymentProfileStripePaymentCustomerId) {
+      throw newInternalServerErrorError(
+        `Payment account ${accountId} does not have a Stripe customer.`,
+      );
+    }
+    let stripeCustomerId = profile.paymentProfileStripePaymentCustomerId;
+    let [session, customer] = await Promise.all([
+      this.stripeClient.val.checkout.sessions.retrieve(body.checkoutSessionId, {
         expand: ["setup_intent"],
-      },
-    );
-    let paymentMethodId = (session.setup_intent as Stripe.SetupIntent)
+      }),
+      this.stripeClient.val.customers.retrieve(stripeCustomerId),
+    ]);
+    let newPaymentMethodId = (session.setup_intent as Stripe.SetupIntent)
       .payment_method as string;
+    let prevDefaultPaymentMethodId = (customer as Stripe.Customer)
+      .invoice_settings?.default_payment_method as string;
+    if (prevDefaultPaymentMethodId === newPaymentMethodId) {
+      // Already updated.
+      return {};
+    }
 
-    await this.setPrimaryPaymentMethod(stripeCustomerId, paymentMethodId);
-    await this.detachOtherPaymentMethods(stripeCustomerId, paymentMethodId);
+    await this.stripeClient.val.customers.update(stripeCustomerId, {
+      invoice_settings: {
+        default_payment_method: newPaymentMethodId,
+      },
+    });
+    // Best effort.
+    this.detachPaymentMethod(loggingPrefix, prevDefaultPaymentMethodId);
     return {};
   }
 
-  private async setPrimaryPaymentMethod(
-    stripeCustomerId: string,
-    paymentMethodId: string,
+  private async detachPaymentMethod(
+    loggingPrefix: string,
+    paymentMethodId?: string,
   ): Promise<void> {
-    await this.stripeClient.val.customers.update(stripeCustomerId, {
-      invoice_settings: {
-        default_payment_method: paymentMethodId,
-      },
-    });
-  }
-
-  private async detachOtherPaymentMethods(
-    stripeCustomerId: string,
-    paymentMethodId: string,
-  ): Promise<void> {
-    let paymentMethods =
-      await this.stripeClient.val.customers.listPaymentMethods(
-        stripeCustomerId,
+    if (!paymentMethodId) {
+      return;
+    }
+    try {
+      await this.stripeClient.val.paymentMethods.detach(paymentMethodId);
+    } catch (error) {
+      console.error(
+        `${loggingPrefix} Failed to detach payment method ${paymentMethodId}:`,
+        error,
       );
-    await Promise.all(
-      paymentMethods.data
-        .filter((paymentMethod) => paymentMethod.id !== paymentMethodId)
-        .map((paymentMethod) =>
-          this.stripeClient.val.paymentMethods.detach(paymentMethod.id),
-        ),
-    );
+    }
+    this.detachedCallbackFn();
   }
 }

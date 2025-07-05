@@ -7,7 +7,6 @@ import {
   GET_PAYOUT_ROW,
   GET_PAYOUT_TASK_ROW,
   GET_TRANSACTION_STATEMENT_ROW,
-  deletePaymentProfileStatement,
   deletePaymentStatement,
   deletePaymentTaskStatement,
   deletePayoutStatement,
@@ -18,7 +17,6 @@ import {
   getPayout,
   getPayoutTask,
   getTransactionStatement,
-  insertPaymentProfileStatement,
   insertTransactionStatementStatement,
   listPendingPaymentTasks,
   listPendingPayoutTasks,
@@ -30,24 +28,9 @@ import { eqMessage } from "@selfage/message/test_matcher";
 import { assertThat, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
-async function insertPaymentProfile(firstPaymentTimeMs: number) {
-  await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-    await transaction.batchUpdate([
-      insertPaymentProfileStatement({
-        accountId: "account1",
-        firstPaymentTimeMs,
-      }),
-    ]);
-    await transaction.commit();
-  });
-}
-
 async function cleanupAll() {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
-      deletePaymentProfileStatement({
-        paymentProfileAccountIdEq: "account1",
-      }),
       deleteTransactionStatementStatement({
         transactionStatementStatementIdEq: "statement1",
       }),
@@ -75,7 +58,6 @@ TEST_RUNNER.run({
       name: "DebitToConsumer",
       execute: async () => {
         // Prepare
-        await insertPaymentProfile(100);
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
           () => `statement1`,
@@ -170,7 +152,6 @@ TEST_RUNNER.run({
       name: "CreditToPublisher",
       execute: async () => {
         // Prepare
-        await insertPaymentProfile(2000);
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
           () => "statement1",
@@ -287,7 +268,6 @@ TEST_RUNNER.run({
       name: "DebitToPublisher",
       execute: async () => {
         // Prepare
-        await insertPaymentProfile(2000);
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
           () => "statement1",
@@ -387,7 +367,7 @@ TEST_RUNNER.run({
               {
                 paymentTaskStatementId: "statement1",
                 paymentTaskRetryCount: 0,
-                paymentTaskExecutionTimeMs: 2000,
+                paymentTaskExecutionTimeMs: 1000,
                 paymentTaskCreatedTimeMs: 1000,
               },
               GET_PAYMENT_TASK_ROW,
@@ -404,7 +384,6 @@ TEST_RUNNER.run({
       name: "ZeroDebit",
       execute: async () => {
         // Prepare
-        await insertPaymentProfile(100);
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
           () => "statement1",
@@ -505,10 +484,6 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertPaymentProfileStatement({
-              accountId: "account1",
-              firstPaymentTimeMs: 100,
-            }),
             insertTransactionStatementStatement({
               accountId: "account1",
               statementId: "statement1",

@@ -6,12 +6,12 @@ import { STORAGE_CLIENT } from "./storage_client";
 export let SENDGRID_CLIENT = sgMail;
 
 export async function initSendgridClient(): Promise<void> {
-  let [stripeSecretKey] = await Promise.all([
+  let [secretKey] = await Promise.all([
     getStream(
       STORAGE_CLIENT.bucket(ENV_VARS.gcsSecretBucketName)
         .file(ENV_VARS.sendgridApiKeyFile)
         .createReadStream(),
     ),
   ]);
-  SENDGRID_CLIENT.setApiKey(stripeSecretKey);
+  SENDGRID_CLIENT.setApiKey(secretKey);
 }

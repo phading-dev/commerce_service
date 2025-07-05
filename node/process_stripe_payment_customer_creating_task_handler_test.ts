@@ -93,6 +93,11 @@ TEST_RUNNER.run({
           "createCustomerParams.name",
         );
         assertThat(
+          createCustomerParamsCapture.metadata.accountId,
+          eq("account1"),
+          "createCustomerParams.metadata.accountId",
+        );
+        assertThat(
           optionsCapture.idempotencyKey,
           eq("caccount1"),
           "options.idempotencyKey",

@@ -3,6 +3,7 @@ import "@phading/cluster/dev/env";
 import { ENV_VARS } from "../env_vars";
 
 ENV_VARS.spannerInstanceId = ENV_VARS.balancedSpannerInstanceId;
+ENV_VARS.stripeInitCreditAmount = 100; // $1
 ENV_VARS.updatePaymentMethodEnEmailTemplateId =
   "d-ff7a366080984aa5a00231e211214943";
 ENV_VARS.accountSuspensionEnEmailTemplateId =

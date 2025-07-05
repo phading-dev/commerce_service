@@ -11,13 +11,24 @@
       "name": "stateInfo",
       "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN stateInfo BYTES(MAX)"
     }, {
-      "name": "firstPaymentTimeMs",
-      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN firstPaymentTimeMs FLOAT64"
+      "name": "initCreditGrantingState",
+      "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN initCreditGrantingState FLOAT64"
     }, {
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE PaymentProfile ADD COLUMN createdTimeMs FLOAT64"
     }],
-    "createTableDdl": "CREATE TABLE PaymentProfile (accountId STRING(MAX) NOT NULL, stripePaymentCustomerId STRING(MAX), stateInfo BYTES(MAX), firstPaymentTimeMs FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (accountId ASC)",
+    "createTableDdl": "CREATE TABLE PaymentProfile (accountId STRING(MAX) NOT NULL, stripePaymentCustomerId STRING(MAX), stateInfo BYTES(MAX), initCreditGrantingState FLOAT64, createdTimeMs FLOAT64) PRIMARY KEY (accountId ASC)",
+    "indexes": []
+  }, {
+    "name": "PaymentCardGrantedInitCredit",
+    "columns": [{
+      "name": "fingerprint",
+      "addColumnDdl": "ALTER TABLE PaymentCardGrantedInitCredit ADD COLUMN fingerprint STRING(MAX) NOT NULL"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE PaymentCardGrantedInitCredit ADD COLUMN createdTimeMs FLOAT64"
+    }],
+    "createTableDdl": "CREATE TABLE PaymentCardGrantedInitCredit (fingerprint STRING(MAX) NOT NULL, createdTimeMs FLOAT64) PRIMARY KEY (fingerprint ASC)",
     "indexes": []
   }, {
     "name": "PayoutProfile",
@@ -130,6 +141,26 @@
     "indexes": [{
       "name": "StripePaymentCustomerCreatingTaskByExecutionTime",
       "createIndexDdl": "CREATE INDEX StripePaymentCustomerCreatingTaskByExecutionTime ON StripePaymentCustomerCreatingTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "InitPaymentCreditGrantingTask",
+    "columns": [{
+      "name": "accountId",
+      "addColumnDdl": "ALTER TABLE InitPaymentCreditGrantingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+    }, {
+      "name": "retryCount",
+      "addColumnDdl": "ALTER TABLE InitPaymentCreditGrantingTask ADD COLUMN retryCount FLOAT64"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE InitPaymentCreditGrantingTask ADD COLUMN executionTimeMs TIMESTAMP"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE InitPaymentCreditGrantingTask ADD COLUMN createdTimeMs TIMESTAMP"
+    }],
+    "createTableDdl": "CREATE TABLE InitPaymentCreditGrantingTask (accountId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (accountId ASC)",
+    "indexes": [{
+      "name": "InitPaymentCreditGrantingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX InitPaymentCreditGrantingTaskByExecutionTime ON InitPaymentCreditGrantingTask(executionTimeMs)"
     }]
   }, {
     "name": "StripeConnectedAccountCreatingTask",

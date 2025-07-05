@@ -1,5 +1,8 @@
 import Stripe from "stripe";
-import { GRACE_PERIOD_DAYS_IN_MS } from "../common/constants";
+import {
+  GRACE_PERIOD_DAYS_IN_MS,
+  PAYMENT_METADATA_STATEMENT_ID_KEY,
+} from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
@@ -110,6 +113,12 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         `Payment profile for statement ${body.statementId} is not found.`,
       );
     }
+    let profile = profileRows[0];
+    if (!profile.paymentProfileStripePaymentCustomerId) {
+      throw newInternalServerErrorError(
+        `Payment profile for statement ${body.statementId} does not have a Stripe customer.`,
+      );
+    }
     if (statementRows.length === 0) {
       throw newInternalServerErrorError(
         `Transaction statement ${body.statementId} is not found.`,
@@ -125,7 +134,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       );
     }
 
-    let stripeCustomerId = profileRows[0].paymentProfileStripePaymentCustomerId;
+    let stripeCustomerId = profile.paymentProfileStripePaymentCustomerId;
     let stripeCustomer =
       await this.stripeClient.val.customers.retrieve(stripeCustomerId);
     if (
@@ -144,7 +153,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         },
         description: transactionStatement.transactionStatementMonth,
         metadata: {
-          statementId: body.statementId,
+          [PAYMENT_METADATA_STATEMENT_ID_KEY]: body.statementId,
         },
         currency:
           transactionStatement.transactionStatementStatement.currency.toLowerCase(),

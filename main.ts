@@ -7,6 +7,7 @@ import { ENV_VARS } from "./env_vars";
 import { CreatePaymentProfileHandler } from "./node/create_payment_profile_handler";
 import { CreatePayoutProfileHandler } from "./node/create_payout_profile_handler";
 import { GenerateTransactionStatementHandler } from "./node/generate_transaction_statement_handler";
+import { ListInitPaymentCreditGrantingTasksHandler } from "./node/list_init_payment_credit_granting_tasks_handler";
 import { ListPaymentMethodNeedsUpdateNotifyingTasksHandler } from "./node/list_payment_method_needs_update_notifying_tasks_handler";
 import { ListPaymentProfileStateSyncingTasksHandler } from "./node/list_payment_profile_state_syncing_tasks_handler";
 import { ListPaymentProfileSuspendingDueToPastDueTasksHandler } from "./node/list_payment_profile_suspending_due_to_past_due_tasks_handler";
@@ -16,6 +17,7 @@ import { ListPayoutTasksHandler } from "./node/list_payout_tasks_handler";
 import { ListStripeConnectedAccountCreatingTasksHandler } from "./node/list_stripe_connected_account_creating_tasks_handler";
 import { ListStripeConnectedAccountNeedsSetupNotifyingTasksHandler } from "./node/list_stripe_connected_account_needs_setup_notifying_tasks_handler";
 import { ListStripePaymentCustomerCreatingTasksHandler } from "./node/list_stripe_payment_customer_creating_tasks_handler";
+import { ProcessInitPaymentCreditGrantingTaskHandler } from "./node/process_init_payment_credit_granting_task_handler";
 import { ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler } from "./node/process_payment_method_needs_update_notifying_task_handler";
 import { ProcessPaymentProfileStateSyncingTaskHandler } from "./node/process_payment_profile_state_syncing_task_handler";
 import { ProcessPaymentProfileSuspendingDueToPastDueTaskHandler } from "./node/process_payment_profile_suspending_due_to_past_due_task_handler";
@@ -34,6 +36,7 @@ import { GetPayoutProfileInfoHandler } from "./web/payout/get_payout_profile_inf
 import { ListPayoutsHandler } from "./web/payout/list_payouts_handler";
 import { SetConnectedAccountOnboardedHandler } from "./web/payout/set_connected_account_onboarded_handler";
 import { ListTransactionStatementsHandler } from "./web/statements/list_transaction_statements_handler";
+import { GrantInitPaymentCreditHandler } from "./web/stripe_webhook/grant_init_payment_credit_handler";
 import { MarkPaymentDoneHandler } from "./web/stripe_webhook/mark_payment_done_handler";
 import { MarkPaymentFailedHandler } from "./web/stripe_webhook/mark_payment_failed_handler";
 import {
@@ -44,9 +47,15 @@ import { ServiceHandler } from "@selfage/service_handler/service_handler";
 
 async function main() {
   let [
+    stripeCustomerUpdatedSecretKey,
     stripePaymentIntentSuccessSecretKey,
     stripePaymentIntentFailedSecretKey,
   ] = await Promise.all([
+    getStream(
+      STORAGE_CLIENT.bucket(ENV_VARS.gcsSecretBucketName)
+        .file(ENV_VARS.stripeCustomerUpdatedSecretKeyFile)
+        .createReadStream(),
+    ),
     getStream(
       STORAGE_CLIENT.bucket(ENV_VARS.gcsSecretBucketName)
         .file(ENV_VARS.stripePaymentIntentSuccessSecretKeyFile)
@@ -73,6 +82,7 @@ async function main() {
     .add(CreatePaymentProfileHandler.create())
     .add(CreatePayoutProfileHandler.create())
     .add(GenerateTransactionStatementHandler.create())
+    .add(ListInitPaymentCreditGrantingTasksHandler.create())
     .add(ListPaymentMethodNeedsUpdateNotifyingTasksHandler.create())
     .add(ListPaymentProfileStateSyncingTasksHandler.create())
     .add(ListPaymentProfileSuspendingDueToPastDueTasksHandler.create())
@@ -82,6 +92,7 @@ async function main() {
     .add(ListStripeConnectedAccountCreatingTasksHandler.create())
     .add(ListStripeConnectedAccountNeedsSetupNotifyingTasksHandler.create())
     .add(ListStripePaymentCustomerCreatingTasksHandler.create())
+    .add(ProcessInitPaymentCreditGrantingTaskHandler.create())
     .add(ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler.create())
     .add(ProcessPaymentProfileStateSyncingTaskHandler.create())
     .add(ProcessPaymentProfileSuspendingDueToPastDueTaskHandler.create())
@@ -102,6 +113,7 @@ async function main() {
     .add(ListPayoutsHandler.create())
     .add(SetConnectedAccountOnboardedHandler.create())
     .add(ListTransactionStatementsHandler.create())
+    .add(GrantInitPaymentCreditHandler.create(stripeCustomerUpdatedSecretKey))
     .add(MarkPaymentDoneHandler.create(stripePaymentIntentSuccessSecretKey))
     .add(MarkPaymentFailedHandler.create(stripePaymentIntentFailedSecretKey));
   await service.start(ENV_VARS.port);

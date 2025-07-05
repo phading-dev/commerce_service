@@ -1,5 +1,6 @@
 import getStream from "get-stream";
 import Stripe from "stripe";
+import { PAYMENT_METADATA_STATEMENT_ID_KEY } from "../../common/constants";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
@@ -11,7 +12,7 @@ import {
 } from "../../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { MarkPaymentDoneHandlerInterface } from "@phading/commerce_service_interface/web/stripe_webhook/handler";
-import { EventReceivedResponse } from "@phading/commerce_service_interface/web/stripe_webhook/interface";
+import { Empty } from "@phading/web_interface/empty";
 import {
   newBadRequestError,
   newInternalServerErrorError,
@@ -26,16 +27,16 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
     return new MarkPaymentDoneHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
-      stripePaymentIntentSuccessSecretKey,
       () => Date.now(),
+      stripePaymentIntentSuccessSecretKey,
     );
   }
 
   public constructor(
     private database: Database,
     private stripeClient: Ref<Stripe>,
-    private stripeSecretKey: string,
     private getNow: () => number,
+    private stripeSecretKey: string,
   ) {
     super();
   }
@@ -44,7 +45,7 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
     loggingPrefix: string,
     body: Readable,
     sessionStr: string,
-  ): Promise<EventReceivedResponse> {
+  ): Promise<Empty> {
     let event = this.stripeClient.val.webhooks.constructEvent(
       await getStream(body),
       sessionStr,
@@ -58,7 +59,7 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
     let invoiceId = event.data.object.invoice as string;
     let invoice = await this.stripeClient.val.invoices.retrieve(invoiceId);
     await this.database.runTransactionAsync(async (transaction) => {
-      let statementId = invoice.metadata.statementId;
+      let statementId = invoice.metadata[PAYMENT_METADATA_STATEMENT_ID_KEY];
       let rows = await getPayment(transaction, {
         paymentStatementIdEq: statementId,
       });
@@ -88,6 +89,6 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
       ]);
       await transaction.commit();
     });
-    return { received: true };
+    return {};
   }
 }

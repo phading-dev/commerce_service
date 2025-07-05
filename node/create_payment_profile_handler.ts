@@ -1,25 +1,21 @@
 import { SPANNER_DATABASE } from "../common/spanner_database";
-import { PaymentProfileState } from "../db/schema";
+import { InitCreditGrantingState, PaymentProfileState } from "../db/schema";
 import {
   getPaymentProfile,
   insertPaymentProfileStatement,
   insertStripePaymentCustomerCreatingTaskStatement,
 } from "../db/sql";
-import { ENV_VARS } from "../env_vars";
 import { Database } from "@google-cloud/spanner";
 import { CreatePaymentProfileHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
   CreatePaymentProfileRequestBody,
   CreatePaymentProfileResponse,
 } from "@phading/commerce_service_interface/node/interface";
-import { TzDate } from "@selfage/tz_date";
 
 export class CreatePaymentProfileHandler extends CreatePaymentProfileHandlerInterface {
   public static create(): CreatePaymentProfileHandler {
     return new CreatePaymentProfileHandler(SPANNER_DATABASE, () => Date.now());
   }
-
-  private static DELAYED_PAYMENT_MS = 20 * 24 * 60 * 60 * 1000; // 20 days
 
   public constructor(
     private database: Database,
@@ -40,13 +36,6 @@ export class CreatePaymentProfileHandler extends CreatePaymentProfileHandlerInte
         return;
       }
       let now = this.getNow();
-      let firstPaymentTimeMs = TzDate.fromTimestampMs(
-        now + CreatePaymentProfileHandler.DELAYED_PAYMENT_MS,
-        ENV_VARS.timezoneNegativeOffset,
-      )
-        .moveToFirstDayOfMonth()
-        .addMonths(1)
-        .toTimestampMs();
       await transaction.batchUpdate([
         insertPaymentProfileStatement({
           accountId: body.accountId,
@@ -55,7 +44,7 @@ export class CreatePaymentProfileHandler extends CreatePaymentProfileHandlerInte
             state: PaymentProfileState.HEALTHY,
             updatedTimeMs: now,
           },
-          firstPaymentTimeMs,
+          initCreditGrantingState: InitCreditGrantingState.NOT_GRANTED,
           createdTimeMs: now,
         }),
         insertStripePaymentCustomerCreatingTaskStatement({

@@ -4,8 +4,10 @@ export interface EnvVars extends ClusterEnvVars {
   spannerInstanceId?: string;
   spannerDatabaseId?: string;
   stripeSecretKeyFile?: string;
+  stripeCustomerUpdatedSecretKeyFile?: string;
   stripePaymentIntentSuccessSecretKeyFile?: string;
   stripePaymentIntentFailedSecretKeyFile?: string;
+  stripeInitCreditAmount?: number;
   sendgridApiKeyFile?: string;
   updatePaymentMethodEnEmailTemplateId?: string;
   accountSuspensionEnEmailTemplateId?: string;

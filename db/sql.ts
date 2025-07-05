@@ -1,4 +1,4 @@
-import { PaymentProfileStateInfo, PAYMENT_PROFILE_STATE_INFO, StripeConnectedAccountState, STRIPE_CONNECTED_ACCOUNT_STATE, TransactionStatement, TRANSACTION_STATEMENT, PaymentState, PAYMENT_STATE, PayoutState, PAYOUT_STATE } from './schema';
+import { PaymentProfileStateInfo, PAYMENT_PROFILE_STATE_INFO, InitCreditGrantingState, INIT_CREDIT_GRANTING_STATE, StripeConnectedAccountState, STRIPE_CONNECTED_ACCOUNT_STATE, TransactionStatement, TRANSACTION_STATEMENT, PaymentState, PAYMENT_STATE, PayoutState, PAYOUT_STATE } from './schema';
 import { serializeMessage, deserializeMessage, toEnumFromNumber } from '@selfage/message/serializer';
 import { Spanner, Database, Transaction } from '@google-cloud/spanner';
 import { Statement } from '@google-cloud/spanner/build/src/transaction';
@@ -9,24 +9,24 @@ export function insertPaymentProfileStatement(
     accountId: string,
     stripePaymentCustomerId?: string,
     stateInfo?: PaymentProfileStateInfo,
-    firstPaymentTimeMs?: number,
+    initCreditGrantingState?: InitCreditGrantingState,
     createdTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "INSERT PaymentProfile (accountId, stripePaymentCustomerId, stateInfo, firstPaymentTimeMs, createdTimeMs) VALUES (@accountId, @stripePaymentCustomerId, @stateInfo, @firstPaymentTimeMs, @createdTimeMs)",
+    sql: "INSERT PaymentProfile (accountId, stripePaymentCustomerId, stateInfo, initCreditGrantingState, createdTimeMs) VALUES (@accountId, @stripePaymentCustomerId, @stateInfo, @initCreditGrantingState, @createdTimeMs)",
     params: {
       accountId: args.accountId,
       stripePaymentCustomerId: args.stripePaymentCustomerId == null ? null : args.stripePaymentCustomerId,
       stateInfo: args.stateInfo == null ? null : Buffer.from(serializeMessage(args.stateInfo, PAYMENT_PROFILE_STATE_INFO).buffer),
-      firstPaymentTimeMs: args.firstPaymentTimeMs == null ? null : Spanner.float(args.firstPaymentTimeMs),
+      initCreditGrantingState: args.initCreditGrantingState == null ? null : Spanner.float(args.initCreditGrantingState),
       createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
     },
     types: {
       accountId: { type: "string" },
       stripePaymentCustomerId: { type: "string" },
       stateInfo: { type: "bytes" },
-      firstPaymentTimeMs: { type: "float64" },
+      initCreditGrantingState: { type: "float64" },
       createdTimeMs: { type: "float64" },
     }
   };
@@ -52,7 +52,7 @@ export interface GetPaymentProfileRow {
   paymentProfileAccountId?: string,
   paymentProfileStripePaymentCustomerId?: string,
   paymentProfileStateInfo?: PaymentProfileStateInfo,
-  paymentProfileFirstPaymentTimeMs?: number,
+  paymentProfileInitCreditGrantingState?: InitCreditGrantingState,
   paymentProfileCreatedTimeMs?: number,
 }
 
@@ -71,9 +71,9 @@ export let GET_PAYMENT_PROFILE_ROW: MessageDescriptor<GetPaymentProfileRow> = {
     index: 3,
     messageType: PAYMENT_PROFILE_STATE_INFO,
   }, {
-    name: 'paymentProfileFirstPaymentTimeMs',
+    name: 'paymentProfileInitCreditGrantingState',
     index: 4,
-    primitiveType: PrimitiveType.NUMBER,
+    enumType: INIT_CREDIT_GRANTING_STATE,
   }, {
     name: 'paymentProfileCreatedTimeMs',
     index: 5,
@@ -88,7 +88,7 @@ export async function getPaymentProfile(
   }
 ): Promise<Array<GetPaymentProfileRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PaymentProfile.accountId, PaymentProfile.stripePaymentCustomerId, PaymentProfile.stateInfo, PaymentProfile.firstPaymentTimeMs, PaymentProfile.createdTimeMs FROM PaymentProfile WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
+    sql: "SELECT PaymentProfile.accountId, PaymentProfile.stripePaymentCustomerId, PaymentProfile.stateInfo, PaymentProfile.initCreditGrantingState, PaymentProfile.createdTimeMs FROM PaymentProfile WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
     params: {
       paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
     },
@@ -102,8 +102,86 @@ export async function getPaymentProfile(
       paymentProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
       paymentProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
       paymentProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, PAYMENT_PROFILE_STATE_INFO),
-      paymentProfileFirstPaymentTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      paymentProfileInitCreditGrantingState: row.at(3).value == null ? undefined : toEnumFromNumber(row.at(3).value.value, INIT_CREDIT_GRANTING_STATE),
       paymentProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
+    });
+  }
+  return resRows;
+}
+
+export function insertPaymentCardGrantedInitCreditStatement(
+  args: {
+    fingerprint: string,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT PaymentCardGrantedInitCredit (fingerprint, createdTimeMs) VALUES (@fingerprint, @createdTimeMs)",
+    params: {
+      fingerprint: args.fingerprint,
+      createdTimeMs: args.createdTimeMs == null ? null : Spanner.float(args.createdTimeMs),
+    },
+    types: {
+      fingerprint: { type: "string" },
+      createdTimeMs: { type: "float64" },
+    }
+  };
+}
+
+export function deletePaymentCardGrantedInitCreditStatement(
+  args: {
+    paymentCardGrantedInitCreditFingerprintEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE PaymentCardGrantedInitCredit WHERE (PaymentCardGrantedInitCredit.fingerprint = @paymentCardGrantedInitCreditFingerprintEq)",
+    params: {
+      paymentCardGrantedInitCreditFingerprintEq: args.paymentCardGrantedInitCreditFingerprintEq,
+    },
+    types: {
+      paymentCardGrantedInitCreditFingerprintEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetPaymentCardGrantedInitCreditRow {
+  paymentCardGrantedInitCreditFingerprint?: string,
+  paymentCardGrantedInitCreditCreatedTimeMs?: number,
+}
+
+export let GET_PAYMENT_CARD_GRANTED_INIT_CREDIT_ROW: MessageDescriptor<GetPaymentCardGrantedInitCreditRow> = {
+  name: 'GetPaymentCardGrantedInitCreditRow',
+  fields: [{
+    name: 'paymentCardGrantedInitCreditFingerprint',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentCardGrantedInitCreditCreatedTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPaymentCardGrantedInitCredit(
+  runner: Database | Transaction,
+  args: {
+    paymentCardGrantedInitCreditFingerprintEq: string,
+  }
+): Promise<Array<GetPaymentCardGrantedInitCreditRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentCardGrantedInitCredit.fingerprint, PaymentCardGrantedInitCredit.createdTimeMs FROM PaymentCardGrantedInitCredit WHERE (PaymentCardGrantedInitCredit.fingerprint = @paymentCardGrantedInitCreditFingerprintEq)",
+    params: {
+      paymentCardGrantedInitCreditFingerprintEq: args.paymentCardGrantedInitCreditFingerprintEq,
+    },
+    types: {
+      paymentCardGrantedInitCreditFingerprintEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPaymentCardGrantedInitCreditRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentCardGrantedInitCreditFingerprint: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentCardGrantedInitCreditCreatedTimeMs: row.at(1).value == null ? undefined : row.at(1).value.value,
     });
   }
   return resRows;
@@ -730,6 +808,204 @@ export function updateStripePaymentCustomerCreatingTaskMetadataStatement(
     },
     types: {
       stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function insertInitPaymentCreditGrantingTaskStatement(
+  args: {
+    accountId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT InitPaymentCreditGrantingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      accountId: args.accountId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      accountId: { type: "string" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deleteInitPaymentCreditGrantingTaskStatement(
+  args: {
+    initPaymentCreditGrantingTaskAccountIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE InitPaymentCreditGrantingTask WHERE (InitPaymentCreditGrantingTask.accountId = @initPaymentCreditGrantingTaskAccountIdEq)",
+    params: {
+      initPaymentCreditGrantingTaskAccountIdEq: args.initPaymentCreditGrantingTaskAccountIdEq,
+    },
+    types: {
+      initPaymentCreditGrantingTaskAccountIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetInitPaymentCreditGrantingTaskRow {
+  initPaymentCreditGrantingTaskAccountId?: string,
+  initPaymentCreditGrantingTaskRetryCount?: number,
+  initPaymentCreditGrantingTaskExecutionTimeMs?: number,
+  initPaymentCreditGrantingTaskCreatedTimeMs?: number,
+}
+
+export let GET_INIT_PAYMENT_CREDIT_GRANTING_TASK_ROW: MessageDescriptor<GetInitPaymentCreditGrantingTaskRow> = {
+  name: 'GetInitPaymentCreditGrantingTaskRow',
+  fields: [{
+    name: 'initPaymentCreditGrantingTaskAccountId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'initPaymentCreditGrantingTaskRetryCount',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'initPaymentCreditGrantingTaskExecutionTimeMs',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'initPaymentCreditGrantingTaskCreatedTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getInitPaymentCreditGrantingTask(
+  runner: Database | Transaction,
+  args: {
+    initPaymentCreditGrantingTaskAccountIdEq: string,
+  }
+): Promise<Array<GetInitPaymentCreditGrantingTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT InitPaymentCreditGrantingTask.accountId, InitPaymentCreditGrantingTask.retryCount, InitPaymentCreditGrantingTask.executionTimeMs, InitPaymentCreditGrantingTask.createdTimeMs FROM InitPaymentCreditGrantingTask WHERE (InitPaymentCreditGrantingTask.accountId = @initPaymentCreditGrantingTaskAccountIdEq)",
+    params: {
+      initPaymentCreditGrantingTaskAccountIdEq: args.initPaymentCreditGrantingTaskAccountIdEq,
+    },
+    types: {
+      initPaymentCreditGrantingTaskAccountIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetInitPaymentCreditGrantingTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      initPaymentCreditGrantingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      initPaymentCreditGrantingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      initPaymentCreditGrantingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      initPaymentCreditGrantingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingInitPaymentCreditGrantingTasksRow {
+  initPaymentCreditGrantingTaskAccountId?: string,
+}
+
+export let LIST_PENDING_INIT_PAYMENT_CREDIT_GRANTING_TASKS_ROW: MessageDescriptor<ListPendingInitPaymentCreditGrantingTasksRow> = {
+  name: 'ListPendingInitPaymentCreditGrantingTasksRow',
+  fields: [{
+    name: 'initPaymentCreditGrantingTaskAccountId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }],
+};
+
+export async function listPendingInitPaymentCreditGrantingTasks(
+  runner: Database | Transaction,
+  args: {
+    initPaymentCreditGrantingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingInitPaymentCreditGrantingTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT InitPaymentCreditGrantingTask.accountId FROM InitPaymentCreditGrantingTask WHERE InitPaymentCreditGrantingTask.executionTimeMs <= @initPaymentCreditGrantingTaskExecutionTimeMsLe",
+    params: {
+      initPaymentCreditGrantingTaskExecutionTimeMsLe: args.initPaymentCreditGrantingTaskExecutionTimeMsLe == null ? null : new Date(args.initPaymentCreditGrantingTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      initPaymentCreditGrantingTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingInitPaymentCreditGrantingTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      initPaymentCreditGrantingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetInitPaymentCreditGrantingTaskMetadataRow {
+  initPaymentCreditGrantingTaskRetryCount?: number,
+  initPaymentCreditGrantingTaskExecutionTimeMs?: number,
+}
+
+export let GET_INIT_PAYMENT_CREDIT_GRANTING_TASK_METADATA_ROW: MessageDescriptor<GetInitPaymentCreditGrantingTaskMetadataRow> = {
+  name: 'GetInitPaymentCreditGrantingTaskMetadataRow',
+  fields: [{
+    name: 'initPaymentCreditGrantingTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'initPaymentCreditGrantingTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getInitPaymentCreditGrantingTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    initPaymentCreditGrantingTaskAccountIdEq: string,
+  }
+): Promise<Array<GetInitPaymentCreditGrantingTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT InitPaymentCreditGrantingTask.retryCount, InitPaymentCreditGrantingTask.executionTimeMs FROM InitPaymentCreditGrantingTask WHERE (InitPaymentCreditGrantingTask.accountId = @initPaymentCreditGrantingTaskAccountIdEq)",
+    params: {
+      initPaymentCreditGrantingTaskAccountIdEq: args.initPaymentCreditGrantingTaskAccountIdEq,
+    },
+    types: {
+      initPaymentCreditGrantingTaskAccountIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetInitPaymentCreditGrantingTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      initPaymentCreditGrantingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      initPaymentCreditGrantingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updateInitPaymentCreditGrantingTaskMetadataStatement(
+  args: {
+    initPaymentCreditGrantingTaskAccountIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE InitPaymentCreditGrantingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (InitPaymentCreditGrantingTask.accountId = @initPaymentCreditGrantingTaskAccountIdEq)",
+    params: {
+      initPaymentCreditGrantingTaskAccountIdEq: args.initPaymentCreditGrantingTaskAccountIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      initPaymentCreditGrantingTaskAccountIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
@@ -2381,7 +2657,7 @@ export function updatePaymentProfileStateStatement(
   }
 ): Statement {
   return {
-    sql: "UPDATE PaymentProfile SET stateInfo = @setStateInfo WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
+    sql: "UPDATE PaymentProfile SET stateInfo = @setStateInfo WHERE PaymentProfile.accountId = @paymentProfileAccountIdEq",
     params: {
       paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
       setStateInfo: args.setStateInfo == null ? null : Buffer.from(serializeMessage(args.setStateInfo, PAYMENT_PROFILE_STATE_INFO).buffer),
@@ -2400,7 +2676,7 @@ export function updatePaymentProfilePaymentCustomerStatement(
   }
 ): Statement {
   return {
-    sql: "UPDATE PaymentProfile SET stripePaymentCustomerId = @setStripePaymentCustomerId WHERE (PaymentProfile.accountId = @paymentProfileAccountIdEq)",
+    sql: "UPDATE PaymentProfile SET stripePaymentCustomerId = @setStripePaymentCustomerId WHERE PaymentProfile.accountId = @paymentProfileAccountIdEq",
     params: {
       paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
       setStripePaymentCustomerId: args.setStripePaymentCustomerId == null ? null : args.setStripePaymentCustomerId,
@@ -2408,6 +2684,25 @@ export function updatePaymentProfilePaymentCustomerStatement(
     types: {
       paymentProfileAccountIdEq: { type: "string" },
       setStripePaymentCustomerId: { type: "string" },
+    }
+  };
+}
+
+export function updatePaymentProfileInitCreditGrantingStateStatement(
+  args: {
+    paymentProfileAccountIdEq: string,
+    setInitCreditGrantingState?: InitCreditGrantingState,
+  }
+): Statement {
+  return {
+    sql: "UPDATE PaymentProfile SET initCreditGrantingState = @setInitCreditGrantingState WHERE PaymentProfile.accountId = @paymentProfileAccountIdEq",
+    params: {
+      paymentProfileAccountIdEq: args.paymentProfileAccountIdEq,
+      setInitCreditGrantingState: args.setInitCreditGrantingState == null ? null : Spanner.float(args.setInitCreditGrantingState),
+    },
+    types: {
+      paymentProfileAccountIdEq: { type: "string" },
+      setInitCreditGrantingState: { type: "float64" },
     }
   };
 }
@@ -2420,7 +2715,7 @@ export function updatePayoutProfileConnectedAccountStatement(
   }
 ): Statement {
   return {
-    sql: "UPDATE PayoutProfile SET stripeConnectedAccountId = @setStripeConnectedAccountId, stripeConnectedAccountState = @setStripeConnectedAccountState WHERE (PayoutProfile.accountId = @payoutProfileAccountIdEq)",
+    sql: "UPDATE PayoutProfile SET stripeConnectedAccountId = @setStripeConnectedAccountId, stripeConnectedAccountState = @setStripeConnectedAccountState WHERE PayoutProfile.accountId = @payoutProfileAccountIdEq",
     params: {
       payoutProfileAccountIdEq: args.payoutProfileAccountIdEq,
       setStripeConnectedAccountId: args.setStripeConnectedAccountId == null ? null : args.setStripeConnectedAccountId,
@@ -2441,7 +2736,7 @@ export function updatePayoutProfileConnectedAccountStateStatement(
   }
 ): Statement {
   return {
-    sql: "UPDATE PayoutProfile SET stripeConnectedAccountState = @setStripeConnectedAccountState WHERE (PayoutProfile.accountId = @payoutProfileAccountIdEq)",
+    sql: "UPDATE PayoutProfile SET stripeConnectedAccountState = @setStripeConnectedAccountState WHERE PayoutProfile.accountId = @payoutProfileAccountIdEq",
     params: {
       payoutProfileAccountIdEq: args.payoutProfileAccountIdEq,
       setStripeConnectedAccountState: args.setStripeConnectedAccountState == null ? null : Spanner.float(args.setStripeConnectedAccountState),
@@ -2461,7 +2756,7 @@ export function updatePaymentStateStatement(
   }
 ): Statement {
   return {
-    sql: "UPDATE Payment SET state = @setState, updatedTimeMs = @setUpdatedTimeMs WHERE (Payment.statementId = @paymentStatementIdEq)",
+    sql: "UPDATE Payment SET state = @setState, updatedTimeMs = @setUpdatedTimeMs WHERE Payment.statementId = @paymentStatementIdEq",
     params: {
       paymentStatementIdEq: args.paymentStatementIdEq,
       setState: args.setState == null ? null : Spanner.float(args.setState),
@@ -2484,7 +2779,7 @@ export function updatePaymentStateAndStripeInvoiceStatement(
   }
 ): Statement {
   return {
-    sql: "UPDATE Payment SET state = @setState, stripeInvoiceId = @setStripeInvoiceId, updatedTimeMs = @setUpdatedTimeMs WHERE (Payment.statementId = @paymentStatementIdEq)",
+    sql: "UPDATE Payment SET state = @setState, stripeInvoiceId = @setStripeInvoiceId, updatedTimeMs = @setUpdatedTimeMs WHERE Payment.statementId = @paymentStatementIdEq",
     params: {
       paymentStatementIdEq: args.paymentStatementIdEq,
       setState: args.setState == null ? null : Spanner.float(args.setState),
@@ -2508,7 +2803,7 @@ export function updatePayoutStateStatement(
   }
 ): Statement {
   return {
-    sql: "UPDATE Payout SET state = @setState, updatedTimeMs = @setUpdatedTimeMs WHERE (Payout.statementId = @payoutStatementIdEq)",
+    sql: "UPDATE Payout SET state = @setState, updatedTimeMs = @setUpdatedTimeMs WHERE Payout.statementId = @payoutStatementIdEq",
     params: {
       payoutStatementIdEq: args.payoutStatementIdEq,
       setState: args.setState == null ? null : Spanner.float(args.setState),
@@ -2531,7 +2826,7 @@ export function updatePayoutStateAndStripeTransferStatement(
   }
 ): Statement {
   return {
-    sql: "UPDATE Payout SET state = @setState, stripeTransferId = @setStripeTransferId, updatedTimeMs = @setUpdatedTimeMs WHERE (Payout.statementId = @payoutStatementIdEq)",
+    sql: "UPDATE Payout SET state = @setState, stripeTransferId = @setStripeTransferId, updatedTimeMs = @setUpdatedTimeMs WHERE Payout.statementId = @payoutStatementIdEq",
     params: {
       payoutStatementIdEq: args.payoutStatementIdEq,
       setState: args.setState == null ? null : Spanner.float(args.setState),
@@ -2551,7 +2846,7 @@ export interface GetPaymentProfileFromStatementRow {
   paymentProfileAccountId?: string,
   paymentProfileStripePaymentCustomerId?: string,
   paymentProfileStateInfo?: PaymentProfileStateInfo,
-  paymentProfileFirstPaymentTimeMs?: number,
+  paymentProfileInitCreditGrantingState?: InitCreditGrantingState,
   paymentProfileCreatedTimeMs?: number,
 }
 
@@ -2570,9 +2865,9 @@ export let GET_PAYMENT_PROFILE_FROM_STATEMENT_ROW: MessageDescriptor<GetPaymentP
     index: 3,
     messageType: PAYMENT_PROFILE_STATE_INFO,
   }, {
-    name: 'paymentProfileFirstPaymentTimeMs',
+    name: 'paymentProfileInitCreditGrantingState',
     index: 4,
-    primitiveType: PrimitiveType.NUMBER,
+    enumType: INIT_CREDIT_GRANTING_STATE,
   }, {
     name: 'paymentProfileCreatedTimeMs',
     index: 5,
@@ -2587,7 +2882,7 @@ export async function getPaymentProfileFromStatement(
   }
 ): Promise<Array<GetPaymentProfileFromStatementRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT b.accountId, b.stripePaymentCustomerId, b.stateInfo, b.firstPaymentTimeMs, b.createdTimeMs FROM TransactionStatement AS t INNER JOIN PaymentProfile AS b ON t.accountId = b.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
+    sql: "SELECT b.accountId, b.stripePaymentCustomerId, b.stateInfo, b.initCreditGrantingState, b.createdTimeMs FROM TransactionStatement AS t INNER JOIN PaymentProfile AS b ON t.accountId = b.accountId WHERE (t.statementId = @transactionStatementStatementIdEq)",
     params: {
       transactionStatementStatementIdEq: args.transactionStatementStatementIdEq,
     },
@@ -2601,7 +2896,7 @@ export async function getPaymentProfileFromStatement(
       paymentProfileAccountId: row.at(0).value == null ? undefined : row.at(0).value,
       paymentProfileStripePaymentCustomerId: row.at(1).value == null ? undefined : row.at(1).value,
       paymentProfileStateInfo: row.at(2).value == null ? undefined : deserializeMessage(row.at(2).value, PAYMENT_PROFILE_STATE_INFO),
-      paymentProfileFirstPaymentTimeMs: row.at(3).value == null ? undefined : row.at(3).value.value,
+      paymentProfileInitCreditGrantingState: row.at(3).value == null ? undefined : toEnumFromNumber(row.at(3).value.value, INIT_CREDIT_GRANTING_STATE),
       paymentProfileCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.value,
     });
   }

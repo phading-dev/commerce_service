@@ -88,8 +88,8 @@ TEST_RUNNER.run({
         let handler = new MarkPaymentFailedHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
-          "secret1",
           () => 1000,
+          "secret1",
         );
 
         // Execute
@@ -209,8 +209,8 @@ TEST_RUNNER.run({
         let handler = new MarkPaymentFailedHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
-          "secret1",
           () => 1000,
+          "secret1",
         );
 
         // Execute
