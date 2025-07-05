@@ -76,10 +76,12 @@ TEST_RUNNER.run({
                     },
                   },
                   previous_attributes: {
-                    invoice_settings: {},
+                    invoice_settings: {
+                      default_payment_method: null,
+                    },
                   },
                 },
-              };
+              } as any;
             },
           },
           paymentMethods: {
@@ -274,9 +276,13 @@ TEST_RUNNER.run({
                       accountId: "account1",
                     },
                   },
-                  previous_attributes: {},
+                  previous_attributes: {
+                    invoice_settings: {
+                      default_payment_method: null,
+                    },
+                  },
                 },
-              };
+              } as any;
             },
           },
           paymentMethods: {
@@ -357,6 +363,9 @@ TEST_RUNNER.run({
                 type: "customer.updated",
                 data: {
                   object: {
+                    invoice_settings: {
+                      default_payment_method: "paymentMethod1",
+                    },
                     metadata: {
                       accountId: "account1",
                     },

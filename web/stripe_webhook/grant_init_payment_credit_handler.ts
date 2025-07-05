@@ -59,10 +59,9 @@ export class GrantInitPaymentCreditHandler extends GrantInitPaymentCreditHandler
     }
     if (
       event.data.previous_attributes.invoice_settings
-        ?.default_payment_method ===
-      event.data.object.invoice_settings?.default_payment_method
+        ?.default_payment_method === undefined
     ) {
-      // Not updating default payment method.
+      // If it's null, it means the customer has no default payment method previously. Only when undefined, it means it's not being updated.
       return {};
     }
 
