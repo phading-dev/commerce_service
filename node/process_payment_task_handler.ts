@@ -1,17 +1,25 @@
 import Stripe from "stripe";
-import { PAYMENT_METADATA_STATEMENT_ID_KEY } from "../common/constants";
+import {
+  GRACE_PERIOD_DAYS_IN_MS,
+  PAYMENT_METADATA_STATEMENT_ID_KEY,
+} from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
 import { PaymentState } from "../db/schema";
 import {
   GetPaymentRow,
+  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
   deletePaymentTaskStatement,
   getPayment,
   getPaymentProfileFromStatement,
+  getPaymentProfileSuspendingDueToPastDueTask,
   getPaymentTaskMetadata,
   getTransactionStatement,
+  insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
+  insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   updatePaymentStateAndStripeInvoiceStatement,
+  updatePaymentStateStatement,
   updatePaymentTaskMetadataStatement,
 } from "../db/sql";
 import { Database, Transaction } from "@google-cloud/spanner";
@@ -126,9 +134,20 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       );
     }
 
+    let stripeCustomerId = profile.paymentProfileStripePaymentCustomerId;
+    let stripeCustomer =
+      await this.stripeClient.val.customers.retrieve(stripeCustomerId);
+    if (
+      !(stripeCustomer as Stripe.Customer).invoice_settings
+        ?.default_payment_method
+    ) {
+      await this.reportFailure(loggingPrefix, body.statementId);
+      return;
+    }
+
     let invoice = await this.stripeClient.val.invoices.create(
       {
-        customer: profile.paymentProfileStripePaymentCustomerId,
+        customer: stripeCustomerId,
         automatic_tax: {
           enabled: true,
         },
@@ -168,6 +187,51 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       },
     );
     await this.finalize(loggingPrefix, body.statementId, invoice.id);
+  }
+
+  private async reportFailure(
+    loggingPrefix: string,
+    statementId: string,
+  ): Promise<void> {
+    await this.database.runTransactionAsync(async (transaction) => {
+      let [_, suspendingTaskRows] = await Promise.all([
+        this.getValidPayment(transaction, statementId),
+        getPaymentProfileSuspendingDueToPastDueTask(transaction, {
+          paymentProfileSuspendingDueToPastDueTaskStatementIdEq: statementId,
+        }),
+      ]);
+      let now = this.getNow();
+      await transaction.batchUpdate([
+        updatePaymentStateStatement({
+          paymentStatementIdEq: statementId,
+          setState: PaymentState.FAILED,
+          setUpdatedTimeMs: now,
+        }),
+        deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
+          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: statementId,
+        }),
+        insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
+          statementId: statementId,
+          retryCount: 0,
+          executionTimeMs: now,
+          createdTimeMs: now,
+        }),
+        ...(suspendingTaskRows.length === 0
+          ? [
+              insertPaymentProfileSuspendingDueToPastDueTaskStatement({
+                statementId: statementId,
+                retryCount: 0,
+                executionTimeMs: now + GRACE_PERIOD_DAYS_IN_MS,
+                createdTimeMs: now,
+              }),
+            ]
+          : []),
+        deletePaymentTaskStatement({
+          paymentTaskStatementIdEq: statementId,
+        }),
+      ]);
+      await transaction.commit();
+    });
   }
 
   private async finalize(
