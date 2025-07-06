@@ -57,7 +57,6 @@ TEST_RUNNER.run({
         let payloadCaptured: string;
         let sigCaptured: string;
         let secretCaptured: string;
-        let invoiceIdCaptured: string;
         let stripeClientMock: any = {
           webhooks: {
             constructEvent: (payload: string, sig: string, secret: string) => {
@@ -65,21 +64,13 @@ TEST_RUNNER.run({
               sigCaptured = sig;
               secretCaptured = secret;
               return {
-                type: "payment_intent.payment_failed",
+                type: "invoice.payment_failed",
                 data: {
                   object: {
-                    invoice: "invoice1",
+                    metadata: {
+                      statementId: "statement1",
+                    },
                   },
-                },
-              };
-            },
-          },
-          invoices: {
-            retrieve: async (invoiceId: string) => {
-              invoiceIdCaptured = invoiceId;
-              return {
-                metadata: {
-                  statementId: "statement1",
                 },
               };
             },
@@ -99,7 +90,6 @@ TEST_RUNNER.run({
         assertThat(payloadCaptured, eq("event_input"), "payload");
         assertThat(sigCaptured, eq("sig1"), "sig");
         assertThat(secretCaptured, eq("secret1"), "secret");
-        assertThat(invoiceIdCaptured, eq("invoice1"), "invoiceId");
         assertThat(
           await getPayment(SPANNER_DATABASE, {
             paymentStatementIdEq: "statement1",
@@ -187,20 +177,13 @@ TEST_RUNNER.run({
           webhooks: {
             constructEvent: () => {
               return {
-                type: "payment_intent.payment_failed",
+                type: "invoice.payment_failed",
                 data: {
                   object: {
-                    invoice: "invoice1",
+                    metadata: {
+                      statementId: "statement1",
+                    },
                   },
-                },
-              };
-            },
-          },
-          invoices: {
-            retrieve: async (invoiceId: string) => {
-              return {
-                metadata: {
-                  statementId: "statement1",
                 },
               };
             },

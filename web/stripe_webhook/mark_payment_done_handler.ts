@@ -51,13 +51,12 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
       sessionStr,
       this.stripeSecretKey,
     );
-    if (event.type !== "payment_intent.succeeded") {
+    if (event.type !== "invoice.paid") {
       throw newBadRequestError(
-        `Expecting payment_intent.succeeded event, but got ${event.type}.`,
+        `Expecting invoice.paid event, but got ${event.type}.`,
       );
     }
-    let invoiceId = event.data.object.invoice as string;
-    let invoice = await this.stripeClient.val.invoices.retrieve(invoiceId);
+    let invoice = event.data.object;
     await this.database.runTransactionAsync(async (transaction) => {
       let statementId = invoice.metadata[PAYMENT_METADATA_STATEMENT_ID_KEY];
       let rows = await getPayment(transaction, {

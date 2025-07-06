@@ -57,13 +57,12 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
       sessionStr,
       this.stripeSecretKey,
     );
-    if (event.type !== "payment_intent.payment_failed") {
+    if (event.type !== "invoice.payment_failed") {
       throw newBadRequestError(
-        `Expecting payment_intent.payment_failed event, but got ${event.type}.`,
+        `Expecting invoice.payment_failed event, but got ${event.type}.`,
       );
     }
-    let invoiceId = event.data.object.invoice as string;
-    let invoice = await this.stripeClient.val.invoices.retrieve(invoiceId);
+    let invoice = event.data.object;
     await this.database.runTransactionAsync(async (transaction) => {
       let statementId = invoice.metadata[PAYMENT_METADATA_STATEMENT_ID_KEY];
       let [paymentRows, suspendingTaskRows] = await Promise.all([
