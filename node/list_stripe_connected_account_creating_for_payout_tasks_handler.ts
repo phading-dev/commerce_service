@@ -39,7 +39,7 @@ export class ListStripeConnectedAccountForPayoutCreatingTasksHandler extends Lis
         (
           row,
         ): ProcessStripeConnectedAccountForPayoutCreatingTaskRequestBody => ({
-          taskId: row.stripeConnectedAccountForPayoutCreatingTaskAccountId,
+          taskId: row.stripeConnectedAccountForPayoutCreatingTaskTaskId,
           accountId: row.stripeConnectedAccountForPayoutCreatingTaskAccountId,
         }),
       ),

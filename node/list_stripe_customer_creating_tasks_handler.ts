@@ -32,7 +32,7 @@ export class ListStripeCustomerCreatingTasksHandler extends ListStripeCustomerCr
     return {
       tasks: rows.map(
         (row): ProcessStripeCustomerCreatingTaskRequestBody => ({
-          taskid: row.stripeCustomerCreatingTaskTaskId,
+          taskId: row.stripeCustomerCreatingTaskTaskId,
           accountId: row.stripeCustomerCreatingTaskAccountId,
         }),
       ),

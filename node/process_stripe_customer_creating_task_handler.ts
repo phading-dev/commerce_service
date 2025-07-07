@@ -56,7 +56,7 @@ export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCusto
     loggingPrefix: string,
     body: ProcessStripeCustomerCreatingTaskRequestBody,
   ): Promise<ProcessStripeCustomerCreatingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payment Stripe customer creating task ${body.taskid}:`;
+    loggingPrefix = `${loggingPrefix} Payment Stripe customer creating task ${body.taskId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -71,7 +71,7 @@ export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCusto
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
       let rows = await getStripeCustomerCreatingTaskMetadata(transaction, {
-        stripeCustomerCreatingTaskTaskIdEq: body.taskid,
+        stripeCustomerCreatingTaskTaskIdEq: body.taskId,
       });
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
@@ -79,7 +79,7 @@ export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCusto
       let task = rows[0];
       await transaction.batchUpdate([
         updateStripeCustomerCreatingTaskMetadataStatement({
-          stripeCustomerCreatingTaskTaskIdEq: body.taskid,
+          stripeCustomerCreatingTaskTaskIdEq: body.taskId,
           setRetryCount: task.stripeCustomerCreatingTaskRetryCount + 1,
           setExecutionTimeMs:
             this.getNow() +
@@ -114,7 +114,7 @@ export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCusto
         },
       },
       {
-        idempotencyKey: `c${body.taskid}`,
+        idempotencyKey: `c${body.taskId}`,
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {
@@ -129,7 +129,7 @@ export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCusto
       let profile = profileRows[0];
       let statements: Array<Statement> = [
         deleteStripeCustomerCreatingTaskStatement({
-          stripeCustomerCreatingTaskTaskIdEq: body.taskid,
+          stripeCustomerCreatingTaskTaskIdEq: body.taskId,
         }),
       ];
       if (!profile.paymentProfileStripePaymentCustomerId) {
