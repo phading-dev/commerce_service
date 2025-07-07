@@ -7,7 +7,7 @@ import {
   deletePaymentStripeInvoicePayingTaskStatement,
   getPayment,
   getPaymentStripeInvoicePayingTaskMetadata,
-  updatePaymentStateAndStripeInvoiceStatement,
+  updatePaymentStateStatement,
   updatePaymentStripeInvoicePayingTaskMetadataStatement,
 } from "../db/sql";
 import { Database, Transaction } from "@google-cloud/spanner";
@@ -107,10 +107,9 @@ export class ProcessPaymentStripeInvoicePayingTaskHandler extends ProcessPayment
     await this.database.runTransactionAsync(async (transaction) => {
       await this.getValidPayment(transaction, body.statementId);
       await transaction.batchUpdate([
-        updatePaymentStateAndStripeInvoiceStatement({
+        updatePaymentStateStatement({
           paymentStatementIdEq: body.statementId,
           setState: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
-          setStripeInvoiceId: payment.paymentStripeInvoiceId,
           setUpdatedTimeMs: this.getNow(),
         }),
         deletePaymentStripeInvoicePayingTaskStatement({

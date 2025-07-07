@@ -18,7 +18,6 @@ import {
   getTransactionStatement,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentProfileSuspendingDueToPastDueTaskStatement,
-  insertPaymentStripeInvoicePayingTaskStatement,
   updatePaymentStateAndStripeInvoiceStatement,
   updatePaymentStateStatement,
   updatePaymentStripeInvoiceCreatingTaskMetadataStatement,
@@ -189,7 +188,7 @@ export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPayme
     await this.stripeClient.val.invoices.finalizeInvoice(
       invoice.id,
       {
-        // auto_advance: true,
+        auto_advance: true,
       },
       {
         idempotencyKey: `fi${body.taskId}`,
@@ -260,17 +259,9 @@ export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPayme
       await transaction.batchUpdate([
         updatePaymentStateAndStripeInvoiceStatement({
           paymentStatementIdEq: statementId,
-          setState: PaymentState.PAYING_INVOICE,
+          setState: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
           setStripeInvoiceId: invoiceId,
           setUpdatedTimeMs: this.getNow(),
-        }),
-        // TODO: Keep it or revert.
-        insertPaymentStripeInvoicePayingTaskStatement({
-          taskId: crypto.randomUUID(),
-          statementId,
-          retryCount: 0,
-          executionTimeMs: this.getNow(),
-          createdTimeMs: this.getNow(),
         }),
         deletePaymentStripeInvoiceCreatingTaskStatement({
           paymentStripeInvoiceCreatingTaskTaskIdEq: taskId,
