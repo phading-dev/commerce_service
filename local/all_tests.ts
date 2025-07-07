@@ -6,11 +6,12 @@ import "../node/process_payment_method_needs_update_notifying_task_handler_test"
 import "../node/process_payment_profile_state_syncing_task_handler_test";
 import "../node/process_payment_profile_suspending_due_to_past_due_task_handler_test";
 import "../node/process_payment_profile_suspension_notifying_task_handler_test";
-import "../node/process_payment_task_handler_test";
-import "../node/process_payout_task_handler_test";
-import "../node/process_stripe_connected_account_creating_task_handler_test";
+import "../node/process_payment_stripe_invoice_creating_task_handler_test";
+import "../node/process_payment_stripe_invoice_paying_task_handler_test";
+import "../node/process_payout_stripe_transfer_creating_task_handler_test";
+import "../node/process_stripe_connected_account_for_payout_creating_task_handler_test";
 import "../node/process_stripe_connected_account_needs_setup_notifying_task_handler_test";
-import "../node/process_stripe_payment_customer_creating_task_handler_test";
+import "../node/process_stripe_customer_creating_task_handler_test";
 import "../web/payment/create_stripe_session_to_add_payment_method_handler_test";
 import "../web/payment/get_payment_profile_info_handler_test";
 import "../web/payment/list_payments_handler_test";

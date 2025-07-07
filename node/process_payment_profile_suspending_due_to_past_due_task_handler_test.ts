@@ -91,7 +91,7 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               statementId: "statement1",
               accountId: "account1",
-              state: PaymentState.FAILED,
+              state: PaymentState.FAILED_WITHOUT_INVOICE,
             }),
             insertPaymentProfileSuspendingDueToPastDueTaskStatement({
               statementId: "statement1",
@@ -207,7 +207,7 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               statementId: "statement1",
               accountId: "account1",
-              state: PaymentState.FAILED,
+              state: PaymentState.FAILED_WITH_INVOICE,
             }),
             insertPaymentProfileSuspendingDueToPastDueTaskStatement({
               statementId: "statement1",

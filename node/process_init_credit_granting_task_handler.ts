@@ -4,18 +4,18 @@ import { STRIPE_CLIENT } from "../common/stripe_client";
 import { InitCreditGrantingState } from "../db/schema";
 import {
   GetPaymentProfileRow,
-  deleteInitPaymentCreditGrantingTaskStatement,
-  getInitPaymentCreditGrantingTaskMetadata,
+  deleteInitCreditGrantingTaskStatement,
+  getInitCreditGrantingTaskMetadata,
   getPaymentProfile,
-  updateInitPaymentCreditGrantingTaskMetadataStatement,
+  updateInitCreditGrantingTaskMetadataStatement,
   updatePaymentProfileInitCreditGrantingStateStatement,
 } from "../db/sql";
 import { ENV_VARS } from "../env_vars";
 import { Database, Transaction } from "@google-cloud/spanner";
-import { ProcessInitPaymentCreditGrantingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { ProcessInitCreditGrantingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessInitPaymentCreditGrantingTaskRequestBody,
-  ProcessInitPaymentCreditGrantingTaskResponse,
+  ProcessInitCreditGrantingTaskRequestBody,
+  ProcessInitCreditGrantingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import {
   newBadRequestError,
@@ -25,9 +25,9 @@ import {
 import { Ref } from "@selfage/ref";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessInitPaymentCreditGrantingTaskHandler extends ProcessInitPaymentCreditGrantingTaskHandlerInterface {
-  public static create(): ProcessInitPaymentCreditGrantingTaskHandler {
-    return new ProcessInitPaymentCreditGrantingTaskHandler(
+export class ProcessInitCreditGrantingTaskHandler extends ProcessInitCreditGrantingTaskHandlerInterface {
+  public static create(): ProcessInitCreditGrantingTaskHandler {
+    return new ProcessInitCreditGrantingTaskHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       () => Date.now(),
@@ -51,9 +51,9 @@ export class ProcessInitPaymentCreditGrantingTaskHandler extends ProcessInitPaym
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessInitPaymentCreditGrantingTaskRequestBody,
-  ): Promise<ProcessInitPaymentCreditGrantingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Init payment credit granting task for account ${body.accountId}:`;
+    body: ProcessInitCreditGrantingTaskRequestBody,
+  ): Promise<ProcessInitCreditGrantingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Init payment credit granting task ${body.taskId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -64,24 +64,24 @@ export class ProcessInitPaymentCreditGrantingTaskHandler extends ProcessInitPaym
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessInitPaymentCreditGrantingTaskRequestBody,
+    body: ProcessInitCreditGrantingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getInitPaymentCreditGrantingTaskMetadata(transaction, {
-        initPaymentCreditGrantingTaskAccountIdEq: body.accountId,
+      let rows = await getInitCreditGrantingTaskMetadata(transaction, {
+        initCreditGrantingTaskTaskIdEq: body.taskId,
       });
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updateInitPaymentCreditGrantingTaskMetadataStatement({
-          initPaymentCreditGrantingTaskAccountIdEq: body.accountId,
-          setRetryCount: task.initPaymentCreditGrantingTaskRetryCount + 1,
+        updateInitCreditGrantingTaskMetadataStatement({
+          initCreditGrantingTaskTaskIdEq: body.taskId,
+          setRetryCount: task.initCreditGrantingTaskRetryCount + 1,
           setExecutionTimeMs:
             this.getNow() +
             this.taskHandler.getBackoffTime(
-              task.initPaymentCreditGrantingTaskRetryCount,
+              task.initCreditGrantingTaskRetryCount,
             ),
         }),
       ]);
@@ -91,7 +91,7 @@ export class ProcessInitPaymentCreditGrantingTaskHandler extends ProcessInitPaym
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessInitPaymentCreditGrantingTaskRequestBody,
+    body: ProcessInitCreditGrantingTaskRequestBody,
   ): Promise<void> {
     let profile = await this.getValidPaymentProfile(
       this.database,
@@ -103,11 +103,10 @@ export class ProcessInitPaymentCreditGrantingTaskHandler extends ProcessInitPaym
         // Stripe stores credit as a negative amount.
         amount: -1 * ENV_VARS.stripeInitCreditAmount,
         currency: ENV_VARS.defaultCurrency.toLowerCase(),
-        description:
-          ProcessInitPaymentCreditGrantingTaskHandler.CREDIT_DESCRIPTION,
+        description: ProcessInitCreditGrantingTaskHandler.CREDIT_DESCRIPTION,
       },
       {
-        idempotencyKey: `ic${body.accountId}`,
+        idempotencyKey: `ic${body.taskId}`,
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {
@@ -117,8 +116,8 @@ export class ProcessInitPaymentCreditGrantingTaskHandler extends ProcessInitPaym
           paymentProfileAccountIdEq: body.accountId,
           setInitCreditGrantingState: InitCreditGrantingState.GRANTED,
         }),
-        deleteInitPaymentCreditGrantingTaskStatement({
-          initPaymentCreditGrantingTaskAccountIdEq: body.accountId,
+        deleteInitCreditGrantingTaskStatement({
+          initCreditGrantingTaskTaskIdEq: body.taskId,
         }),
       ]);
       await transaction.commit();

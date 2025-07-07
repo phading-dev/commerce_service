@@ -18,7 +18,7 @@ import { Ref } from "@selfage/ref";
 import { assertThat, eq } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
-class NoPaymentMethodAndHealthyButWithPaymentsTestCase {
+class HealthyButWithPaymentsTestCase {
   public constructor(
     public name: string,
     public paymentState: PaymentState,
@@ -220,19 +220,29 @@ TEST_RUNNER.run({
         });
       },
     },
-    new NoPaymentMethodAndHealthyButWithPaymentsTestCase(
-      "NoPaymentMethodAndHealthyButWithFailedPayments",
-      PaymentState.FAILED,
+    new HealthyButWithPaymentsTestCase(
+      "FailedWithoutInvoiceAndHealthyButWithFailedPayments",
+      PaymentState.FAILED_WITHOUT_INVOICE,
       PaymentProfileStateResponse.WITH_FAILED_PAYMENTS,
     ),
-    new NoPaymentMethodAndHealthyButWithPaymentsTestCase(
-      "NoPaymentMethodAndHealthyButWithProcessingPayments",
-      PaymentState.PROCESSING,
+    new HealthyButWithPaymentsTestCase(
+      "FailedWithInvoiceAndHealthyButWithFailedPayments",
+      PaymentState.FAILED_WITH_INVOICE,
+      PaymentProfileStateResponse.WITH_FAILED_PAYMENTS,
+    ),
+    new HealthyButWithPaymentsTestCase(
+      "CreatingStripeInvoiceAndHealthyButWithProcessingPayments",
+      PaymentState.CREATING_STRIPE_INVOICE,
       PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS,
     ),
-    new NoPaymentMethodAndHealthyButWithPaymentsTestCase(
-      "NoPaymentMethodAndHealthyButWithChargingViaStripeInvoice",
-      PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+    new HealthyButWithPaymentsTestCase(
+      "PayingInvoiceAndHealthyButWithChargingViaStripeInvoice",
+      PaymentState.PAYING_INVOICE,
+      PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS,
+    ),
+    new HealthyButWithPaymentsTestCase(
+      "WaitingForInvoiceAndHealthyButWithProcessingPayments",
+      PaymentState.WAITING_FOR_INVOICE_PAYMENT,
       PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS,
     ),
     {

@@ -5,41 +5,33 @@ import {
   GET_PAYMENT_METHOD_NEEDS_UPDATE_NOTIFYING_TASK_ROW,
   GET_PAYMENT_PROFILE_SUSPENDING_DUE_TO_PAST_DUE_TASK_ROW,
   GET_PAYMENT_ROW,
-  GET_PAYMENT_TASK_METADATA_ROW,
+  GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_METADATA_ROW,
   deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
   deletePaymentProfileStatement,
   deletePaymentProfileSuspendingDueToPastDueTaskStatement,
   deletePaymentStatement,
-  deletePaymentTaskStatement,
+  deletePaymentStripeInvoiceCreatingTaskStatement,
   deleteTransactionStatementStatement,
   getPayment,
   getPaymentMethodNeedsUpdateNotifyingTask,
   getPaymentProfileSuspendingDueToPastDueTask,
-  getPaymentTaskMetadata,
+  getPaymentStripeInvoiceCreatingTaskMetadata,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentProfileStatement,
   insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentStatement,
-  insertPaymentTaskStatement,
+  insertPaymentStripeInvoiceCreatingTaskStatement,
   insertTransactionStatementStatement,
-  listPendingPaymentTasks,
+  listPendingPaymentStripeInvoiceCreatingTasks,
 } from "../db/sql";
-import { ProcessPaymentTaskHandler } from "./process_payment_task_handler";
+import { ProcessPaymentStripeInvoiceCreatingTaskHandler } from "./process_payment_stripe_invoice_creating_task_handler";
 import { AmountType } from "@phading/price/amount_type";
 import { newBadRequestError } from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { Ref } from "@selfage/ref";
-import {
-  assertReject,
-  assertThat,
-  eq,
-  eqError,
-  isArray,
-} from "@selfage/test_matcher";
+import { assertReject, assertThat, eq, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
-
-let ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
 async function insertPayment(): Promise<void> {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -61,9 +53,10 @@ async function insertPayment(): Promise<void> {
       insertPaymentStatement({
         statementId: "statement1",
         accountId: "account1",
-        state: PaymentState.PROCESSING,
+        state: PaymentState.CREATING_STRIPE_INVOICE,
       }),
-      insertPaymentTaskStatement({
+      insertPaymentStripeInvoiceCreatingTaskStatement({
+        taskId: "task1",
         statementId: "statement1",
         retryCount: 0,
         executionTimeMs: 100,
@@ -81,8 +74,8 @@ async function cleanupAll(): Promise<void> {
         transactionStatementStatementIdEq: "statement1",
       }),
       deletePaymentStatement({ paymentStatementIdEq: "statement1" }),
-      deletePaymentTaskStatement({
-        paymentTaskStatementIdEq: "statement1",
+      deletePaymentStripeInvoiceCreatingTaskStatement({
+        paymentStripeInvoiceCreatingTaskTaskIdEq: "task1",
       }),
       deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
         paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
@@ -96,7 +89,7 @@ async function cleanupAll(): Promise<void> {
 }
 
 TEST_RUNNER.run({
-  name: "ProcessPaymentTaskHandlerTest",
+  name: "ProcessPaymentStripeInvoiceCreatingTaskHandlerTest",
   cases: [
     {
       name: "Success",
@@ -155,14 +148,17 @@ TEST_RUNNER.run({
             },
           },
         };
-        let handler = new ProcessPaymentTaskHandler(
+        let handler = new ProcessPaymentStripeInvoiceCreatingTaskHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        await handler.processTask("", { statementId: "statement1" });
+        await handler.processTask("", {
+          taskId: "task1",
+          statementId: "statement1",
+        });
 
         // Verify
         assertThat(
@@ -192,7 +188,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           createInvoiceOptionCaptured.idempotencyKey,
-          eq("cstatement1"),
+          eq("citask1"),
           "createInvoiceOption.idempotencyKey",
         );
         assertThat(
@@ -212,7 +208,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           addLinesOptionCaptured.idempotencyKey,
-          eq("astatement1"),
+          eq("altask1"),
           "addLinesOption.idempotencyKey",
         );
         assertThat(
@@ -227,7 +223,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           finalizeInvoiceOptionCaptured.idempotencyKey,
-          eq("fstatement1"),
+          eq("fitask1"),
           "finalizeInvoiceOption.idempotencyKey",
         );
         assertThat(
@@ -239,7 +235,7 @@ TEST_RUNNER.run({
               {
                 paymentStatementId: "statement1",
                 paymentAccountId: "account1",
-                paymentState: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+                paymentState: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
                 paymentStripeInvoiceId: "invoice1",
                 paymentUpdatedTimeMs: 1000,
               },
@@ -249,66 +245,11 @@ TEST_RUNNER.run({
           "payment",
         );
         assertThat(
-          await listPendingPaymentTasks(SPANNER_DATABASE, {
-            paymentTaskExecutionTimeMsLe: ONE_YEAR_MS,
+          await listPendingPaymentStripeInvoiceCreatingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "tasks",
-        );
-      },
-      tearDown: async () => {
-        await cleanupAll();
-      },
-    },
-    {
-      name: "CreateInvoiceFailed",
-      execute: async () => {
-        // Prepare
-        await insertPayment();
-        let stripeClientMock: any = {
-          customers: {
-            retrieve: async () => {
-              return {
-                invoice_settings: {
-                  default_payment_method: "paymentMethod1",
-                },
-              };
-            },
-          },
-          invoices: {
-            create: async () => {
-              throw new Error("Fake error");
-            },
-          },
-        };
-        let handler = new ProcessPaymentTaskHandler(
-          SPANNER_DATABASE,
-          new Ref(stripeClientMock),
-          () => 1000,
-        );
-
-        // Execute
-        let error = await assertReject(
-          handler.processTask("", { statementId: "statement1" }),
-        );
-
-        // Verify
-        assertThat(error, eqError(new Error("Fake error")), "error");
-        assertThat(
-          await getPayment(SPANNER_DATABASE, {
-            paymentStatementIdEq: "statement1",
-          }),
-          isArray([
-            eqMessage(
-              {
-                paymentStatementId: "statement1",
-                paymentAccountId: "account1",
-                paymentState: PaymentState.PROCESSING,
-              },
-              GET_PAYMENT_ROW,
-            ),
-          ]),
-          "payment",
         );
       },
       tearDown: async () => {
@@ -331,14 +272,17 @@ TEST_RUNNER.run({
             },
           },
         };
-        let handler = new ProcessPaymentTaskHandler(
+        let handler = new ProcessPaymentStripeInvoiceCreatingTaskHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        await handler.processTask("", { statementId: "statement1" });
+        await handler.processTask("", {
+          taskId: "task1",
+          statementId: "statement1",
+        });
 
         // Verify
         assertThat(
@@ -350,7 +294,7 @@ TEST_RUNNER.run({
               {
                 paymentStatementId: "statement1",
                 paymentAccountId: "account1",
-                paymentState: PaymentState.FAILED,
+                paymentState: PaymentState.FAILED_WITHOUT_INVOICE,
                 paymentUpdatedTimeMs: 1000,
               },
               GET_PAYMENT_ROW,
@@ -359,8 +303,8 @@ TEST_RUNNER.run({
           "payment",
         );
         assertThat(
-          await listPendingPaymentTasks(SPANNER_DATABASE, {
-            paymentTaskExecutionTimeMsLe: ONE_YEAR_MS,
+          await listPendingPaymentStripeInvoiceCreatingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "tasks",
@@ -438,14 +382,17 @@ TEST_RUNNER.run({
             },
           },
         };
-        let handler = new ProcessPaymentTaskHandler(
+        let handler = new ProcessPaymentStripeInvoiceCreatingTaskHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           () => 1000,
         );
 
         // Execute
-        await handler.processTask("", { statementId: "statement1" });
+        await handler.processTask("", {
+          taskId: "task1",
+          statementId: "statement1",
+        });
 
         // Verify
         assertThat(
@@ -457,7 +404,7 @@ TEST_RUNNER.run({
               {
                 paymentStatementId: "statement1",
                 paymentAccountId: "account1",
-                paymentState: PaymentState.FAILED,
+                paymentState: PaymentState.FAILED_WITHOUT_INVOICE,
                 paymentUpdatedTimeMs: 1000,
               },
               GET_PAYMENT_ROW,
@@ -466,8 +413,8 @@ TEST_RUNNER.run({
           "payment",
         );
         assertThat(
-          await listPendingPaymentTasks(SPANNER_DATABASE, {
-            paymentTaskExecutionTimeMsLe: ONE_YEAR_MS,
+          await listPendingPaymentStripeInvoiceCreatingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "tasks",
@@ -513,20 +460,20 @@ TEST_RUNNER.run({
       },
     },
     {
-      name: "PaymentNotInProcessingState",
+      name: "PaymentNotInCreatingState",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
             insertPaymentStatement({
               statementId: "statement1",
-              state: PaymentState.FAILED,
+              state: PaymentState.FAILED_WITHOUT_INVOICE,
             }),
           ]);
           await transaction.commit();
         });
         let stripeClientMock: any = {};
-        let handler = new ProcessPaymentTaskHandler(
+        let handler = new ProcessPaymentStripeInvoiceCreatingTaskHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           () => 1000,
@@ -534,14 +481,19 @@ TEST_RUNNER.run({
 
         // Execute
         let error = await assertReject(
-          handler.processTask("", { statementId: "statement1" }),
+          handler.processTask("", {
+            taskId: "task1",
+            statementId: "statement1",
+          }),
         );
 
         // Verify
         assertThat(
           error,
           eqHttpError(
-            newBadRequestError("Payment statement1 is not in PROCESSING state"),
+            newBadRequestError(
+              "Payment statement1 is not in CREATING_STRIPE_INVOICE state",
+            ),
           ),
           "error",
         );
@@ -556,7 +508,8 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertPaymentTaskStatement({
+            insertPaymentStripeInvoiceCreatingTaskStatement({
+              taskId: "task1",
               statementId: "statement1",
               retryCount: 0,
               executionTimeMs: 100,
@@ -564,27 +517,30 @@ TEST_RUNNER.run({
           ]);
           await transaction.commit();
         });
-        let handler = new ProcessPaymentTaskHandler(
+        let handler = new ProcessPaymentStripeInvoiceCreatingTaskHandler(
           SPANNER_DATABASE,
           undefined,
           () => 1000,
         );
 
         // Execute
-        await handler.claimTask("", { statementId: "statement1" });
+        await handler.claimTask("", {
+          taskId: "task1",
+          statementId: "statement1",
+        });
 
         // Verify
         assertThat(
-          await getPaymentTaskMetadata(SPANNER_DATABASE, {
-            paymentTaskStatementIdEq: "statement1",
+          await getPaymentStripeInvoiceCreatingTaskMetadata(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskTaskIdEq: "task1",
           }),
           isArray([
             eqMessage(
               {
-                paymentTaskRetryCount: 1,
-                paymentTaskExecutionTimeMs: 301000,
+                paymentStripeInvoiceCreatingTaskRetryCount: 1,
+                paymentStripeInvoiceCreatingTaskExecutionTimeMs: 301000,
               },
-              GET_PAYMENT_TASK_METADATA_ROW,
+              GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_METADATA_ROW,
             ),
           ]),
           "tasks",

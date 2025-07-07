@@ -3,32 +3,26 @@ import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PayoutState } from "../db/schema";
 import {
   GET_PAYOUT_ROW,
-  GET_PAYOUT_TASK_METADATA_ROW,
+  GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_METADATA_ROW,
   deletePayoutProfileStatement,
   deletePayoutStatement,
-  deletePayoutTaskStatement,
+  deletePayoutStripeTransferCreatingTaskStatement,
   deleteTransactionStatementStatement,
   getPayout,
-  getPayoutTaskMetadata,
+  getPayoutStripeTransferCreatingTaskMetadata,
   insertPayoutProfileStatement,
   insertPayoutStatement,
-  insertPayoutTaskStatement,
+  insertPayoutStripeTransferCreatingTaskStatement,
   insertTransactionStatementStatement,
-  listPendingPayoutTasks,
+  listPendingPayoutStripeTransferCreatingTasks,
 } from "../db/sql";
-import { ProcessPayoutTaskHandler } from "./process_payout_task_handler";
+import { ProcessPayoutStripeTransferCreatingTaskHandler } from "./process_payout_stripe_transfer_creating_task_handler";
 import { AmountType } from "@phading/price/amount_type";
 import { newBadRequestError } from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { Ref } from "@selfage/ref";
-import {
-  assertReject,
-  assertThat,
-  eq,
-  eqError,
-  isArray,
-} from "@selfage/test_matcher";
+import { assertReject, assertThat, eq, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
 async function insertPayout(): Promise<void> {
@@ -52,7 +46,8 @@ async function insertPayout(): Promise<void> {
         accountId: "account1",
         state: PayoutState.PROCESSING,
       }),
-      insertPayoutTaskStatement({
+      insertPayoutStripeTransferCreatingTaskStatement({
+        taskId: "task1",
         statementId: "statement1",
         retryCount: 0,
         executionTimeMs: 100,
@@ -72,14 +67,16 @@ async function cleanupAll(): Promise<void> {
         transactionStatementStatementIdEq: "statement1",
       }),
       deletePayoutStatement({ payoutStatementIdEq: "statement1" }),
-      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement1" }),
+      deletePayoutStripeTransferCreatingTaskStatement({
+        payoutStripeTransferCreatingTaskTaskIdEq: "task1",
+      }),
     ]);
     await transaction.commit();
   });
 }
 
 TEST_RUNNER.run({
-  name: "ProcessPayoutTaskHandlerTest",
+  name: "ProcessPayoutStripeTransferCreatingTaskHandlerTest",
   cases: [
     {
       name: "ProcessTask",
@@ -104,7 +101,7 @@ TEST_RUNNER.run({
             },
           },
         };
-        let handler = new ProcessPayoutTaskHandler(
+        let handler = new ProcessPayoutStripeTransferCreatingTaskHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           () => 1000,
@@ -112,6 +109,7 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.processTask("", {
+          taskId: "task1",
           statementId: "statement1",
         });
 
@@ -138,7 +136,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           optionCaptured.idempotencyKey,
-          eq("statement1"),
+          eq("potask1"),
           "option.idempotencyKey",
         );
         assertThat(
@@ -160,64 +158,11 @@ TEST_RUNNER.run({
           "payout",
         );
         assertThat(
-          await listPendingPayoutTasks(SPANNER_DATABASE, {
-            payoutTaskExecutionTimeMsLe: 1000000,
+          await listPendingPayoutStripeTransferCreatingTasks(SPANNER_DATABASE, {
+            payoutStripeTransferCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "payoutTasks",
-        );
-      },
-      tearDown: async () => {
-        await cleanupAll();
-      },
-    },
-    {
-      name: "PayoutFailed",
-      execute: async () => {
-        // Prepare
-        await insertPayout();
-        let stripeClientMock: any = {
-          accounts: {
-            retrieve: async () => {
-              return { payouts_enabled: true };
-            },
-          },
-          transfers: {
-            create: async () => {
-              throw new Error("Fake error");
-            },
-          },
-        };
-        let handler = new ProcessPayoutTaskHandler(
-          SPANNER_DATABASE,
-          new Ref(stripeClientMock),
-          () => 1000,
-        );
-
-        // Execute
-        let error = await assertReject(
-          handler.processTask("", {
-            statementId: "statement1",
-          }),
-        );
-
-        // Verify
-        assertThat(error, eqError(new Error("Fake error")), "error");
-        assertThat(
-          await getPayout(SPANNER_DATABASE, {
-            payoutStatementIdEq: "statement1",
-          }),
-          isArray([
-            eqMessage(
-              {
-                payoutStatementId: "statement1",
-                payoutAccountId: "account1",
-                payoutState: PayoutState.PROCESSING,
-              },
-              GET_PAYOUT_ROW,
-            ),
-          ]),
-          "payout",
         );
       },
       tearDown: async () => {
@@ -236,7 +181,7 @@ TEST_RUNNER.run({
             },
           },
         };
-        let handler = new ProcessPayoutTaskHandler(
+        let handler = new ProcessPayoutStripeTransferCreatingTaskHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           () => 1000,
@@ -244,6 +189,7 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.processTask("", {
+          taskId: "task1",
           statementId: "statement1",
         });
 
@@ -266,8 +212,8 @@ TEST_RUNNER.run({
           "payout",
         );
         assertThat(
-          await listPendingPayoutTasks(SPANNER_DATABASE, {
-            payoutTaskExecutionTimeMsLe: 1000000,
+          await listPendingPayoutStripeTransferCreatingTasks(SPANNER_DATABASE, {
+            payoutStripeTransferCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "payoutTasks",
@@ -291,7 +237,7 @@ TEST_RUNNER.run({
           await transaction.commit();
         });
         let stripeClientMock: any = {};
-        let handler = new ProcessPayoutTaskHandler(
+        let handler = new ProcessPayoutStripeTransferCreatingTaskHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
           () => 1000,
@@ -300,6 +246,7 @@ TEST_RUNNER.run({
         // Execute
         let error = await assertReject(
           handler.processTask("", {
+            taskId: "task1",
             statementId: "statement1",
           }),
         );
@@ -323,7 +270,8 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertPayoutTaskStatement({
+            insertPayoutStripeTransferCreatingTaskStatement({
+              taskId: "task1",
               statementId: "statement1",
               retryCount: 0,
               executionTimeMs: 100,
@@ -331,7 +279,7 @@ TEST_RUNNER.run({
           ]);
           await transaction.commit();
         });
-        let handler = new ProcessPayoutTaskHandler(
+        let handler = new ProcessPayoutStripeTransferCreatingTaskHandler(
           SPANNER_DATABASE,
           undefined,
           () => 1000,
@@ -339,21 +287,22 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.claimTask("", {
+          taskId: "task1",
           statementId: "statement1",
         });
 
         // Verify
         assertThat(
-          await getPayoutTaskMetadata(SPANNER_DATABASE, {
-            payoutTaskStatementIdEq: "statement1",
+          await getPayoutStripeTransferCreatingTaskMetadata(SPANNER_DATABASE, {
+            payoutStripeTransferCreatingTaskTaskIdEq: "task1",
           }),
           isArray([
             eqMessage(
               {
-                payoutTaskRetryCount: 1,
-                payoutTaskExecutionTimeMs: 301000,
+                payoutStripeTransferCreatingTaskRetryCount: 1,
+                payoutStripeTransferCreatingTaskExecutionTimeMs: 301000,
               },
-              GET_PAYOUT_TASK_METADATA_ROW,
+              GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_METADATA_ROW,
             ),
           ]),
           "payoutTask",

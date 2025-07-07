@@ -2,36 +2,41 @@ import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
   GET_PAYMENT_PROFILE_ROW,
-  GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_METADATA_ROW,
+  GET_STRIPE_CUSTOMER_CREATING_TASK_METADATA_ROW,
   deletePaymentProfileStatement,
-  deleteStripePaymentCustomerCreatingTaskStatement,
+  deleteStripeCustomerCreatingTaskStatement,
   getPaymentProfile,
-  getStripePaymentCustomerCreatingTaskMetadata,
+  getStripeCustomerCreatingTaskMetadata,
   insertPaymentProfileStatement,
-  insertStripePaymentCustomerCreatingTaskStatement,
-  listPendingStripePaymentCustomerCreatingTasks,
+  insertStripeCustomerCreatingTaskStatement,
+  listPendingStripeCustomerCreatingTasks,
 } from "../db/sql";
-import { ProcessStripePaymentCustomerCreatingTaskHandler } from "./process_stripe_payment_customer_creating_task_handler";
+import { ProcessStripeCustomerCreatingTaskHandler } from "./process_stripe_customer_creating_task_handler";
 import { GetAccountContactResponse } from "@phading/user_service_interface/node/interface";
-import {
-  newBadRequestError,
-  newInternalServerErrorError,
-} from "@selfage/http_error";
+import { newInternalServerErrorError } from "@selfage/http_error";
 import { eqHttpError } from "@selfage/http_error/test_matcher";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
 import { Ref } from "@selfage/ref";
-import {
-  assertReject,
-  assertThat,
-  eq,
-  eqError,
-  isArray,
-} from "@selfage/test_matcher";
+import { assertReject, assertThat, eq, isArray } from "@selfage/test_matcher";
 import { TEST_RUNNER } from "@selfage/test_runner";
 
+async function cleanupAll() {
+  await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+    await transaction.batchUpdate([
+      deletePaymentProfileStatement({
+        paymentProfileAccountIdEq: "account1",
+      }),
+      deleteStripeCustomerCreatingTaskStatement({
+        stripeCustomerCreatingTaskTaskIdEq: "task1",
+      }),
+    ]);
+    await transaction.commit();
+  });
+}
+
 TEST_RUNNER.run({
-  name: "ProcessStripePaymentCustomerCreatingTaskHandlerTest",
+  name: "ProcessStripeCustomerCreatingTaskHandlerTest",
   cases: [
     {
       name: "ProcessTask",
@@ -42,7 +47,8 @@ TEST_RUNNER.run({
             insertPaymentProfileStatement({
               accountId: "account1",
             }),
-            insertStripePaymentCustomerCreatingTaskStatement({
+            insertStripeCustomerCreatingTaskStatement({
+              taskId: "task1",
               accountId: "account1",
               retryCount: 0,
               executionTimeMs: 100,
@@ -69,7 +75,7 @@ TEST_RUNNER.run({
             },
           },
         };
-        let handler = new ProcessStripePaymentCustomerCreatingTaskHandler(
+        let handler = new ProcessStripeCustomerCreatingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           new Ref(stripeClientMock),
@@ -78,6 +84,7 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.processTask("", {
+          taskid: "task1",
           accountId: "account1",
         });
 
@@ -99,7 +106,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           optionsCapture.idempotencyKey,
-          eq("caccount1"),
+          eq("ctask1"),
           "options.idempotencyKey",
         );
         assertThat(
@@ -118,26 +125,15 @@ TEST_RUNNER.run({
           "paymentAccount",
         );
         assertThat(
-          await listPendingStripePaymentCustomerCreatingTasks(
-            SPANNER_DATABASE,
-            { stripePaymentCustomerCreatingTaskExecutionTimeMsLe: 1000000 },
-          ),
+          await listPendingStripeCustomerCreatingTasks(SPANNER_DATABASE, {
+            stripeCustomerCreatingTaskExecutionTimeMsLe: 1000000,
+          }),
           isArray([]),
           "stripeCustomerCreatingTasks",
         );
       },
       tearDown: async () => {
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            deletePaymentProfileStatement({
-              paymentProfileAccountIdEq: "account1",
-            }),
-            deleteStripePaymentCustomerCreatingTaskStatement({
-              stripePaymentCustomerCreatingTaskAccountIdEq: "account1",
-            }),
-          ]);
-          await transaction.commit();
-        });
+        await cleanupAll();
       },
     },
     {
@@ -167,7 +163,7 @@ TEST_RUNNER.run({
             },
           },
         };
-        let handler = new ProcessStripePaymentCustomerCreatingTaskHandler(
+        let handler = new ProcessStripeCustomerCreatingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           new Ref(stripeClientMock),
@@ -175,32 +171,22 @@ TEST_RUNNER.run({
         );
 
         // Execute
-        let error = await assertReject(
-          handler.processTask("", {
-            accountId: "account1",
-          }),
-        );
+        await handler.processTask("", {
+          taskid: "task1",
+          accountId: "account1",
+        });
 
         // Verify
         assertThat(
-          error,
-          eqHttpError(
-            newBadRequestError(
-              "Payment profile account1 already has a stripe customer id stripeCustomer1.",
-            ),
-          ),
-          "error",
+          await listPendingStripeCustomerCreatingTasks(SPANNER_DATABASE, {
+            stripeCustomerCreatingTaskExecutionTimeMsLe: 1000000,
+          }),
+          isArray([]),
+          "stripeCustomerCreatingTasks",
         );
       },
       tearDown: async () => {
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            deletePaymentProfileStatement({
-              paymentProfileAccountIdEq: "account1",
-            }),
-          ]);
-          await transaction.commit();
-        });
+        await cleanupAll();
       },
     },
     {
@@ -230,7 +216,7 @@ TEST_RUNNER.run({
             },
           },
         };
-        let handler = new ProcessStripePaymentCustomerCreatingTaskHandler(
+        let handler = new ProcessStripeCustomerCreatingTaskHandler(
           SPANNER_DATABASE,
           clientMock,
           new Ref(stripeClientMock),
@@ -240,6 +226,7 @@ TEST_RUNNER.run({
         // Execute
         let error = await assertReject(
           handler.processTask("", {
+            taskid: "task1",
             accountId: "account1",
           }),
         );
@@ -256,75 +243,7 @@ TEST_RUNNER.run({
         );
       },
       tearDown: async () => {
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            deletePaymentProfileStatement({
-              paymentProfileAccountIdEq: "account1",
-            }),
-          ]);
-          await transaction.commit();
-        });
-      },
-    },
-    {
-      name: "CustomerCreationFailed",
-      execute: async () => {
-        // Prepare
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            insertPaymentProfileStatement({
-              accountId: "account1",
-            }),
-            insertStripePaymentCustomerCreatingTaskStatement({
-              accountId: "account1",
-              retryCount: 0,
-              executionTimeMs: 100,
-              createdTimeMs: 100,
-            }),
-          ]);
-          await transaction.commit();
-        });
-        let clientMock = new NodeServiceClientMock();
-        clientMock.response = {
-          contactEmail: "contact@email.com",
-          naturalName: "First Second",
-        } as GetAccountContactResponse;
-        let stripeClientMock: any = {
-          customers: {
-            create: async (createCustomerParams: any) => {
-              throw new Error("Fake error.");
-            },
-          },
-        };
-        let handler = new ProcessStripePaymentCustomerCreatingTaskHandler(
-          SPANNER_DATABASE,
-          clientMock,
-          new Ref(stripeClientMock),
-          () => 1000,
-        );
-
-        // Execute
-        let error = await assertReject(
-          handler.processTask("", {
-            accountId: "account1",
-          }),
-        );
-
-        // Verify
-        assertThat(error, eqError(new Error("Fake error.")), "error");
-      },
-      tearDown: async () => {
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            deletePaymentProfileStatement({
-              paymentProfileAccountIdEq: "account1",
-            }),
-            deleteStripePaymentCustomerCreatingTaskStatement({
-              stripePaymentCustomerCreatingTaskAccountIdEq: "account1",
-            }),
-          ]);
-          await transaction.commit();
-        });
+        await cleanupAll();
       },
     },
     {
@@ -333,7 +252,8 @@ TEST_RUNNER.run({
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
           await transaction.batchUpdate([
-            insertStripePaymentCustomerCreatingTaskStatement({
+            insertStripeCustomerCreatingTaskStatement({
+              taskId: "task1",
               accountId: "account1",
               retryCount: 0,
               executionTimeMs: 100,
@@ -342,7 +262,7 @@ TEST_RUNNER.run({
           ]);
           await transaction.commit();
         });
-        let handler = new ProcessStripePaymentCustomerCreatingTaskHandler(
+        let handler = new ProcessStripeCustomerCreatingTaskHandler(
           SPANNER_DATABASE,
           undefined,
           undefined,
@@ -351,35 +271,29 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.claimTask("", {
+          taskid: "task1",
           accountId: "account1",
         });
 
         // Verify
         assertThat(
-          await getStripePaymentCustomerCreatingTaskMetadata(SPANNER_DATABASE, {
-            stripePaymentCustomerCreatingTaskAccountIdEq: "account1",
+          await getStripeCustomerCreatingTaskMetadata(SPANNER_DATABASE, {
+            stripeCustomerCreatingTaskTaskIdEq: "task1",
           }),
           isArray([
             eqMessage(
               {
-                stripePaymentCustomerCreatingTaskRetryCount: 1,
-                stripePaymentCustomerCreatingTaskExecutionTimeMs: 301000,
+                stripeCustomerCreatingTaskRetryCount: 1,
+                stripeCustomerCreatingTaskExecutionTimeMs: 301000,
               },
-              GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_METADATA_ROW,
+              GET_STRIPE_CUSTOMER_CREATING_TASK_METADATA_ROW,
             ),
           ]),
           "stripeCustomerCreatingTasks",
         );
       },
       tearDown: async () => {
-        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
-          await transaction.batchUpdate([
-            deleteStripePaymentCustomerCreatingTaskStatement({
-              stripePaymentCustomerCreatingTaskAccountIdEq: "account1",
-            }),
-          ]);
-          await transaction.commit();
-        });
+        await cleanupAll();
       },
     },
   ],

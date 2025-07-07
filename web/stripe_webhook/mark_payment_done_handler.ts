@@ -68,9 +68,9 @@ export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
         );
       }
       let row = rows[0];
-      if (row.paymentState !== PaymentState.CHARGING_VIA_STRIPE_INVOICE) {
-        console.warn(
-          `${loggingPrefix} Payment ${statementId} is in CHARGING state but in ${PaymentState[row.paymentState]} and yet completed.`,
+      if (row.paymentState !== PaymentState.WAITING_FOR_INVOICE_PAYMENT) {
+        console.log(
+          `${loggingPrefix} Payment ${statementId} is in ${PaymentState[row.paymentState]} and yet completed.`,
         );
       }
       await transaction.batchUpdate([

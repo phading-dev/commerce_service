@@ -77,16 +77,16 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
         );
       }
       let payment = paymentRows[0];
-      if (payment.paymentState !== PaymentState.CHARGING_VIA_STRIPE_INVOICE) {
+      if (payment.paymentState !== PaymentState.WAITING_FOR_INVOICE_PAYMENT) {
         throw newConflictError(
-          `Payment ${statementId} is not in CHARGING_VIA_STRIPE_INVOICE state.`,
+          `Payment ${statementId} is not in WAITING_FOR_INVOICE_PAYMENT state.`,
         );
       }
       let now = this.getNow();
       await transaction.batchUpdate([
         updatePaymentStateStatement({
           paymentStatementIdEq: statementId,
-          setState: PaymentState.FAILED,
+          setState: PaymentState.FAILED_WITH_INVOICE,
           setUpdatedTimeMs: now,
         }),
         deletePaymentMethodNeedsUpdateNotifyingTaskStatement({

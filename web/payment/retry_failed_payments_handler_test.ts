@@ -3,13 +3,17 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
   GET_PAYMENT_ROW,
-  GET_PAYMENT_TASK_ROW,
+  GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_ROW,
+  GET_PAYMENT_STRIPE_INVOICE_PAYING_TASK_ROW,
   deletePaymentStatement,
-  deletePaymentTaskStatement,
+  deletePaymentStripeInvoiceCreatingTaskStatement,
+  deletePaymentStripeInvoicePayingTaskStatement,
   getPayment,
-  getPaymentTask,
+  getPaymentStripeInvoiceCreatingTask,
+  getPaymentStripeInvoicePayingTask,
   insertPaymentStatement,
-  listPendingPaymentTasks,
+  listPendingPaymentStripeInvoiceCreatingTasks,
+  listPendingPaymentStripeInvoicePayingTasks,
 } from "../../db/sql";
 import { RetryFailedPaymentsHandler } from "./retry_failed_payments_handler";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
@@ -30,17 +34,17 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               statementId: "statement1",
               accountId: "account1",
-              state: PaymentState.FAILED,
+              state: PaymentState.FAILED_WITHOUT_INVOICE,
             }),
             insertPaymentStatement({
               statementId: "statement2",
               accountId: "account1",
-              state: PaymentState.PROCESSING,
+              state: PaymentState.CREATING_STRIPE_INVOICE,
             }),
             insertPaymentStatement({
               statementId: "statement3",
               accountId: "account1",
-              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+              state: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
             }),
             insertPaymentStatement({
               statementId: "statement4",
@@ -50,7 +54,12 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               statementId: "statement5",
               accountId: "account1",
-              state: PaymentState.FAILED,
+              state: PaymentState.FAILED_WITH_INVOICE,
+            }),
+            insertPaymentStatement({
+              statementId: "statement6",
+              accountId: "account1",
+              state: PaymentState.PAYING_INVOICE,
             }),
           ]);
           await transaction.commit();
@@ -62,9 +71,11 @@ TEST_RUNNER.run({
             canBeBilled: true,
           },
         } as FetchSessionAndCheckCapabilityResponse;
+        let id = 0;
         let handler = new RetryFailedPaymentsHandler(
           SPANNER_DATABASE,
           clientMock,
+          () => `uuid${id++}`,
           () => 1000,
         );
 
@@ -81,7 +92,7 @@ TEST_RUNNER.run({
               {
                 paymentAccountId: "account1",
                 paymentStatementId: "statement1",
-                paymentState: PaymentState.PROCESSING,
+                paymentState: PaymentState.CREATING_STRIPE_INVOICE,
                 paymentUpdatedTimeMs: 1000,
               },
               GET_PAYMENT_ROW,
@@ -98,7 +109,7 @@ TEST_RUNNER.run({
               {
                 paymentAccountId: "account1",
                 paymentStatementId: "statement2",
-                paymentState: PaymentState.PROCESSING,
+                paymentState: PaymentState.CREATING_STRIPE_INVOICE,
               },
               GET_PAYMENT_ROW,
             ),
@@ -114,7 +125,7 @@ TEST_RUNNER.run({
               {
                 paymentAccountId: "account1",
                 paymentStatementId: "statement3",
-                paymentState: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+                paymentState: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
               },
               GET_PAYMENT_ROW,
             ),
@@ -146,7 +157,7 @@ TEST_RUNNER.run({
               {
                 paymentAccountId: "account1",
                 paymentStatementId: "statement5",
-                paymentState: PaymentState.PROCESSING,
+                paymentState: PaymentState.PAYING_INVOICE,
                 paymentUpdatedTimeMs: 1000,
               },
               GET_PAYMENT_ROW,
@@ -155,38 +166,56 @@ TEST_RUNNER.run({
           "payment for statement5",
         );
         assertThat(
-          await getPaymentTask(SPANNER_DATABASE, {
-            paymentTaskStatementIdEq: "statement1",
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement6",
           }),
-          isUnorderedArray([
+          isArray([
             eqMessage(
               {
-                paymentTaskStatementId: "statement1",
-                paymentTaskRetryCount: 0,
-                paymentTaskExecutionTimeMs: 1000,
-                paymentTaskCreatedTimeMs: 1000,
+                paymentAccountId: "account1",
+                paymentStatementId: "statement6",
+                paymentState: PaymentState.PAYING_INVOICE,
               },
-              GET_PAYMENT_TASK_ROW,
+              GET_PAYMENT_ROW,
             ),
           ]),
-          "paymentTask for statement1",
+          "payment for statement6",
         );
         assertThat(
-          await getPaymentTask(SPANNER_DATABASE, {
-            paymentTaskStatementIdEq: "statement5",
+          await getPaymentStripeInvoiceCreatingTask(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskTaskIdEq: "uuid0",
           }),
           isUnorderedArray([
             eqMessage(
               {
-                paymentTaskStatementId: "statement5",
-                paymentTaskRetryCount: 0,
-                paymentTaskExecutionTimeMs: 1000,
-                paymentTaskCreatedTimeMs: 1000,
+                paymentStripeInvoiceCreatingTaskTaskId: "uuid0",
+                paymentStripeInvoiceCreatingTaskStatementId: "statement1",
+                paymentStripeInvoiceCreatingTaskRetryCount: 0,
+                paymentStripeInvoiceCreatingTaskExecutionTimeMs: 1000,
+                paymentStripeInvoiceCreatingTaskCreatedTimeMs: 1000,
               },
-              GET_PAYMENT_TASK_ROW,
+              GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_ROW,
             ),
           ]),
-          "paymentTask for statement5",
+          "paymentStripeInvoiceCreatingTask for statement1",
+        );
+        assertThat(
+          await getPaymentStripeInvoicePayingTask(SPANNER_DATABASE, {
+            paymentStripeInvoicePayingTaskTaskIdEq: "uuid1",
+          }),
+          isUnorderedArray([
+            eqMessage(
+              {
+                paymentStripeInvoicePayingTaskTaskId: "uuid1",
+                paymentStripeInvoicePayingTaskStatementId: "statement5",
+                paymentStripeInvoicePayingTaskRetryCount: 0,
+                paymentStripeInvoicePayingTaskExecutionTimeMs: 1000,
+                paymentStripeInvoicePayingTaskCreatedTimeMs: 1000,
+              },
+              GET_PAYMENT_STRIPE_INVOICE_PAYING_TASK_ROW,
+            ),
+          ]),
+          "paymentStripeInvoicePayingTask for statement5",
         );
       },
       async tearDown() {
@@ -197,20 +226,18 @@ TEST_RUNNER.run({
             deletePaymentStatement({ paymentStatementIdEq: "statement3" }),
             deletePaymentStatement({ paymentStatementIdEq: "statement4" }),
             deletePaymentStatement({ paymentStatementIdEq: "statement5" }),
-            deletePaymentTaskStatement({
-              paymentTaskStatementIdEq: "statement1",
+            deletePaymentStatement({ paymentStatementIdEq: "statement6" }),
+            deletePaymentStripeInvoiceCreatingTaskStatement({
+              paymentStripeInvoiceCreatingTaskTaskIdEq: "uuid0",
             }),
-            deletePaymentTaskStatement({
-              paymentTaskStatementIdEq: "statement2",
+            deletePaymentStripeInvoiceCreatingTaskStatement({
+              paymentStripeInvoiceCreatingTaskTaskIdEq: "uuid1",
             }),
-            deletePaymentTaskStatement({
-              paymentTaskStatementIdEq: "statement3",
+            deletePaymentStripeInvoicePayingTaskStatement({
+              paymentStripeInvoicePayingTaskTaskIdEq: "uuid0",
             }),
-            deletePaymentTaskStatement({
-              paymentTaskStatementIdEq: "statement4",
-            }),
-            deletePaymentTaskStatement({
-              paymentTaskStatementIdEq: "statement5",
+            deletePaymentStripeInvoicePayingTaskStatement({
+              paymentStripeInvoicePayingTaskTaskIdEq: "uuid1",
             }),
           ]);
           await transaction.commit();
@@ -231,6 +258,7 @@ TEST_RUNNER.run({
         let handler = new RetryFailedPaymentsHandler(
           SPANNER_DATABASE,
           clientMock,
+          () => "uuid0",
           () => 1000,
         );
 
@@ -239,11 +267,18 @@ TEST_RUNNER.run({
 
         // Verify
         assertThat(
-          await listPendingPaymentTasks(SPANNER_DATABASE, {
-            paymentTaskExecutionTimeMsLe: 1000000,
+          await listPendingPaymentStripeInvoiceCreatingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
-          "pending payment tasks",
+          "pending PaymentStripeInvoiceCreatingTasks",
+        );
+        assertThat(
+          await listPendingPaymentStripeInvoicePayingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoicePayingTaskExecutionTimeMsLe: 1000000,
+          }),
+          isArray([]),
+          "pending PaymentStripeInvoicePayingTasks",
         );
       },
       async tearDown() {},

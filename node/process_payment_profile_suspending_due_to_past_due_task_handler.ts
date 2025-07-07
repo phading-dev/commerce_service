@@ -65,7 +65,7 @@ export class ProcessPaymentProfileSuspendingDueToPastDueTaskHandler extends Proc
         }),
       ];
       if (
-        payment.paymentState === PaymentState.FAILED &&
+        payment.paymentState !== PaymentState.PAID &&
         profile.paymentProfileStateInfo.state !== PaymentProfileState.SUSPENDED
       ) {
         // If payment still failed and payment profile not suspended yet, suspend it.

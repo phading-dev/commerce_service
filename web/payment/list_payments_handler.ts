@@ -95,12 +95,14 @@ export class ListPaymentsHandler extends ListPaymentsHandlerInterface {
 
   private convertPaymentState(state: PaymentState): PaymentStateResponse {
     switch (state) {
-      case PaymentState.PROCESSING:
-      case PaymentState.CHARGING_VIA_STRIPE_INVOICE:
+      case PaymentState.CREATING_STRIPE_INVOICE:
+      case PaymentState.WAITING_FOR_INVOICE_PAYMENT:
+      case PaymentState.PAYING_INVOICE:
         return PaymentStateResponse.PROCESSING;
       case PaymentState.PAID:
         return PaymentStateResponse.PAID;
-      case PaymentState.FAILED:
+      case PaymentState.FAILED_WITH_INVOICE:
+      case PaymentState.FAILED_WITHOUT_INVOICE:
         return PaymentStateResponse.FAILED;
       default:
         throw new Error(`Unknown payment state: ${state}`);

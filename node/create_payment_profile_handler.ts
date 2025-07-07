@@ -1,9 +1,10 @@
+import crypto = require("crypto");
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { InitCreditGrantingState, PaymentProfileState } from "../db/schema";
 import {
   getPaymentProfile,
   insertPaymentProfileStatement,
-  insertStripePaymentCustomerCreatingTaskStatement,
+  insertStripeCustomerCreatingTaskStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { CreatePaymentProfileHandlerInterface } from "@phading/commerce_service_interface/node/handler";
@@ -14,11 +15,16 @@ import {
 
 export class CreatePaymentProfileHandler extends CreatePaymentProfileHandlerInterface {
   public static create(): CreatePaymentProfileHandler {
-    return new CreatePaymentProfileHandler(SPANNER_DATABASE, () => Date.now());
+    return new CreatePaymentProfileHandler(
+      SPANNER_DATABASE,
+      () => crypto.randomUUID(),
+      () => Date.now(),
+    );
   }
 
   public constructor(
     private database: Database,
+    private generateUuid: () => string,
     private getNow: () => number,
   ) {
     super();
@@ -47,7 +53,8 @@ export class CreatePaymentProfileHandler extends CreatePaymentProfileHandlerInte
           initCreditGrantingState: InitCreditGrantingState.NOT_GRANTED,
           createdTimeMs: now,
         }),
-        insertStripePaymentCustomerCreatingTaskStatement({
+        insertStripeCustomerCreatingTaskStatement({
+          taskId: this.generateUuid(),
           accountId: body.accountId,
           retryCount: 0,
           executionTimeMs: now,

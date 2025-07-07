@@ -3,9 +3,9 @@ import { PaymentState, PayoutState, TransactionStatement } from "../db/schema";
 import {
   getTransactionStatementByMonth,
   insertPaymentStatement,
-  insertPaymentTaskStatement,
+  insertPaymentStripeInvoiceCreatingTaskStatement,
   insertPayoutStatement,
-  insertPayoutTaskStatement,
+  insertPayoutStripeTransferCreatingTaskStatement,
   insertTransactionStatementStatement,
 } from "../db/sql";
 import { ENV_VARS } from "../env_vars";
@@ -90,6 +90,7 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
 
       let now = this.getNow();
       let statementId = this.generateUuid();
+      let taskId = this.generateUuid();
       await transaction.batchUpdate([
         insertTransactionStatementStatement({
           statementId,
@@ -109,7 +110,8 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
                   updatedTimeMs: now,
                   createdTimeMs: now,
                 }),
-                insertPayoutTaskStatement({
+                insertPayoutStripeTransferCreatingTaskStatement({
+                  taskId,
                   statementId,
                   retryCount: 0,
                   executionTimeMs: now,
@@ -120,11 +122,12 @@ export class GenerateTransactionStatementHandler extends GenerateTransactionStat
                 insertPaymentStatement({
                   statementId,
                   accountId: body.accountId,
-                  state: PaymentState.PROCESSING,
+                  state: PaymentState.CREATING_STRIPE_INVOICE,
                   createdTimeMs: now,
                   updatedTimeMs: now,
                 }),
-                insertPaymentTaskStatement({
+                insertPaymentStripeInvoiceCreatingTaskStatement({
+                  taskId,
                   statementId,
                   retryCount: 0,
                   executionTimeMs: now,

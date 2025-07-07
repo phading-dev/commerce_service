@@ -52,7 +52,7 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               statementId: "statement2",
               accountId: "account1",
-              state: PaymentState.FAILED,
+              state: PaymentState.FAILED_WITHOUT_INVOICE,
               updatedTimeMs: 2000,
             }),
             insertTransactionStatementStatement({
@@ -67,7 +67,7 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               statementId: "statement3",
               accountId: "account1",
-              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+              state: PaymentState.FAILED_WITH_INVOICE,
               updatedTimeMs: 3000,
             }),
             insertTransactionStatementStatement({
@@ -91,7 +91,7 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               statementId: "statement5",
               accountId: "account1",
-              state: PaymentState.PROCESSING,
+              state: PaymentState.CREATING_STRIPE_INVOICE,
               updatedTimeMs: 5000,
             }),
             insertTransactionStatementStatement({
@@ -106,14 +106,8 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               statementId: "statement6",
               accountId: "account1",
-              state: PaymentState.PAID,
+              state: PaymentState.PAYING_INVOICE,
               updatedTimeMs: 6000,
-            }),
-            insertPaymentStatement({
-              statementId: "statement7",
-              accountId: "account1",
-              state: PaymentState.PAID,
-              updatedTimeMs: 7000,
             }),
             insertTransactionStatementStatement({
               statementId: "statement7",
@@ -123,6 +117,42 @@ TEST_RUNNER.run({
                 currency: "USD",
                 totalAmount: 1900,
               },
+            }),
+            insertPaymentStatement({
+              statementId: "statement7",
+              accountId: "account1",
+              state: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
+              updatedTimeMs: 7000,
+            }),
+            insertTransactionStatementStatement({
+              statementId: "statement8",
+              accountId: "account1",
+              month: "2023-05",
+              statement: {
+                currency: "USD",
+                totalAmount: 2000,
+              },
+            }),
+            insertPaymentStatement({
+              statementId: "statement8",
+              accountId: "account1",
+              state: PaymentState.PAID,
+              updatedTimeMs: 8000,
+            }),
+            insertTransactionStatementStatement({
+              statementId: "statement9",
+              accountId: "account1",
+              month: "2023-06",
+              statement: {
+                currency: "USD",
+                totalAmount: 2100,
+              },
+            }),
+            insertPaymentStatement({
+              statementId: "statement9",
+              accountId: "account1",
+              state: PaymentState.PAID,
+              updatedTimeMs: 9000,
             }),
           ]);
           await transaction.commit();
@@ -144,7 +174,7 @@ TEST_RUNNER.run({
           "",
           {
             startMonth: "2022-11",
-            endMonth: "2023-03",
+            endMonth: "2023-05",
           },
           "session1",
         );
@@ -156,10 +186,24 @@ TEST_RUNNER.run({
             {
               payments: [
                 {
+                  month: "2023-05",
+                  amount: 2000,
+                  currency: "USD",
+                  state: PaymentStateResponse.PAID,
+                  updatedTimeMs: 8000,
+                },
+                {
+                  month: "2023-04",
+                  amount: 1900,
+                  currency: "USD",
+                  state: PaymentStateResponse.PROCESSING,
+                  updatedTimeMs: 7000,
+                },
+                {
                   month: "2023-03",
                   amount: 1800,
                   currency: "USD",
-                  state: PaymentStateResponse.PAID,
+                  state: PaymentStateResponse.PROCESSING,
                   updatedTimeMs: 6000,
                 },
                 {
@@ -173,7 +217,7 @@ TEST_RUNNER.run({
                   month: "2022-12",
                   amount: 1500,
                   currency: "USD",
-                  state: PaymentStateResponse.PROCESSING,
+                  state: PaymentStateResponse.FAILED,
                   updatedTimeMs: 3000,
                 },
                 {
@@ -200,6 +244,8 @@ TEST_RUNNER.run({
             deletePaymentStatement({ paymentStatementIdEq: "statement5" }),
             deletePaymentStatement({ paymentStatementIdEq: "statement6" }),
             deletePaymentStatement({ paymentStatementIdEq: "statement7" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement8" }),
+            deletePaymentStatement({ paymentStatementIdEq: "statement9" }),
             deleteTransactionStatementStatement({
               transactionStatementStatementIdEq: "statement1",
             }),
@@ -220,6 +266,12 @@ TEST_RUNNER.run({
             }),
             deleteTransactionStatementStatement({
               transactionStatementStatementIdEq: "statement7",
+            }),
+            deleteTransactionStatementStatement({
+              transactionStatementStatementIdEq: "statement8",
+            }),
+            deleteTransactionStatementStatement({
+              transactionStatementStatementIdEq: "statement9",
             }),
           ]);
           await transaction.commit();

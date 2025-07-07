@@ -4,20 +4,20 @@ import { STRIPE_CLIENT } from "../common/stripe_client";
 import { PayoutState } from "../db/schema";
 import {
   GetPayoutRow,
-  deletePayoutTaskStatement,
+  deletePayoutStripeTransferCreatingTaskStatement,
   getPayout,
   getPayoutProfileFromStatement,
-  getPayoutTaskMetadata,
+  getPayoutStripeTransferCreatingTaskMetadata,
   getTransactionStatement,
   updatePayoutStateAndStripeTransferStatement,
   updatePayoutStateStatement,
-  updatePayoutTaskMetadataStatement,
+  updatePayoutStripeTransferCreatingTaskMetadataStatement,
 } from "../db/sql";
 import { Database, Transaction } from "@google-cloud/spanner";
-import { ProcessPayoutTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { ProcessPayoutStripeTransferCreatingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessPayoutTaskRequestBody,
-  ProcessPayoutTaskResponse,
+  ProcessPayoutStripeTransferCreatingTaskRequestBody,
+  ProcessPayoutStripeTransferCreatingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { AmountType } from "@phading/price/amount_type";
 import {
@@ -27,10 +27,12 @@ import {
 import { Ref } from "@selfage/ref";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface {
-  public static create(): ProcessPayoutTaskHandler {
-    return new ProcessPayoutTaskHandler(SPANNER_DATABASE, STRIPE_CLIENT, () =>
-      Date.now(),
+export class ProcessPayoutStripeTransferCreatingTaskHandler extends ProcessPayoutStripeTransferCreatingTaskHandlerInterface {
+  public static create(): ProcessPayoutStripeTransferCreatingTaskHandler {
+    return new ProcessPayoutStripeTransferCreatingTaskHandler(
+      SPANNER_DATABASE,
+      STRIPE_CLIENT,
+      () => Date.now(),
     );
   }
 
@@ -50,9 +52,9 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessPayoutTaskRequestBody,
-  ): Promise<ProcessPayoutTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payout task for statement ${body.statementId}:`;
+    body: ProcessPayoutStripeTransferCreatingTaskRequestBody,
+  ): Promise<ProcessPayoutStripeTransferCreatingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Payout Stripe transfer creating task ${body.taskId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -63,23 +65,28 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessPayoutTaskRequestBody,
+    body: ProcessPayoutStripeTransferCreatingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getPayoutTaskMetadata(transaction, {
-        payoutTaskStatementIdEq: body.statementId,
-      });
+      let rows = await getPayoutStripeTransferCreatingTaskMetadata(
+        transaction,
+        {
+          payoutStripeTransferCreatingTaskTaskIdEq: body.taskId,
+        },
+      );
       if (rows.length === 0) {
-        throw newBadRequestError(`${loggingPrefix} Task is not found.`);
+        throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updatePayoutTaskMetadataStatement({
-          payoutTaskStatementIdEq: body.statementId,
-          setRetryCount: task.payoutTaskRetryCount + 1,
+        updatePayoutStripeTransferCreatingTaskMetadataStatement({
+          payoutStripeTransferCreatingTaskTaskIdEq: body.taskId,
+          setRetryCount: task.payoutStripeTransferCreatingTaskRetryCount + 1,
           setExecutionTimeMs:
             this.getNow() +
-            this.taskHandler.getBackoffTime(task.payoutTaskRetryCount),
+            this.taskHandler.getBackoffTime(
+              task.payoutStripeTransferCreatingTaskRetryCount,
+            ),
         }),
       ]);
       await transaction.commit();
@@ -88,7 +95,7 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessPayoutTaskRequestBody,
+    body: ProcessPayoutStripeTransferCreatingTaskRequestBody,
   ): Promise<void> {
     let [profileRows, statementRows] = await Promise.all([
       getPayoutProfileFromStatement(this.database, {
@@ -124,11 +131,10 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
       stripeConnectedAccountId,
     );
     if (!connectedAccount.payouts_enabled) {
-      await this.reportFailure(loggingPrefix, body.statementId);
+      await this.reportFailure(loggingPrefix, body.taskId, body.statementId);
       return;
     }
 
-    // Any error will be retried.
     let transfer = await this.stripeClient.val.transfers.create(
       {
         amount: transactionStatement.transactionStatementStatement.totalAmount,
@@ -137,14 +143,23 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
         destination: stripeConnectedAccountId,
       },
       {
-        idempotencyKey: body.statementId,
+        idempotencyKey: `po${body.taskId}`,
       },
     );
     let transferId = transfer.id;
-    await this.finalize(loggingPrefix, body.statementId, transferId);
+    await this.finalize(
+      loggingPrefix,
+      body.taskId,
+      body.statementId,
+      transferId,
+    );
   }
 
-  private async reportFailure(loggingPrefix: string, statementId: string) {
+  private async reportFailure(
+    loggingPrefix: string,
+    taskId: string,
+    statementId: string,
+  ) {
     await this.database.runTransactionAsync(async (transaction) => {
       await this.getvalidPayout(transaction, statementId);
       await transaction.batchUpdate([
@@ -153,8 +168,8 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
           setState: PayoutState.DISABLED,
           setUpdatedTimeMs: this.getNow(),
         }),
-        deletePayoutTaskStatement({
-          payoutTaskStatementIdEq: statementId,
+        deletePayoutStripeTransferCreatingTaskStatement({
+          payoutStripeTransferCreatingTaskTaskIdEq: taskId,
         }),
       ]);
       await transaction.commit();
@@ -163,6 +178,7 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
 
   private async finalize(
     loggingPrefix: string,
+    taskId: string,
     statementId: string,
     transferId: string,
   ) {
@@ -175,8 +191,8 @@ export class ProcessPayoutTaskHandler extends ProcessPayoutTaskHandlerInterface 
           setStripeTransferId: transferId,
           setUpdatedTimeMs: this.getNow(),
         }),
-        deletePayoutTaskStatement({
-          payoutTaskStatementIdEq: statementId,
+        deletePayoutStripeTransferCreatingTaskStatement({
+          payoutStripeTransferCreatingTaskTaskIdEq: taskId,
         }),
       ]);
       await transaction.commit();

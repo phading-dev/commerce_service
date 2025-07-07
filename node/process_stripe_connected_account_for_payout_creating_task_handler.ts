@@ -8,18 +8,19 @@ import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
 import { StripeConnectedAccountState } from "../db/schema";
 import {
-  deleteStripeConnectedAccountCreatingTaskStatement,
+  deleteStripeConnectedAccountForPayoutCreatingTaskStatement,
   getPayoutProfile,
-  getStripeConnectedAccountCreatingTaskMetadata,
+  getStripeConnectedAccountForPayoutCreatingTaskMetadata,
   insertStripeConnectedAccountNeedsSetupNotifyingTaskStatement,
   updatePayoutProfileConnectedAccountStatement,
-  updateStripeConnectedAccountCreatingTaskMetadataStatement,
+  updateStripeConnectedAccountForPayoutCreatingTaskMetadataStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { ProcessStripeConnectedAccountCreatingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { Statement } from "@google-cloud/spanner/build/src/transaction";
+import { ProcessStripeConnectedAccountForPayoutCreatingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessStripeConnectedAccountCreatingTaskRequestBody,
-  ProcessStripeConnectedAccountCreatingTaskResponse,
+  ProcessStripeConnectedAccountForPayoutCreatingTaskRequestBody,
+  ProcessStripeConnectedAccountForPayoutCreatingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
 import {
@@ -30,9 +31,9 @@ import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStripeConnectedAccountCreatingTaskHandlerInterface {
-  public static create(): ProcessStripeConnectedAccountCreatingTaskHandler {
-    return new ProcessStripeConnectedAccountCreatingTaskHandler(
+export class ProcessStripeConnectedAccountForPayoutCreatingTaskHandler extends ProcessStripeConnectedAccountForPayoutCreatingTaskHandlerInterface {
+  public static create(): ProcessStripeConnectedAccountForPayoutCreatingTaskHandler {
+    return new ProcessStripeConnectedAccountForPayoutCreatingTaskHandler(
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       STRIPE_CLIENT,
@@ -57,9 +58,9 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessStripeConnectedAccountCreatingTaskRequestBody,
-  ): Promise<ProcessStripeConnectedAccountCreatingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Stripe connected account creating task for payout profile ${body.accountId}:`;
+    body: ProcessStripeConnectedAccountForPayoutCreatingTaskRequestBody,
+  ): Promise<ProcessStripeConnectedAccountForPayoutCreatingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Stripe connected account creating task for payout ${body.taskId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -70,25 +71,26 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessStripeConnectedAccountCreatingTaskRequestBody,
+    body: ProcessStripeConnectedAccountForPayoutCreatingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getStripeConnectedAccountCreatingTaskMetadata(
+      let rows = await getStripeConnectedAccountForPayoutCreatingTaskMetadata(
         transaction,
-        { stripeConnectedAccountCreatingTaskAccountIdEq: body.accountId },
+        { stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: body.taskId },
       );
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updateStripeConnectedAccountCreatingTaskMetadataStatement({
-          stripeConnectedAccountCreatingTaskAccountIdEq: body.accountId,
-          setRetryCount: task.stripeConnectedAccountCreatingTaskRetryCount + 1,
+        updateStripeConnectedAccountForPayoutCreatingTaskMetadataStatement({
+          stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: body.taskId,
+          setRetryCount:
+            task.stripeConnectedAccountForPayoutCreatingTaskRetryCount + 1,
           setExecutionTimeMs:
             this.getNow() +
             this.taskHandler.getBackoffTime(
-              task.stripeConnectedAccountCreatingTaskRetryCount,
+              task.stripeConnectedAccountForPayoutCreatingTaskRetryCount,
             ),
         }),
       ]);
@@ -98,7 +100,7 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessStripeConnectedAccountCreatingTaskRequestBody,
+    body: ProcessStripeConnectedAccountForPayoutCreatingTaskRequestBody,
   ): Promise<void> {
     let contactResponse = await this.serviceClient.send(
       newGetAccountContactRequest({
@@ -133,7 +135,7 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
         },
       },
       {
-        idempotencyKey: `a${body.accountId}`,
+        idempotencyKey: `ca${body.taskId}`,
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {
@@ -146,19 +148,14 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
         );
       }
       let profile = profileRows[0];
-      if (profile.payoutProfileStripeConnectedAccountId) {
-        if (profile.payoutProfileStripeConnectedAccountId !== account.id) {
-          throw newInternalServerErrorError(
-            `Payout profile ${body.accountId} already has a stripe connected account id ${profile.payoutProfileStripeConnectedAccountId} which is different from the new one ${account.id}.`,
-          );
-        } else {
-          throw newBadRequestError(
-            `Payout profile ${body.accountId} already has a stripe connected account id ${profile.payoutProfileStripeConnectedAccountId}.`,
-          );
-        }
-      } else {
+      let statements: Array<Statement> = [
+        deleteStripeConnectedAccountForPayoutCreatingTaskStatement({
+          stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: body.taskId,
+        }),
+      ];
+      if (!profile.payoutProfileStripeConnectedAccountId) {
         let now = this.getNow();
-        await transaction.batchUpdate([
+        statements.push(
           updatePayoutProfileConnectedAccountStatement({
             payoutProfileAccountIdEq: body.accountId,
             setStripeConnectedAccountId: account.id,
@@ -171,12 +168,14 @@ export class ProcessStripeConnectedAccountCreatingTaskHandler extends ProcessStr
             executionTimeMs: now,
             createdTimeMs: now,
           }),
-          deleteStripeConnectedAccountCreatingTaskStatement({
-            stripeConnectedAccountCreatingTaskAccountIdEq: body.accountId,
-          }),
-        ]);
-        await transaction.commit();
+        );
+      } else if (profile.payoutProfileStripeConnectedAccountId !== account.id) {
+        throw newInternalServerErrorError(
+          `Payout profile ${body.accountId} already has a stripe connected account id ${profile.payoutProfileStripeConnectedAccountId} which is different from the new one ${account.id}.`,
+        );
       }
+      await transaction.batchUpdate(statements);
+      await transaction.commit();
     });
   }
 }

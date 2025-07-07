@@ -3,23 +3,23 @@ import { SPANNER_DATABASE } from "../common/spanner_database";
 import { PaymentState, PayoutState } from "../db/schema";
 import {
   GET_PAYMENT_ROW,
-  GET_PAYMENT_TASK_ROW,
+  GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_ROW,
   GET_PAYOUT_ROW,
-  GET_PAYOUT_TASK_ROW,
+  GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_ROW,
   GET_TRANSACTION_STATEMENT_ROW,
   deletePaymentStatement,
-  deletePaymentTaskStatement,
+  deletePaymentStripeInvoiceCreatingTaskStatement,
   deletePayoutStatement,
-  deletePayoutTaskStatement,
+  deletePayoutStripeTransferCreatingTaskStatement,
   deleteTransactionStatementStatement,
   getPayment,
-  getPaymentTask,
+  getPaymentStripeInvoiceCreatingTask,
   getPayout,
-  getPayoutTask,
+  getPayoutStripeTransferCreatingTask,
   getTransactionStatement,
   insertTransactionStatementStatement,
-  listPendingPaymentTasks,
-  listPendingPayoutTasks,
+  listPendingPaymentStripeInvoiceCreatingTasks,
+  listPendingPayoutStripeTransferCreatingTasks,
 } from "../db/sql";
 import { GenerateTransactionStatementHandler } from "./generate_transaction_statement_handler";
 import { ProductID } from "@phading/price";
@@ -32,19 +32,22 @@ async function cleanupAll() {
   await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
     await transaction.batchUpdate([
       deleteTransactionStatementStatement({
-        transactionStatementStatementIdEq: "statement1",
+        transactionStatementStatementIdEq: "uuid0",
+      }),
+      deleteTransactionStatementStatement({
+        transactionStatementStatementIdEq: "uuid1",
       }),
       deletePaymentStatement({
-        paymentStatementIdEq: "statement1",
+        paymentStatementIdEq: "uuid0",
       }),
-      deletePaymentTaskStatement({
-        paymentTaskStatementIdEq: "statement1",
+      deletePaymentStripeInvoiceCreatingTaskStatement({
+        paymentStripeInvoiceCreatingTaskTaskIdEq: "uuid1",
       }),
       deletePayoutStatement({
-        payoutStatementIdEq: "statement1",
+        payoutStatementIdEq: "uuid0",
       }),
-      deletePayoutTaskStatement({
-        payoutTaskStatementIdEq: "statement1",
+      deletePayoutStripeTransferCreatingTaskStatement({
+        payoutStripeTransferCreatingTaskTaskIdEq: "uuid1",
       }),
     ]);
     await transaction.commit();
@@ -58,9 +61,10 @@ TEST_RUNNER.run({
       name: "DebitToConsumer",
       execute: async () => {
         // Prepare
+        let id = 0;
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
-          () => `statement1`,
+          () => `uuid${id++}`,
           () => 1000,
         );
 
@@ -79,13 +83,13 @@ TEST_RUNNER.run({
         // Verify
         assertThat(
           await getTransactionStatement(SPANNER_DATABASE, {
-            transactionStatementStatementIdEq: "statement1",
+            transactionStatementStatementIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
                 transactionStatementAccountId: "account1",
-                transactionStatementStatementId: "statement1",
+                transactionStatementStatementId: "uuid0",
                 transactionStatementMonth: "2021-01",
                 transactionStatementStatement: {
                   currency: "USD",
@@ -110,14 +114,14 @@ TEST_RUNNER.run({
         );
         assertThat(
           await getPayment(SPANNER_DATABASE, {
-            paymentStatementIdEq: "statement1",
+            paymentStatementIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
                 paymentAccountId: "account1",
-                paymentStatementId: "statement1",
-                paymentState: PaymentState.PROCESSING,
+                paymentStatementId: "uuid0",
+                paymentState: PaymentState.CREATING_STRIPE_INVOICE,
                 paymentCreatedTimeMs: 1000,
                 paymentUpdatedTimeMs: 1000,
               },
@@ -127,21 +131,22 @@ TEST_RUNNER.run({
           "payment",
         );
         assertThat(
-          await getPaymentTask(SPANNER_DATABASE, {
-            paymentTaskStatementIdEq: "statement1",
+          await getPaymentStripeInvoiceCreatingTask(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskTaskIdEq: "uuid1",
           }),
           isArray([
             eqMessage(
               {
-                paymentTaskStatementId: "statement1",
-                paymentTaskRetryCount: 0,
-                paymentTaskExecutionTimeMs: 1000,
-                paymentTaskCreatedTimeMs: 1000,
+                paymentStripeInvoiceCreatingTaskTaskId: "uuid1",
+                paymentStripeInvoiceCreatingTaskStatementId: "uuid0",
+                paymentStripeInvoiceCreatingTaskRetryCount: 0,
+                paymentStripeInvoiceCreatingTaskExecutionTimeMs: 1000,
+                paymentStripeInvoiceCreatingTaskCreatedTimeMs: 1000,
               },
-              GET_PAYMENT_TASK_ROW,
+              GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_ROW,
             ),
           ]),
-          "paymentTask",
+          "paymentStripeInvoiceCreatingTask",
         );
       },
       tearDown: async () => {
@@ -152,9 +157,10 @@ TEST_RUNNER.run({
       name: "CreditToPublisher",
       execute: async () => {
         // Prepare
+        let id = 0;
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
-          () => "statement1",
+          () => `uuid${id++}`,
           () => 1000,
         );
 
@@ -181,13 +187,13 @@ TEST_RUNNER.run({
         // Verify
         assertThat(
           await getTransactionStatement(SPANNER_DATABASE, {
-            transactionStatementStatementIdEq: "statement1",
+            transactionStatementStatementIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
                 transactionStatementAccountId: "account1",
-                transactionStatementStatementId: "statement1",
+                transactionStatementStatementId: "uuid0",
                 transactionStatementMonth: "2021-01",
                 transactionStatementStatement: {
                   currency: "USD",
@@ -226,13 +232,13 @@ TEST_RUNNER.run({
         );
         assertThat(
           await getPayout(SPANNER_DATABASE, {
-            payoutStatementIdEq: "statement1",
+            payoutStatementIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
                 payoutAccountId: "account1",
-                payoutStatementId: "statement1",
+                payoutStatementId: "uuid0",
                 payoutState: PayoutState.PROCESSING,
                 payoutCreatedTimeMs: 1000,
                 payoutUpdatedTimeMs: 1000,
@@ -243,21 +249,22 @@ TEST_RUNNER.run({
           "payout",
         );
         assertThat(
-          await getPayoutTask(SPANNER_DATABASE, {
-            payoutTaskStatementIdEq: "statement1",
+          await getPayoutStripeTransferCreatingTask(SPANNER_DATABASE, {
+            payoutStripeTransferCreatingTaskTaskIdEq: "uuid1",
           }),
           isArray([
             eqMessage(
               {
-                payoutTaskStatementId: "statement1",
-                payoutTaskRetryCount: 0,
-                payoutTaskExecutionTimeMs: 1000,
-                payoutTaskCreatedTimeMs: 1000,
+                payoutStripeTransferCreatingTaskTaskId: "uuid1",
+                payoutStripeTransferCreatingTaskStatementId: "uuid0",
+                payoutStripeTransferCreatingTaskRetryCount: 0,
+                payoutStripeTransferCreatingTaskExecutionTimeMs: 1000,
+                payoutStripeTransferCreatingTaskCreatedTimeMs: 1000,
               },
-              GET_PAYOUT_TASK_ROW,
+              GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_ROW,
             ),
           ]),
-          "payoutTask",
+          "payoutStripeTransferCreatingTask",
         );
       },
       tearDown: async () => {
@@ -268,9 +275,10 @@ TEST_RUNNER.run({
       name: "DebitToPublisher",
       execute: async () => {
         // Prepare
+        let id = 0;
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
-          () => "statement1",
+          () => `uuid${id++}`,
           () => 1000,
         );
 
@@ -297,13 +305,13 @@ TEST_RUNNER.run({
         // Verify
         assertThat(
           await getTransactionStatement(SPANNER_DATABASE, {
-            transactionStatementStatementIdEq: "statement1",
+            transactionStatementStatementIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
                 transactionStatementAccountId: "account1",
-                transactionStatementStatementId: "statement1",
+                transactionStatementStatementId: "uuid0",
                 transactionStatementMonth: "2021-01",
                 transactionStatementStatement: {
                   currency: "USD",
@@ -342,14 +350,14 @@ TEST_RUNNER.run({
         );
         assertThat(
           await getPayment(SPANNER_DATABASE, {
-            paymentStatementIdEq: "statement1",
+            paymentStatementIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
                 paymentAccountId: "account1",
-                paymentStatementId: "statement1",
-                paymentState: PaymentState.PROCESSING,
+                paymentStatementId: "uuid0",
+                paymentState: PaymentState.CREATING_STRIPE_INVOICE,
                 paymentCreatedTimeMs: 1000,
                 paymentUpdatedTimeMs: 1000,
               },
@@ -359,21 +367,22 @@ TEST_RUNNER.run({
           "payment",
         );
         assertThat(
-          await getPaymentTask(SPANNER_DATABASE, {
-            paymentTaskStatementIdEq: "statement1",
+          await getPaymentStripeInvoiceCreatingTask(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskTaskIdEq: "uuid1",
           }),
           isArray([
             eqMessage(
               {
-                paymentTaskStatementId: "statement1",
-                paymentTaskRetryCount: 0,
-                paymentTaskExecutionTimeMs: 1000,
-                paymentTaskCreatedTimeMs: 1000,
+                paymentStripeInvoiceCreatingTaskTaskId: "uuid1",
+                paymentStripeInvoiceCreatingTaskStatementId: "uuid0",
+                paymentStripeInvoiceCreatingTaskRetryCount: 0,
+                paymentStripeInvoiceCreatingTaskExecutionTimeMs: 1000,
+                paymentStripeInvoiceCreatingTaskCreatedTimeMs: 1000,
               },
-              GET_PAYMENT_TASK_ROW,
+              GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_ROW,
             ),
           ]),
-          "paymentTask",
+          "paymentStripeInvoiceCreatingTask",
         );
       },
       tearDown: async () => {
@@ -384,9 +393,10 @@ TEST_RUNNER.run({
       name: "ZeroDebit",
       execute: async () => {
         // Prepare
+        let id = 0;
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
-          () => "statement1",
+          () => `uuid${id++}`,
           () => 1000,
         );
 
@@ -409,13 +419,13 @@ TEST_RUNNER.run({
         // Verify
         assertThat(
           await getTransactionStatement(SPANNER_DATABASE, {
-            transactionStatementStatementIdEq: "statement1",
+            transactionStatementStatementIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
                 transactionStatementAccountId: "account1",
-                transactionStatementStatementId: "statement1",
+                transactionStatementStatementId: "uuid0",
                 transactionStatementMonth: "2021-01",
                 transactionStatementStatement: {
                   currency: "USD",
@@ -447,28 +457,28 @@ TEST_RUNNER.run({
         );
         assertThat(
           await getPayment(SPANNER_DATABASE, {
-            paymentStatementIdEq: "statement1",
+            paymentStatementIdEq: "uuid0",
           }),
           isArray([]),
           "payment",
         );
         assertThat(
-          await listPendingPaymentTasks(SPANNER_DATABASE, {
-            paymentTaskExecutionTimeMsLe: 1000000,
+          await listPendingPaymentStripeInvoiceCreatingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "paymentTask",
         );
         assertThat(
           await getPayout(SPANNER_DATABASE, {
-            payoutStatementIdEq: "statement1",
+            payoutStatementIdEq: "uuid0",
           }),
           isArray([]),
           "payout",
         );
         assertThat(
-          await listPendingPayoutTasks(SPANNER_DATABASE, {
-            payoutTaskExecutionTimeMsLe: 1000000,
+          await listPendingPayoutStripeTransferCreatingTasks(SPANNER_DATABASE, {
+            payoutStripeTransferCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "payoutTask",
@@ -486,7 +496,7 @@ TEST_RUNNER.run({
           await transaction.batchUpdate([
             insertTransactionStatementStatement({
               accountId: "account1",
-              statementId: "statement1",
+              statementId: "uuid0",
               month: "2021-01",
             }),
           ]);
@@ -494,7 +504,7 @@ TEST_RUNNER.run({
         });
         let handler = new GenerateTransactionStatementHandler(
           SPANNER_DATABASE,
-          () => "statement2",
+          () => "uuid1",
           () => 1000,
         );
 
@@ -513,13 +523,13 @@ TEST_RUNNER.run({
         // Verify
         assertThat(
           await getTransactionStatement(SPANNER_DATABASE, {
-            transactionStatementStatementIdEq: "statement1",
+            transactionStatementStatementIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
                 transactionStatementAccountId: "account1",
-                transactionStatementStatementId: "statement1",
+                transactionStatementStatementId: "uuid0",
                 transactionStatementMonth: "2021-01",
               },
               GET_TRANSACTION_STATEMENT_ROW,
@@ -528,15 +538,15 @@ TEST_RUNNER.run({
           "statement",
         );
         assertThat(
-          await listPendingPaymentTasks(SPANNER_DATABASE, {
-            paymentTaskExecutionTimeMsLe: 1000000,
+          await listPendingPaymentStripeInvoiceCreatingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "paymentTasks",
         );
         assertThat(
-          await listPendingPayoutTasks(SPANNER_DATABASE, {
-            payoutTaskExecutionTimeMsLe: 1000000,
+          await listPendingPayoutStripeTransferCreatingTasks(SPANNER_DATABASE, {
+            payoutStripeTransferCreatingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
           "payoutTasks",

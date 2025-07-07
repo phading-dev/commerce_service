@@ -1,8 +1,9 @@
+import crypto = require("crypto");
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
   getPayoutProfile,
   insertPayoutProfileStatement,
-  insertStripeConnectedAccountCreatingTaskStatement,
+  insertStripeConnectedAccountForPayoutCreatingTaskStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
 import { CreatePayoutProfileHandlerInterface } from "@phading/commerce_service_interface/node/handler";
@@ -13,11 +14,16 @@ import {
 
 export class CreatePayoutProfileHandler extends CreatePayoutProfileHandlerInterface {
   public static create(): CreatePayoutProfileHandler {
-    return new CreatePayoutProfileHandler(SPANNER_DATABASE, () => Date.now());
+    return new CreatePayoutProfileHandler(
+      SPANNER_DATABASE,
+      () => crypto.randomUUID(),
+      () => Date.now(),
+    );
   }
 
   public constructor(
     private database: Database,
+    private generateUuid: () => string,
     private getNow: () => number,
   ) {
     super();
@@ -40,7 +46,8 @@ export class CreatePayoutProfileHandler extends CreatePayoutProfileHandlerInterf
           accountId: body.accountId,
           createdTimeMs: now,
         }),
-        insertStripeConnectedAccountCreatingTaskStatement({
+        insertStripeConnectedAccountForPayoutCreatingTaskStatement({
+          taskId: this.generateUuid(),
           accountId: body.accountId,
           retryCount: 0,
           executionTimeMs: now,

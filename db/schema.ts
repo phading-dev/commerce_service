@@ -140,26 +140,34 @@ export let TRANSACTION_STATEMENT: MessageDescriptor<TransactionStatement> = {
 };
 
 export enum PaymentState {
-  PROCESSING = 1,
-  CHARGING_VIA_STRIPE_INVOICE = 2,
+  CREATING_STRIPE_INVOICE = 1,
+  WAITING_FOR_INVOICE_PAYMENT = 2,
   PAID = 3,
-  FAILED = 4,
+  FAILED_WITHOUT_INVOICE = 4,
+  FAILED_WITH_INVOICE = 5,
+  PAYING_INVOICE = 6,
 }
 
 export let PAYMENT_STATE: EnumDescriptor<PaymentState> = {
   name: 'PaymentState',
   values: [{
-    name: 'PROCESSING',
+    name: 'CREATING_STRIPE_INVOICE',
     value: 1,
   }, {
-    name: 'CHARGING_VIA_STRIPE_INVOICE',
+    name: 'WAITING_FOR_INVOICE_PAYMENT',
     value: 2,
   }, {
     name: 'PAID',
     value: 3,
   }, {
-    name: 'FAILED',
+    name: 'FAILED_WITHOUT_INVOICE',
     value: 4,
+  }, {
+    name: 'FAILED_WITH_INVOICE',
+    value: 5,
+  }, {
+    name: 'PAYING_INVOICE',
+    value: 6,
   }]
 }
 

@@ -73,14 +73,18 @@
 - kind: Enum
   name: PaymentState
   values:
-    - name: PROCESSING
+    - name: CREATING_STRIPE_INVOICE
       value: 1
-    - name: CHARGING_VIA_STRIPE_INVOICE
+    - name: WAITING_FOR_INVOICE_PAYMENT
       value: 2
     - name: PAID
       value: 3
-    - name: FAILED
+    - name: FAILED_WITHOUT_INVOICE
       value: 4
+    - name: FAILED_WITH_INVOICE
+      value: 5
+    - name: PAYING_INVOICE
+      value: 6
 - kind: Enum
   name: PayoutState
   values:
@@ -241,56 +245,62 @@
       delete: DeletePayout
       get: GetPayout
     - kind: TaskTable
-      name: StripePaymentCustomerCreatingTask
+      name: StripeCustomerCreatingTask
       columns:
+        - name: taskId
+          type: string
         - name: accountId
           type: string
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
       primaryKeys:
-        - accountId
-      executionTimeIndex: StripePaymentCustomerCreatingTaskByExecutionTime
-      insert: InsertStripePaymentCustomerCreatingTask
-      delete: DeleteStripePaymentCustomerCreatingTask
-      get: GetStripePaymentCustomerCreatingTask
-      listPendingTasks: ListPendingStripePaymentCustomerCreatingTasks
-      getMetadata: GetStripePaymentCustomerCreatingTaskMetadata
-      updateMetadata: UpdateStripePaymentCustomerCreatingTaskMetadata
+        - taskId
+      executionTimeIndex: StripeCustomerCreatingTaskByExecutionTime
+      insert: InsertStripeCustomerCreatingTask
+      delete: DeleteStripeCustomerCreatingTask
+      get: GetStripeCustomerCreatingTask
+      listPendingTasks: ListPendingStripeCustomerCreatingTasks
+      getMetadata: GetStripeCustomerCreatingTaskMetadata
+      updateMetadata: UpdateStripeCustomerCreatingTaskMetadata
     - kind: TaskTable
-      name: InitPaymentCreditGrantingTask
+      name: InitCreditGrantingTask
       columns:
+        - name: taskId
+          type: string
         - name: accountId
           type: string
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
       primaryKeys:
-        - accountId
-      executionTimeIndex: InitPaymentCreditGrantingTaskByExecutionTime
-      insert: InsertInitPaymentCreditGrantingTask
-      delete: DeleteInitPaymentCreditGrantingTask
-      get: GetInitPaymentCreditGrantingTask
-      listPendingTasks: ListPendingInitPaymentCreditGrantingTasks
-      getMetadata: GetInitPaymentCreditGrantingTaskMetadata
-      updateMetadata: UpdateInitPaymentCreditGrantingTaskMetadata
+        - taskId
+      executionTimeIndex: InitCreditGrantingTaskByExecutionTime
+      insert: InsertInitCreditGrantingTask
+      delete: DeleteInitCreditGrantingTask
+      get: GetInitCreditGrantingTask
+      listPendingTasks: ListPendingInitCreditGrantingTasks
+      getMetadata: GetInitCreditGrantingTaskMetadata
+      updateMetadata: UpdateInitCreditGrantingTaskMetadata
     - kind: TaskTable
-      name: StripeConnectedAccountCreatingTask
+      name: StripeConnectedAccountForPayoutCreatingTask
       columns:
+        - name: taskId
+          type: string
         - name: accountId
           type: string
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
       primaryKeys:
-        - accountId
-      executionTimeIndex: StripeConnectedAccountCreatingTaskByExecutionTime
-      insert: InsertStripeConnectedAccountCreatingTask
-      delete: DeleteStripeConnectedAccountCreatingTask
-      get: GetStripeConnectedAccountCreatingTask
-      listPendingTasks: ListPendingStripeConnectedAccountCreatingTasks
-      getMetadata: GetStripeConnectedAccountCreatingTaskMetadata
-      updateMetadata: UpdateStripeConnectedAccountCreatingTaskMetadata
+        - taskId
+      executionTimeIndex: StripeConnectedAccountForPayoutCreatingTaskByExecutionTime
+      insert: InsertStripeConnectedAccountForPayoutCreatingTask
+      delete: DeleteStripeConnectedAccountForPayoutCreatingTask
+      get: GetStripeConnectedAccountForPayoutCreatingTask
+      listPendingTasks: ListPendingStripeConnectedAccountForPayoutCreatingTasks
+      getMetadata: GetStripeConnectedAccountForPayoutCreatingTaskMetadata
+      updateMetadata: UpdateStripeConnectedAccountForPayoutCreatingTaskMetadata
     - kind: TaskTable
       name: StripeConnectedAccountNeedsSetupNotifyingTask
       columns:
@@ -309,22 +319,43 @@
       getMetadata: GetStripeConnectedAccountNeedsSetupNotifyingTaskMetadata
       updateMetadata: UpdateStripeConnectedAccountNeedsSetupNotifyingTaskMetadata
     - kind: TaskTable
-      name: PaymentTask
+      name: PaymentStripeInvoiceCreatingTask
       columns:
+        - name: taskId
+          type: string
         - name: statementId
           type: string
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
       primaryKeys:
-        - statementId
-      executionTimeIndex: PaymentTaskByExecutionTime
-      insert: InsertPaymentTask
-      delete: DeletePaymentTask
-      get: GetPaymentTask
-      listPendingTasks: ListPendingPaymentTasks
-      getMetadata: GetPaymentTaskMetadata
-      updateMetadata: UpdatePaymentTaskMetadata
+        - taskId
+      executionTimeIndex: PaymentStripeInvoiceCreatingTaskByExecutionTime
+      insert: InsertPaymentStripeInvoiceCreatingTask
+      delete: DeletePaymentStripeInvoiceCreatingTask
+      get: GetPaymentStripeInvoiceCreatingTask
+      listPendingTasks: ListPendingPaymentStripeInvoiceCreatingTasks
+      getMetadata: GetPaymentStripeInvoiceCreatingTaskMetadata
+      updateMetadata: UpdatePaymentStripeInvoiceCreatingTaskMetadata
+    - kind: TaskTable
+      name: PaymentStripeInvoicePayingTask
+      columns:
+        - name: taskId
+          type: string
+        - name: statementId
+          type: string
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - taskId
+      executionTimeIndex: PaymentStripeInvoicePayingTaskByExecutionTime
+      insert: InsertPaymentStripeInvoicePayingTask
+      delete: DeletePaymentStripeInvoicePayingTask
+      get: GetPaymentStripeInvoicePayingTask
+      listPendingTasks: ListPendingPaymentStripeInvoicePayingTasks
+      getMetadata: GetPaymentStripeInvoicePayingTaskMetadata
+      updateMetadata: UpdatePaymentStripeInvoicePayingTaskMetadata
     - kind: TaskTable
       name: PaymentMethodNeedsUpdateNotifyingTask
       columns:
@@ -400,22 +431,24 @@
       getMetadata: GetPaymentProfileStateSyncingTaskMetadata
       updateMetadata: UpdatePaymentProfileStateSyncingTaskMetadata
     - kind: TaskTable
-      name: PayoutTask
+      name: PayoutStripeTransferCreatingTask
       columns:
+        - name: taskId
+          type: string
         - name: statementId
           type: string
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
       primaryKeys:
-        - statementId
-      executionTimeIndex: PayoutTaskByExecutionTime
-      insert: InsertPayoutTask
-      delete: DeletePayoutTask
-      get: GetPayoutTask
-      listPendingTasks: ListPendingPayoutTasks
-      getMetadata: GetPayoutTaskMetadata
-      updateMetadata: UpdatePayoutTaskMetadata
+        - taskId
+      executionTimeIndex: PayoutStripeTransferCreatingTaskByExecutionTime
+      insert: InsertPayoutStripeTransferCreatingTask
+      delete: DeletePayoutStripeTransferCreatingTask
+      get: GetPayoutStripeTransferCreatingTask
+      listPendingTasks: ListPendingPayoutStripeTransferCreatingTasks
+      getMetadata: GetPayoutStripeTransferCreatingTaskMetadata
+      updateMetadata: UpdatePayoutStripeTransferCreatingTaskMetadata
   updates:
     - name: UpdatePaymentProfileState
       table: PaymentProfile

@@ -10,23 +10,23 @@ import { PaymentState } from "../db/schema";
 import {
   GetPaymentRow,
   deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
-  deletePaymentTaskStatement,
+  deletePaymentStripeInvoiceCreatingTaskStatement,
   getPayment,
   getPaymentProfileFromStatement,
   getPaymentProfileSuspendingDueToPastDueTask,
-  getPaymentTaskMetadata,
+  getPaymentStripeInvoiceCreatingTaskMetadata,
   getTransactionStatement,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   updatePaymentStateAndStripeInvoiceStatement,
   updatePaymentStateStatement,
-  updatePaymentTaskMetadataStatement,
+  updatePaymentStripeInvoiceCreatingTaskMetadataStatement,
 } from "../db/sql";
 import { Database, Transaction } from "@google-cloud/spanner";
-import { ProcessPaymentTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { ProcessPaymentStripeInvoiceCreatingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessPaymentTaskRequestBody,
-  ProcessPaymentTaskResponse,
+  ProcessPaymentStripeInvoiceCreatingTaskRequestBody,
+  ProcessPaymentStripeInvoiceCreatingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { AmountType } from "@phading/price/amount_type";
 import {
@@ -36,10 +36,12 @@ import {
 import { Ref } from "@selfage/ref";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterface {
-  public static create(): ProcessPaymentTaskHandler {
-    return new ProcessPaymentTaskHandler(SPANNER_DATABASE, STRIPE_CLIENT, () =>
-      Date.now(),
+export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPaymentStripeInvoiceCreatingTaskHandlerInterface {
+  public static create(): ProcessPaymentStripeInvoiceCreatingTaskHandler {
+    return new ProcessPaymentStripeInvoiceCreatingTaskHandler(
+      SPANNER_DATABASE,
+      STRIPE_CLIENT,
+      () => Date.now(),
     );
   }
 
@@ -59,9 +61,9 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessPaymentTaskRequestBody,
-  ): Promise<ProcessPaymentTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payment task for statement ${body.statementId}:`;
+    body: ProcessPaymentStripeInvoiceCreatingTaskRequestBody,
+  ): Promise<ProcessPaymentStripeInvoiceCreatingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Payment task for statement ${body.taskId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -72,23 +74,28 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessPaymentTaskRequestBody,
+    body: ProcessPaymentStripeInvoiceCreatingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getPaymentTaskMetadata(transaction, {
-        paymentTaskStatementIdEq: body.statementId,
-      });
+      let rows = await getPaymentStripeInvoiceCreatingTaskMetadata(
+        transaction,
+        {
+          paymentStripeInvoiceCreatingTaskTaskIdEq: body.taskId,
+        },
+      );
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updatePaymentTaskMetadataStatement({
-          paymentTaskStatementIdEq: body.statementId,
-          setRetryCount: task.paymentTaskRetryCount + 1,
+        updatePaymentStripeInvoiceCreatingTaskMetadataStatement({
+          paymentStripeInvoiceCreatingTaskTaskIdEq: body.taskId,
+          setRetryCount: task.paymentStripeInvoiceCreatingTaskRetryCount + 1,
           setExecutionTimeMs:
             this.getNow() +
-            this.taskHandler.getBackoffTime(task.paymentTaskRetryCount),
+            this.taskHandler.getBackoffTime(
+              task.paymentStripeInvoiceCreatingTaskRetryCount,
+            ),
         }),
       ]);
       await transaction.commit();
@@ -97,7 +104,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessPaymentTaskRequestBody,
+    body: ProcessPaymentStripeInvoiceCreatingTaskRequestBody,
   ): Promise<void> {
     let [profileRows, statementRows] = await Promise.all([
       getPaymentProfileFromStatement(this.database, {
@@ -141,7 +148,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       !(stripeCustomer as Stripe.Customer).invoice_settings
         ?.default_payment_method
     ) {
-      await this.reportFailure(loggingPrefix, body.statementId);
+      await this.reportFailure(loggingPrefix, body.taskId, body.statementId);
       return;
     }
 
@@ -159,7 +166,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
           transactionStatement.transactionStatementStatement.currency.toLowerCase(),
       },
       {
-        idempotencyKey: `c${body.statementId}`,
+        idempotencyKey: `ci${body.taskId}`,
       },
     );
     await this.stripeClient.val.invoices.addLines(
@@ -174,7 +181,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         ],
       },
       {
-        idempotencyKey: `a${body.statementId}`,
+        idempotencyKey: `al${body.taskId}`,
       },
     );
     await this.stripeClient.val.invoices.finalizeInvoice(
@@ -183,14 +190,20 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
         auto_advance: true,
       },
       {
-        idempotencyKey: `f${body.statementId}`,
+        idempotencyKey: `fi${body.taskId}`,
       },
     );
-    await this.finalize(loggingPrefix, body.statementId, invoice.id);
+    await this.finalize(
+      loggingPrefix,
+      body.taskId,
+      body.statementId,
+      invoice.id,
+    );
   }
 
   private async reportFailure(
     loggingPrefix: string,
+    taskId: string,
     statementId: string,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
@@ -204,7 +217,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       await transaction.batchUpdate([
         updatePaymentStateStatement({
           paymentStatementIdEq: statementId,
-          setState: PaymentState.FAILED,
+          setState: PaymentState.FAILED_WITHOUT_INVOICE,
           setUpdatedTimeMs: now,
         }),
         deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
@@ -226,8 +239,8 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
               }),
             ]
           : []),
-        deletePaymentTaskStatement({
-          paymentTaskStatementIdEq: statementId,
+        deletePaymentStripeInvoiceCreatingTaskStatement({
+          paymentStripeInvoiceCreatingTaskTaskIdEq: taskId,
         }),
       ]);
       await transaction.commit();
@@ -236,6 +249,7 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
 
   private async finalize(
     loggingPrefix: string,
+    taskId: string,
     statementId: string,
     invoiceId: string,
   ): Promise<void> {
@@ -244,12 +258,12 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       await transaction.batchUpdate([
         updatePaymentStateAndStripeInvoiceStatement({
           paymentStatementIdEq: statementId,
-          setState: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+          setState: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
           setStripeInvoiceId: invoiceId,
           setUpdatedTimeMs: this.getNow(),
         }),
-        deletePaymentTaskStatement({
-          paymentTaskStatementIdEq: statementId,
+        deletePaymentStripeInvoiceCreatingTaskStatement({
+          paymentStripeInvoiceCreatingTaskTaskIdEq: taskId,
         }),
       ]);
       await transaction.commit();
@@ -266,9 +280,9 @@ export class ProcessPaymentTaskHandler extends ProcessPaymentTaskHandlerInterfac
       throw newInternalServerErrorError(`Payment ${statementId} is not found.`);
     }
     let row = rows[0];
-    if (row.paymentState !== PaymentState.PROCESSING) {
+    if (row.paymentState !== PaymentState.CREATING_STRIPE_INVOICE) {
       throw newBadRequestError(
-        `Payment ${statementId} is not in PROCESSING state.`,
+        `Payment ${statementId} is not in CREATING_STRIPE_INVOICE state.`,
       );
     }
     return row;

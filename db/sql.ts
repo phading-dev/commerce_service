@@ -616,8 +616,9 @@ export async function getPayout(
   return resRows;
 }
 
-export function insertStripePaymentCustomerCreatingTaskStatement(
+export function insertStripeCustomerCreatingTaskStatement(
   args: {
+    taskId: string,
     accountId: string,
     retryCount?: number,
     executionTimeMs?: number,
@@ -625,14 +626,16 @@ export function insertStripePaymentCustomerCreatingTaskStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT StripePaymentCustomerCreatingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT StripeCustomerCreatingTask (taskId, accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
+      taskId: args.taskId,
       accountId: args.accountId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
+      taskId: { type: "string" },
       accountId: { type: "string" },
       retryCount: { type: "float64" },
       executionTimeMs: { type: "timestamp" },
@@ -641,181 +644,194 @@ export function insertStripePaymentCustomerCreatingTaskStatement(
   };
 }
 
-export function deleteStripePaymentCustomerCreatingTaskStatement(
+export function deleteStripeCustomerCreatingTaskStatement(
   args: {
-    stripePaymentCustomerCreatingTaskAccountIdEq: string,
+    stripeCustomerCreatingTaskTaskIdEq: string,
   }
 ): Statement {
   return {
-    sql: "DELETE StripePaymentCustomerCreatingTask WHERE (StripePaymentCustomerCreatingTask.accountId = @stripePaymentCustomerCreatingTaskAccountIdEq)",
+    sql: "DELETE StripeCustomerCreatingTask WHERE (StripeCustomerCreatingTask.taskId = @stripeCustomerCreatingTaskTaskIdEq)",
     params: {
-      stripePaymentCustomerCreatingTaskAccountIdEq: args.stripePaymentCustomerCreatingTaskAccountIdEq,
+      stripeCustomerCreatingTaskTaskIdEq: args.stripeCustomerCreatingTaskTaskIdEq,
     },
     types: {
-      stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
+      stripeCustomerCreatingTaskTaskIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetStripePaymentCustomerCreatingTaskRow {
-  stripePaymentCustomerCreatingTaskAccountId?: string,
-  stripePaymentCustomerCreatingTaskRetryCount?: number,
-  stripePaymentCustomerCreatingTaskExecutionTimeMs?: number,
-  stripePaymentCustomerCreatingTaskCreatedTimeMs?: number,
+export interface GetStripeCustomerCreatingTaskRow {
+  stripeCustomerCreatingTaskTaskId?: string,
+  stripeCustomerCreatingTaskAccountId?: string,
+  stripeCustomerCreatingTaskRetryCount?: number,
+  stripeCustomerCreatingTaskExecutionTimeMs?: number,
+  stripeCustomerCreatingTaskCreatedTimeMs?: number,
 }
 
-export let GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_ROW: MessageDescriptor<GetStripePaymentCustomerCreatingTaskRow> = {
-  name: 'GetStripePaymentCustomerCreatingTaskRow',
+export let GET_STRIPE_CUSTOMER_CREATING_TASK_ROW: MessageDescriptor<GetStripeCustomerCreatingTaskRow> = {
+  name: 'GetStripeCustomerCreatingTaskRow',
   fields: [{
-    name: 'stripePaymentCustomerCreatingTaskAccountId',
+    name: 'stripeCustomerCreatingTaskTaskId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'stripePaymentCustomerCreatingTaskRetryCount',
+    name: 'stripeCustomerCreatingTaskAccountId',
     index: 2,
-    primitiveType: PrimitiveType.NUMBER,
+    primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'stripePaymentCustomerCreatingTaskExecutionTimeMs',
+    name: 'stripeCustomerCreatingTaskRetryCount',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'stripePaymentCustomerCreatingTaskCreatedTimeMs',
+    name: 'stripeCustomerCreatingTaskExecutionTimeMs',
     index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'stripeCustomerCreatingTaskCreatedTimeMs',
+    index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getStripePaymentCustomerCreatingTask(
+export async function getStripeCustomerCreatingTask(
   runner: Database | Transaction,
   args: {
-    stripePaymentCustomerCreatingTaskAccountIdEq: string,
+    stripeCustomerCreatingTaskTaskIdEq: string,
   }
-): Promise<Array<GetStripePaymentCustomerCreatingTaskRow>> {
+): Promise<Array<GetStripeCustomerCreatingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT StripePaymentCustomerCreatingTask.accountId, StripePaymentCustomerCreatingTask.retryCount, StripePaymentCustomerCreatingTask.executionTimeMs, StripePaymentCustomerCreatingTask.createdTimeMs FROM StripePaymentCustomerCreatingTask WHERE (StripePaymentCustomerCreatingTask.accountId = @stripePaymentCustomerCreatingTaskAccountIdEq)",
+    sql: "SELECT StripeCustomerCreatingTask.taskId, StripeCustomerCreatingTask.accountId, StripeCustomerCreatingTask.retryCount, StripeCustomerCreatingTask.executionTimeMs, StripeCustomerCreatingTask.createdTimeMs FROM StripeCustomerCreatingTask WHERE (StripeCustomerCreatingTask.taskId = @stripeCustomerCreatingTaskTaskIdEq)",
     params: {
-      stripePaymentCustomerCreatingTaskAccountIdEq: args.stripePaymentCustomerCreatingTaskAccountIdEq,
+      stripeCustomerCreatingTaskTaskIdEq: args.stripeCustomerCreatingTaskTaskIdEq,
     },
     types: {
-      stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
+      stripeCustomerCreatingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetStripePaymentCustomerCreatingTaskRow>();
+  let resRows = new Array<GetStripeCustomerCreatingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      stripePaymentCustomerCreatingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      stripePaymentCustomerCreatingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
-      stripePaymentCustomerCreatingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
-      stripePaymentCustomerCreatingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      stripeCustomerCreatingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripeCustomerCreatingTaskAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      stripeCustomerCreatingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      stripeCustomerCreatingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      stripeCustomerCreatingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingStripePaymentCustomerCreatingTasksRow {
-  stripePaymentCustomerCreatingTaskAccountId?: string,
+export interface ListPendingStripeCustomerCreatingTasksRow {
+  stripeCustomerCreatingTaskTaskId?: string,
+  stripeCustomerCreatingTaskAccountId?: string,
 }
 
-export let LIST_PENDING_STRIPE_PAYMENT_CUSTOMER_CREATING_TASKS_ROW: MessageDescriptor<ListPendingStripePaymentCustomerCreatingTasksRow> = {
-  name: 'ListPendingStripePaymentCustomerCreatingTasksRow',
+export let LIST_PENDING_STRIPE_CUSTOMER_CREATING_TASKS_ROW: MessageDescriptor<ListPendingStripeCustomerCreatingTasksRow> = {
+  name: 'ListPendingStripeCustomerCreatingTasksRow',
   fields: [{
-    name: 'stripePaymentCustomerCreatingTaskAccountId',
+    name: 'stripeCustomerCreatingTaskTaskId',
     index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'stripeCustomerCreatingTaskAccountId',
+    index: 2,
     primitiveType: PrimitiveType.STRING,
   }],
 };
 
-export async function listPendingStripePaymentCustomerCreatingTasks(
+export async function listPendingStripeCustomerCreatingTasks(
   runner: Database | Transaction,
   args: {
-    stripePaymentCustomerCreatingTaskExecutionTimeMsLe?: number,
+    stripeCustomerCreatingTaskExecutionTimeMsLe?: number,
   }
-): Promise<Array<ListPendingStripePaymentCustomerCreatingTasksRow>> {
+): Promise<Array<ListPendingStripeCustomerCreatingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT StripePaymentCustomerCreatingTask.accountId FROM StripePaymentCustomerCreatingTask WHERE StripePaymentCustomerCreatingTask.executionTimeMs <= @stripePaymentCustomerCreatingTaskExecutionTimeMsLe",
+    sql: "SELECT StripeCustomerCreatingTask.taskId, StripeCustomerCreatingTask.accountId FROM StripeCustomerCreatingTask WHERE StripeCustomerCreatingTask.executionTimeMs <= @stripeCustomerCreatingTaskExecutionTimeMsLe",
     params: {
-      stripePaymentCustomerCreatingTaskExecutionTimeMsLe: args.stripePaymentCustomerCreatingTaskExecutionTimeMsLe == null ? null : new Date(args.stripePaymentCustomerCreatingTaskExecutionTimeMsLe).toISOString(),
+      stripeCustomerCreatingTaskExecutionTimeMsLe: args.stripeCustomerCreatingTaskExecutionTimeMsLe == null ? null : new Date(args.stripeCustomerCreatingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      stripePaymentCustomerCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
+      stripeCustomerCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingStripePaymentCustomerCreatingTasksRow>();
+  let resRows = new Array<ListPendingStripeCustomerCreatingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      stripePaymentCustomerCreatingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripeCustomerCreatingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripeCustomerCreatingTaskAccountId: row.at(1).value == null ? undefined : row.at(1).value,
     });
   }
   return resRows;
 }
 
-export interface GetStripePaymentCustomerCreatingTaskMetadataRow {
-  stripePaymentCustomerCreatingTaskRetryCount?: number,
-  stripePaymentCustomerCreatingTaskExecutionTimeMs?: number,
+export interface GetStripeCustomerCreatingTaskMetadataRow {
+  stripeCustomerCreatingTaskRetryCount?: number,
+  stripeCustomerCreatingTaskExecutionTimeMs?: number,
 }
 
-export let GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetStripePaymentCustomerCreatingTaskMetadataRow> = {
-  name: 'GetStripePaymentCustomerCreatingTaskMetadataRow',
+export let GET_STRIPE_CUSTOMER_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetStripeCustomerCreatingTaskMetadataRow> = {
+  name: 'GetStripeCustomerCreatingTaskMetadataRow',
   fields: [{
-    name: 'stripePaymentCustomerCreatingTaskRetryCount',
+    name: 'stripeCustomerCreatingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'stripePaymentCustomerCreatingTaskExecutionTimeMs',
+    name: 'stripeCustomerCreatingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getStripePaymentCustomerCreatingTaskMetadata(
+export async function getStripeCustomerCreatingTaskMetadata(
   runner: Database | Transaction,
   args: {
-    stripePaymentCustomerCreatingTaskAccountIdEq: string,
+    stripeCustomerCreatingTaskTaskIdEq: string,
   }
-): Promise<Array<GetStripePaymentCustomerCreatingTaskMetadataRow>> {
+): Promise<Array<GetStripeCustomerCreatingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT StripePaymentCustomerCreatingTask.retryCount, StripePaymentCustomerCreatingTask.executionTimeMs FROM StripePaymentCustomerCreatingTask WHERE (StripePaymentCustomerCreatingTask.accountId = @stripePaymentCustomerCreatingTaskAccountIdEq)",
+    sql: "SELECT StripeCustomerCreatingTask.retryCount, StripeCustomerCreatingTask.executionTimeMs FROM StripeCustomerCreatingTask WHERE (StripeCustomerCreatingTask.taskId = @stripeCustomerCreatingTaskTaskIdEq)",
     params: {
-      stripePaymentCustomerCreatingTaskAccountIdEq: args.stripePaymentCustomerCreatingTaskAccountIdEq,
+      stripeCustomerCreatingTaskTaskIdEq: args.stripeCustomerCreatingTaskTaskIdEq,
     },
     types: {
-      stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
+      stripeCustomerCreatingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetStripePaymentCustomerCreatingTaskMetadataRow>();
+  let resRows = new Array<GetStripeCustomerCreatingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      stripePaymentCustomerCreatingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
-      stripePaymentCustomerCreatingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+      stripeCustomerCreatingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      stripeCustomerCreatingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updateStripePaymentCustomerCreatingTaskMetadataStatement(
+export function updateStripeCustomerCreatingTaskMetadataStatement(
   args: {
-    stripePaymentCustomerCreatingTaskAccountIdEq: string,
+    stripeCustomerCreatingTaskTaskIdEq: string,
     setRetryCount?: number,
     setExecutionTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE StripePaymentCustomerCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (StripePaymentCustomerCreatingTask.accountId = @stripePaymentCustomerCreatingTaskAccountIdEq)",
+    sql: "UPDATE StripeCustomerCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (StripeCustomerCreatingTask.taskId = @stripeCustomerCreatingTaskTaskIdEq)",
     params: {
-      stripePaymentCustomerCreatingTaskAccountIdEq: args.stripePaymentCustomerCreatingTaskAccountIdEq,
+      stripeCustomerCreatingTaskTaskIdEq: args.stripeCustomerCreatingTaskTaskIdEq,
       setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
       setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      stripePaymentCustomerCreatingTaskAccountIdEq: { type: "string" },
+      stripeCustomerCreatingTaskTaskIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
   };
 }
 
-export function insertInitPaymentCreditGrantingTaskStatement(
+export function insertInitCreditGrantingTaskStatement(
   args: {
+    taskId: string,
     accountId: string,
     retryCount?: number,
     executionTimeMs?: number,
@@ -823,14 +839,16 @@ export function insertInitPaymentCreditGrantingTaskStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT InitPaymentCreditGrantingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT InitCreditGrantingTask (taskId, accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
+      taskId: args.taskId,
       accountId: args.accountId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
+      taskId: { type: "string" },
       accountId: { type: "string" },
       retryCount: { type: "float64" },
       executionTimeMs: { type: "timestamp" },
@@ -839,181 +857,194 @@ export function insertInitPaymentCreditGrantingTaskStatement(
   };
 }
 
-export function deleteInitPaymentCreditGrantingTaskStatement(
+export function deleteInitCreditGrantingTaskStatement(
   args: {
-    initPaymentCreditGrantingTaskAccountIdEq: string,
+    initCreditGrantingTaskTaskIdEq: string,
   }
 ): Statement {
   return {
-    sql: "DELETE InitPaymentCreditGrantingTask WHERE (InitPaymentCreditGrantingTask.accountId = @initPaymentCreditGrantingTaskAccountIdEq)",
+    sql: "DELETE InitCreditGrantingTask WHERE (InitCreditGrantingTask.taskId = @initCreditGrantingTaskTaskIdEq)",
     params: {
-      initPaymentCreditGrantingTaskAccountIdEq: args.initPaymentCreditGrantingTaskAccountIdEq,
+      initCreditGrantingTaskTaskIdEq: args.initCreditGrantingTaskTaskIdEq,
     },
     types: {
-      initPaymentCreditGrantingTaskAccountIdEq: { type: "string" },
+      initCreditGrantingTaskTaskIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetInitPaymentCreditGrantingTaskRow {
-  initPaymentCreditGrantingTaskAccountId?: string,
-  initPaymentCreditGrantingTaskRetryCount?: number,
-  initPaymentCreditGrantingTaskExecutionTimeMs?: number,
-  initPaymentCreditGrantingTaskCreatedTimeMs?: number,
+export interface GetInitCreditGrantingTaskRow {
+  initCreditGrantingTaskTaskId?: string,
+  initCreditGrantingTaskAccountId?: string,
+  initCreditGrantingTaskRetryCount?: number,
+  initCreditGrantingTaskExecutionTimeMs?: number,
+  initCreditGrantingTaskCreatedTimeMs?: number,
 }
 
-export let GET_INIT_PAYMENT_CREDIT_GRANTING_TASK_ROW: MessageDescriptor<GetInitPaymentCreditGrantingTaskRow> = {
-  name: 'GetInitPaymentCreditGrantingTaskRow',
+export let GET_INIT_CREDIT_GRANTING_TASK_ROW: MessageDescriptor<GetInitCreditGrantingTaskRow> = {
+  name: 'GetInitCreditGrantingTaskRow',
   fields: [{
-    name: 'initPaymentCreditGrantingTaskAccountId',
+    name: 'initCreditGrantingTaskTaskId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'initPaymentCreditGrantingTaskRetryCount',
+    name: 'initCreditGrantingTaskAccountId',
     index: 2,
-    primitiveType: PrimitiveType.NUMBER,
+    primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'initPaymentCreditGrantingTaskExecutionTimeMs',
+    name: 'initCreditGrantingTaskRetryCount',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'initPaymentCreditGrantingTaskCreatedTimeMs',
+    name: 'initCreditGrantingTaskExecutionTimeMs',
     index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'initCreditGrantingTaskCreatedTimeMs',
+    index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getInitPaymentCreditGrantingTask(
+export async function getInitCreditGrantingTask(
   runner: Database | Transaction,
   args: {
-    initPaymentCreditGrantingTaskAccountIdEq: string,
+    initCreditGrantingTaskTaskIdEq: string,
   }
-): Promise<Array<GetInitPaymentCreditGrantingTaskRow>> {
+): Promise<Array<GetInitCreditGrantingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT InitPaymentCreditGrantingTask.accountId, InitPaymentCreditGrantingTask.retryCount, InitPaymentCreditGrantingTask.executionTimeMs, InitPaymentCreditGrantingTask.createdTimeMs FROM InitPaymentCreditGrantingTask WHERE (InitPaymentCreditGrantingTask.accountId = @initPaymentCreditGrantingTaskAccountIdEq)",
+    sql: "SELECT InitCreditGrantingTask.taskId, InitCreditGrantingTask.accountId, InitCreditGrantingTask.retryCount, InitCreditGrantingTask.executionTimeMs, InitCreditGrantingTask.createdTimeMs FROM InitCreditGrantingTask WHERE (InitCreditGrantingTask.taskId = @initCreditGrantingTaskTaskIdEq)",
     params: {
-      initPaymentCreditGrantingTaskAccountIdEq: args.initPaymentCreditGrantingTaskAccountIdEq,
+      initCreditGrantingTaskTaskIdEq: args.initCreditGrantingTaskTaskIdEq,
     },
     types: {
-      initPaymentCreditGrantingTaskAccountIdEq: { type: "string" },
+      initCreditGrantingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetInitPaymentCreditGrantingTaskRow>();
+  let resRows = new Array<GetInitCreditGrantingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      initPaymentCreditGrantingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      initPaymentCreditGrantingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
-      initPaymentCreditGrantingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
-      initPaymentCreditGrantingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      initCreditGrantingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      initCreditGrantingTaskAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      initCreditGrantingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      initCreditGrantingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      initCreditGrantingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingInitPaymentCreditGrantingTasksRow {
-  initPaymentCreditGrantingTaskAccountId?: string,
+export interface ListPendingInitCreditGrantingTasksRow {
+  initCreditGrantingTaskTaskId?: string,
+  initCreditGrantingTaskAccountId?: string,
 }
 
-export let LIST_PENDING_INIT_PAYMENT_CREDIT_GRANTING_TASKS_ROW: MessageDescriptor<ListPendingInitPaymentCreditGrantingTasksRow> = {
-  name: 'ListPendingInitPaymentCreditGrantingTasksRow',
+export let LIST_PENDING_INIT_CREDIT_GRANTING_TASKS_ROW: MessageDescriptor<ListPendingInitCreditGrantingTasksRow> = {
+  name: 'ListPendingInitCreditGrantingTasksRow',
   fields: [{
-    name: 'initPaymentCreditGrantingTaskAccountId',
+    name: 'initCreditGrantingTaskTaskId',
     index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'initCreditGrantingTaskAccountId',
+    index: 2,
     primitiveType: PrimitiveType.STRING,
   }],
 };
 
-export async function listPendingInitPaymentCreditGrantingTasks(
+export async function listPendingInitCreditGrantingTasks(
   runner: Database | Transaction,
   args: {
-    initPaymentCreditGrantingTaskExecutionTimeMsLe?: number,
+    initCreditGrantingTaskExecutionTimeMsLe?: number,
   }
-): Promise<Array<ListPendingInitPaymentCreditGrantingTasksRow>> {
+): Promise<Array<ListPendingInitCreditGrantingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT InitPaymentCreditGrantingTask.accountId FROM InitPaymentCreditGrantingTask WHERE InitPaymentCreditGrantingTask.executionTimeMs <= @initPaymentCreditGrantingTaskExecutionTimeMsLe",
+    sql: "SELECT InitCreditGrantingTask.taskId, InitCreditGrantingTask.accountId FROM InitCreditGrantingTask WHERE InitCreditGrantingTask.executionTimeMs <= @initCreditGrantingTaskExecutionTimeMsLe",
     params: {
-      initPaymentCreditGrantingTaskExecutionTimeMsLe: args.initPaymentCreditGrantingTaskExecutionTimeMsLe == null ? null : new Date(args.initPaymentCreditGrantingTaskExecutionTimeMsLe).toISOString(),
+      initCreditGrantingTaskExecutionTimeMsLe: args.initCreditGrantingTaskExecutionTimeMsLe == null ? null : new Date(args.initCreditGrantingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      initPaymentCreditGrantingTaskExecutionTimeMsLe: { type: "timestamp" },
+      initCreditGrantingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingInitPaymentCreditGrantingTasksRow>();
+  let resRows = new Array<ListPendingInitCreditGrantingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      initPaymentCreditGrantingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      initCreditGrantingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      initCreditGrantingTaskAccountId: row.at(1).value == null ? undefined : row.at(1).value,
     });
   }
   return resRows;
 }
 
-export interface GetInitPaymentCreditGrantingTaskMetadataRow {
-  initPaymentCreditGrantingTaskRetryCount?: number,
-  initPaymentCreditGrantingTaskExecutionTimeMs?: number,
+export interface GetInitCreditGrantingTaskMetadataRow {
+  initCreditGrantingTaskRetryCount?: number,
+  initCreditGrantingTaskExecutionTimeMs?: number,
 }
 
-export let GET_INIT_PAYMENT_CREDIT_GRANTING_TASK_METADATA_ROW: MessageDescriptor<GetInitPaymentCreditGrantingTaskMetadataRow> = {
-  name: 'GetInitPaymentCreditGrantingTaskMetadataRow',
+export let GET_INIT_CREDIT_GRANTING_TASK_METADATA_ROW: MessageDescriptor<GetInitCreditGrantingTaskMetadataRow> = {
+  name: 'GetInitCreditGrantingTaskMetadataRow',
   fields: [{
-    name: 'initPaymentCreditGrantingTaskRetryCount',
+    name: 'initCreditGrantingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'initPaymentCreditGrantingTaskExecutionTimeMs',
+    name: 'initCreditGrantingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getInitPaymentCreditGrantingTaskMetadata(
+export async function getInitCreditGrantingTaskMetadata(
   runner: Database | Transaction,
   args: {
-    initPaymentCreditGrantingTaskAccountIdEq: string,
+    initCreditGrantingTaskTaskIdEq: string,
   }
-): Promise<Array<GetInitPaymentCreditGrantingTaskMetadataRow>> {
+): Promise<Array<GetInitCreditGrantingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT InitPaymentCreditGrantingTask.retryCount, InitPaymentCreditGrantingTask.executionTimeMs FROM InitPaymentCreditGrantingTask WHERE (InitPaymentCreditGrantingTask.accountId = @initPaymentCreditGrantingTaskAccountIdEq)",
+    sql: "SELECT InitCreditGrantingTask.retryCount, InitCreditGrantingTask.executionTimeMs FROM InitCreditGrantingTask WHERE (InitCreditGrantingTask.taskId = @initCreditGrantingTaskTaskIdEq)",
     params: {
-      initPaymentCreditGrantingTaskAccountIdEq: args.initPaymentCreditGrantingTaskAccountIdEq,
+      initCreditGrantingTaskTaskIdEq: args.initCreditGrantingTaskTaskIdEq,
     },
     types: {
-      initPaymentCreditGrantingTaskAccountIdEq: { type: "string" },
+      initCreditGrantingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetInitPaymentCreditGrantingTaskMetadataRow>();
+  let resRows = new Array<GetInitCreditGrantingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      initPaymentCreditGrantingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
-      initPaymentCreditGrantingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+      initCreditGrantingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      initCreditGrantingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updateInitPaymentCreditGrantingTaskMetadataStatement(
+export function updateInitCreditGrantingTaskMetadataStatement(
   args: {
-    initPaymentCreditGrantingTaskAccountIdEq: string,
+    initCreditGrantingTaskTaskIdEq: string,
     setRetryCount?: number,
     setExecutionTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE InitPaymentCreditGrantingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (InitPaymentCreditGrantingTask.accountId = @initPaymentCreditGrantingTaskAccountIdEq)",
+    sql: "UPDATE InitCreditGrantingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (InitCreditGrantingTask.taskId = @initCreditGrantingTaskTaskIdEq)",
     params: {
-      initPaymentCreditGrantingTaskAccountIdEq: args.initPaymentCreditGrantingTaskAccountIdEq,
+      initCreditGrantingTaskTaskIdEq: args.initCreditGrantingTaskTaskIdEq,
       setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
       setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      initPaymentCreditGrantingTaskAccountIdEq: { type: "string" },
+      initCreditGrantingTaskTaskIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
   };
 }
 
-export function insertStripeConnectedAccountCreatingTaskStatement(
+export function insertStripeConnectedAccountForPayoutCreatingTaskStatement(
   args: {
+    taskId: string,
     accountId: string,
     retryCount?: number,
     executionTimeMs?: number,
@@ -1021,14 +1052,16 @@ export function insertStripeConnectedAccountCreatingTaskStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT StripeConnectedAccountCreatingTask (accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT StripeConnectedAccountForPayoutCreatingTask (taskId, accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
+      taskId: args.taskId,
       accountId: args.accountId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
+      taskId: { type: "string" },
       accountId: { type: "string" },
       retryCount: { type: "float64" },
       executionTimeMs: { type: "timestamp" },
@@ -1037,173 +1070,185 @@ export function insertStripeConnectedAccountCreatingTaskStatement(
   };
 }
 
-export function deleteStripeConnectedAccountCreatingTaskStatement(
+export function deleteStripeConnectedAccountForPayoutCreatingTaskStatement(
   args: {
-    stripeConnectedAccountCreatingTaskAccountIdEq: string,
+    stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: string,
   }
 ): Statement {
   return {
-    sql: "DELETE StripeConnectedAccountCreatingTask WHERE (StripeConnectedAccountCreatingTask.accountId = @stripeConnectedAccountCreatingTaskAccountIdEq)",
+    sql: "DELETE StripeConnectedAccountForPayoutCreatingTask WHERE (StripeConnectedAccountForPayoutCreatingTask.taskId = @stripeConnectedAccountForPayoutCreatingTaskTaskIdEq)",
     params: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: args.stripeConnectedAccountCreatingTaskAccountIdEq,
+      stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: args.stripeConnectedAccountForPayoutCreatingTaskTaskIdEq,
     },
     types: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: { type: "string" },
+      stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetStripeConnectedAccountCreatingTaskRow {
-  stripeConnectedAccountCreatingTaskAccountId?: string,
-  stripeConnectedAccountCreatingTaskRetryCount?: number,
-  stripeConnectedAccountCreatingTaskExecutionTimeMs?: number,
-  stripeConnectedAccountCreatingTaskCreatedTimeMs?: number,
+export interface GetStripeConnectedAccountForPayoutCreatingTaskRow {
+  stripeConnectedAccountForPayoutCreatingTaskTaskId?: string,
+  stripeConnectedAccountForPayoutCreatingTaskAccountId?: string,
+  stripeConnectedAccountForPayoutCreatingTaskRetryCount?: number,
+  stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMs?: number,
+  stripeConnectedAccountForPayoutCreatingTaskCreatedTimeMs?: number,
 }
 
-export let GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW: MessageDescriptor<GetStripeConnectedAccountCreatingTaskRow> = {
-  name: 'GetStripeConnectedAccountCreatingTaskRow',
+export let GET_STRIPE_CONNECTED_ACCOUNT_FOR_PAYOUT_CREATING_TASK_ROW: MessageDescriptor<GetStripeConnectedAccountForPayoutCreatingTaskRow> = {
+  name: 'GetStripeConnectedAccountForPayoutCreatingTaskRow',
   fields: [{
-    name: 'stripeConnectedAccountCreatingTaskAccountId',
+    name: 'stripeConnectedAccountForPayoutCreatingTaskTaskId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'stripeConnectedAccountCreatingTaskRetryCount',
+    name: 'stripeConnectedAccountForPayoutCreatingTaskAccountId',
     index: 2,
-    primitiveType: PrimitiveType.NUMBER,
+    primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'stripeConnectedAccountCreatingTaskExecutionTimeMs',
+    name: 'stripeConnectedAccountForPayoutCreatingTaskRetryCount',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'stripeConnectedAccountCreatingTaskCreatedTimeMs',
+    name: 'stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMs',
     index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'stripeConnectedAccountForPayoutCreatingTaskCreatedTimeMs',
+    index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getStripeConnectedAccountCreatingTask(
+export async function getStripeConnectedAccountForPayoutCreatingTask(
   runner: Database | Transaction,
   args: {
-    stripeConnectedAccountCreatingTaskAccountIdEq: string,
+    stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: string,
   }
-): Promise<Array<GetStripeConnectedAccountCreatingTaskRow>> {
+): Promise<Array<GetStripeConnectedAccountForPayoutCreatingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT StripeConnectedAccountCreatingTask.accountId, StripeConnectedAccountCreatingTask.retryCount, StripeConnectedAccountCreatingTask.executionTimeMs, StripeConnectedAccountCreatingTask.createdTimeMs FROM StripeConnectedAccountCreatingTask WHERE (StripeConnectedAccountCreatingTask.accountId = @stripeConnectedAccountCreatingTaskAccountIdEq)",
+    sql: "SELECT StripeConnectedAccountForPayoutCreatingTask.taskId, StripeConnectedAccountForPayoutCreatingTask.accountId, StripeConnectedAccountForPayoutCreatingTask.retryCount, StripeConnectedAccountForPayoutCreatingTask.executionTimeMs, StripeConnectedAccountForPayoutCreatingTask.createdTimeMs FROM StripeConnectedAccountForPayoutCreatingTask WHERE (StripeConnectedAccountForPayoutCreatingTask.taskId = @stripeConnectedAccountForPayoutCreatingTaskTaskIdEq)",
     params: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: args.stripeConnectedAccountCreatingTaskAccountIdEq,
+      stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: args.stripeConnectedAccountForPayoutCreatingTaskTaskIdEq,
     },
     types: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: { type: "string" },
+      stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetStripeConnectedAccountCreatingTaskRow>();
+  let resRows = new Array<GetStripeConnectedAccountForPayoutCreatingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      stripeConnectedAccountCreatingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
-      stripeConnectedAccountCreatingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
-      stripeConnectedAccountCreatingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
-      stripeConnectedAccountCreatingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      stripeConnectedAccountForPayoutCreatingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripeConnectedAccountForPayoutCreatingTaskAccountId: row.at(1).value == null ? undefined : row.at(1).value,
+      stripeConnectedAccountForPayoutCreatingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      stripeConnectedAccountForPayoutCreatingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingStripeConnectedAccountCreatingTasksRow {
-  stripeConnectedAccountCreatingTaskAccountId?: string,
+export interface ListPendingStripeConnectedAccountForPayoutCreatingTasksRow {
+  stripeConnectedAccountForPayoutCreatingTaskTaskId?: string,
+  stripeConnectedAccountForPayoutCreatingTaskAccountId?: string,
 }
 
-export let LIST_PENDING_STRIPE_CONNECTED_ACCOUNT_CREATING_TASKS_ROW: MessageDescriptor<ListPendingStripeConnectedAccountCreatingTasksRow> = {
-  name: 'ListPendingStripeConnectedAccountCreatingTasksRow',
+export let LIST_PENDING_STRIPE_CONNECTED_ACCOUNT_FOR_PAYOUT_CREATING_TASKS_ROW: MessageDescriptor<ListPendingStripeConnectedAccountForPayoutCreatingTasksRow> = {
+  name: 'ListPendingStripeConnectedAccountForPayoutCreatingTasksRow',
   fields: [{
-    name: 'stripeConnectedAccountCreatingTaskAccountId',
+    name: 'stripeConnectedAccountForPayoutCreatingTaskTaskId',
     index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'stripeConnectedAccountForPayoutCreatingTaskAccountId',
+    index: 2,
     primitiveType: PrimitiveType.STRING,
   }],
 };
 
-export async function listPendingStripeConnectedAccountCreatingTasks(
+export async function listPendingStripeConnectedAccountForPayoutCreatingTasks(
   runner: Database | Transaction,
   args: {
-    stripeConnectedAccountCreatingTaskExecutionTimeMsLe?: number,
+    stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMsLe?: number,
   }
-): Promise<Array<ListPendingStripeConnectedAccountCreatingTasksRow>> {
+): Promise<Array<ListPendingStripeConnectedAccountForPayoutCreatingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT StripeConnectedAccountCreatingTask.accountId FROM StripeConnectedAccountCreatingTask WHERE StripeConnectedAccountCreatingTask.executionTimeMs <= @stripeConnectedAccountCreatingTaskExecutionTimeMsLe",
+    sql: "SELECT StripeConnectedAccountForPayoutCreatingTask.taskId, StripeConnectedAccountForPayoutCreatingTask.accountId FROM StripeConnectedAccountForPayoutCreatingTask WHERE StripeConnectedAccountForPayoutCreatingTask.executionTimeMs <= @stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMsLe",
     params: {
-      stripeConnectedAccountCreatingTaskExecutionTimeMsLe: args.stripeConnectedAccountCreatingTaskExecutionTimeMsLe == null ? null : new Date(args.stripeConnectedAccountCreatingTaskExecutionTimeMsLe).toISOString(),
+      stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMsLe: args.stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMsLe == null ? null : new Date(args.stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      stripeConnectedAccountCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
+      stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingStripeConnectedAccountCreatingTasksRow>();
+  let resRows = new Array<ListPendingStripeConnectedAccountForPayoutCreatingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      stripeConnectedAccountCreatingTaskAccountId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripeConnectedAccountForPayoutCreatingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      stripeConnectedAccountForPayoutCreatingTaskAccountId: row.at(1).value == null ? undefined : row.at(1).value,
     });
   }
   return resRows;
 }
 
-export interface GetStripeConnectedAccountCreatingTaskMetadataRow {
-  stripeConnectedAccountCreatingTaskRetryCount?: number,
-  stripeConnectedAccountCreatingTaskExecutionTimeMs?: number,
+export interface GetStripeConnectedAccountForPayoutCreatingTaskMetadataRow {
+  stripeConnectedAccountForPayoutCreatingTaskRetryCount?: number,
+  stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMs?: number,
 }
 
-export let GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetStripeConnectedAccountCreatingTaskMetadataRow> = {
-  name: 'GetStripeConnectedAccountCreatingTaskMetadataRow',
+export let GET_STRIPE_CONNECTED_ACCOUNT_FOR_PAYOUT_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetStripeConnectedAccountForPayoutCreatingTaskMetadataRow> = {
+  name: 'GetStripeConnectedAccountForPayoutCreatingTaskMetadataRow',
   fields: [{
-    name: 'stripeConnectedAccountCreatingTaskRetryCount',
+    name: 'stripeConnectedAccountForPayoutCreatingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'stripeConnectedAccountCreatingTaskExecutionTimeMs',
+    name: 'stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getStripeConnectedAccountCreatingTaskMetadata(
+export async function getStripeConnectedAccountForPayoutCreatingTaskMetadata(
   runner: Database | Transaction,
   args: {
-    stripeConnectedAccountCreatingTaskAccountIdEq: string,
+    stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: string,
   }
-): Promise<Array<GetStripeConnectedAccountCreatingTaskMetadataRow>> {
+): Promise<Array<GetStripeConnectedAccountForPayoutCreatingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT StripeConnectedAccountCreatingTask.retryCount, StripeConnectedAccountCreatingTask.executionTimeMs FROM StripeConnectedAccountCreatingTask WHERE (StripeConnectedAccountCreatingTask.accountId = @stripeConnectedAccountCreatingTaskAccountIdEq)",
+    sql: "SELECT StripeConnectedAccountForPayoutCreatingTask.retryCount, StripeConnectedAccountForPayoutCreatingTask.executionTimeMs FROM StripeConnectedAccountForPayoutCreatingTask WHERE (StripeConnectedAccountForPayoutCreatingTask.taskId = @stripeConnectedAccountForPayoutCreatingTaskTaskIdEq)",
     params: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: args.stripeConnectedAccountCreatingTaskAccountIdEq,
+      stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: args.stripeConnectedAccountForPayoutCreatingTaskTaskIdEq,
     },
     types: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: { type: "string" },
+      stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetStripeConnectedAccountCreatingTaskMetadataRow>();
+  let resRows = new Array<GetStripeConnectedAccountForPayoutCreatingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      stripeConnectedAccountCreatingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
-      stripeConnectedAccountCreatingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+      stripeConnectedAccountForPayoutCreatingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updateStripeConnectedAccountCreatingTaskMetadataStatement(
+export function updateStripeConnectedAccountForPayoutCreatingTaskMetadataStatement(
   args: {
-    stripeConnectedAccountCreatingTaskAccountIdEq: string,
+    stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: string,
     setRetryCount?: number,
     setExecutionTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE StripeConnectedAccountCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (StripeConnectedAccountCreatingTask.accountId = @stripeConnectedAccountCreatingTaskAccountIdEq)",
+    sql: "UPDATE StripeConnectedAccountForPayoutCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (StripeConnectedAccountForPayoutCreatingTask.taskId = @stripeConnectedAccountForPayoutCreatingTaskTaskIdEq)",
     params: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: args.stripeConnectedAccountCreatingTaskAccountIdEq,
+      stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: args.stripeConnectedAccountForPayoutCreatingTaskTaskIdEq,
       setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
       setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      stripeConnectedAccountCreatingTaskAccountIdEq: { type: "string" },
+      stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
@@ -1408,8 +1453,9 @@ export function updateStripeConnectedAccountNeedsSetupNotifyingTaskMetadataState
   };
 }
 
-export function insertPaymentTaskStatement(
+export function insertPaymentStripeInvoiceCreatingTaskStatement(
   args: {
+    taskId: string,
     statementId: string,
     retryCount?: number,
     executionTimeMs?: number,
@@ -1417,14 +1463,16 @@ export function insertPaymentTaskStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT PaymentTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT PaymentStripeInvoiceCreatingTask (taskId, statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
+      taskId: args.taskId,
       statementId: args.statementId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
+      taskId: { type: "string" },
       statementId: { type: "string" },
       retryCount: { type: "float64" },
       executionTimeMs: { type: "timestamp" },
@@ -1433,173 +1481,398 @@ export function insertPaymentTaskStatement(
   };
 }
 
-export function deletePaymentTaskStatement(
+export function deletePaymentStripeInvoiceCreatingTaskStatement(
   args: {
-    paymentTaskStatementIdEq: string,
+    paymentStripeInvoiceCreatingTaskTaskIdEq: string,
   }
 ): Statement {
   return {
-    sql: "DELETE PaymentTask WHERE (PaymentTask.statementId = @paymentTaskStatementIdEq)",
+    sql: "DELETE PaymentStripeInvoiceCreatingTask WHERE (PaymentStripeInvoiceCreatingTask.taskId = @paymentStripeInvoiceCreatingTaskTaskIdEq)",
     params: {
-      paymentTaskStatementIdEq: args.paymentTaskStatementIdEq,
+      paymentStripeInvoiceCreatingTaskTaskIdEq: args.paymentStripeInvoiceCreatingTaskTaskIdEq,
     },
     types: {
-      paymentTaskStatementIdEq: { type: "string" },
+      paymentStripeInvoiceCreatingTaskTaskIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetPaymentTaskRow {
-  paymentTaskStatementId?: string,
-  paymentTaskRetryCount?: number,
-  paymentTaskExecutionTimeMs?: number,
-  paymentTaskCreatedTimeMs?: number,
+export interface GetPaymentStripeInvoiceCreatingTaskRow {
+  paymentStripeInvoiceCreatingTaskTaskId?: string,
+  paymentStripeInvoiceCreatingTaskStatementId?: string,
+  paymentStripeInvoiceCreatingTaskRetryCount?: number,
+  paymentStripeInvoiceCreatingTaskExecutionTimeMs?: number,
+  paymentStripeInvoiceCreatingTaskCreatedTimeMs?: number,
 }
 
-export let GET_PAYMENT_TASK_ROW: MessageDescriptor<GetPaymentTaskRow> = {
-  name: 'GetPaymentTaskRow',
+export let GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_ROW: MessageDescriptor<GetPaymentStripeInvoiceCreatingTaskRow> = {
+  name: 'GetPaymentStripeInvoiceCreatingTaskRow',
   fields: [{
-    name: 'paymentTaskStatementId',
+    name: 'paymentStripeInvoiceCreatingTaskTaskId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'paymentTaskRetryCount',
+    name: 'paymentStripeInvoiceCreatingTaskStatementId',
     index: 2,
-    primitiveType: PrimitiveType.NUMBER,
+    primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'paymentTaskExecutionTimeMs',
+    name: 'paymentStripeInvoiceCreatingTaskRetryCount',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'paymentTaskCreatedTimeMs',
+    name: 'paymentStripeInvoiceCreatingTaskExecutionTimeMs',
     index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentStripeInvoiceCreatingTaskCreatedTimeMs',
+    index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getPaymentTask(
+export async function getPaymentStripeInvoiceCreatingTask(
   runner: Database | Transaction,
   args: {
-    paymentTaskStatementIdEq: string,
+    paymentStripeInvoiceCreatingTaskTaskIdEq: string,
   }
-): Promise<Array<GetPaymentTaskRow>> {
+): Promise<Array<GetPaymentStripeInvoiceCreatingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PaymentTask.statementId, PaymentTask.retryCount, PaymentTask.executionTimeMs, PaymentTask.createdTimeMs FROM PaymentTask WHERE (PaymentTask.statementId = @paymentTaskStatementIdEq)",
+    sql: "SELECT PaymentStripeInvoiceCreatingTask.taskId, PaymentStripeInvoiceCreatingTask.statementId, PaymentStripeInvoiceCreatingTask.retryCount, PaymentStripeInvoiceCreatingTask.executionTimeMs, PaymentStripeInvoiceCreatingTask.createdTimeMs FROM PaymentStripeInvoiceCreatingTask WHERE (PaymentStripeInvoiceCreatingTask.taskId = @paymentStripeInvoiceCreatingTaskTaskIdEq)",
     params: {
-      paymentTaskStatementIdEq: args.paymentTaskStatementIdEq,
+      paymentStripeInvoiceCreatingTaskTaskIdEq: args.paymentStripeInvoiceCreatingTaskTaskIdEq,
     },
     types: {
-      paymentTaskStatementIdEq: { type: "string" },
+      paymentStripeInvoiceCreatingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetPaymentTaskRow>();
+  let resRows = new Array<GetPaymentStripeInvoiceCreatingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      paymentTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
-      paymentTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
-      paymentTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
-      paymentTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      paymentStripeInvoiceCreatingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentStripeInvoiceCreatingTaskStatementId: row.at(1).value == null ? undefined : row.at(1).value,
+      paymentStripeInvoiceCreatingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      paymentStripeInvoiceCreatingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      paymentStripeInvoiceCreatingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingPaymentTasksRow {
-  paymentTaskStatementId?: string,
+export interface ListPendingPaymentStripeInvoiceCreatingTasksRow {
+  paymentStripeInvoiceCreatingTaskTaskId?: string,
+  paymentStripeInvoiceCreatingTaskStatementId?: string,
 }
 
-export let LIST_PENDING_PAYMENT_TASKS_ROW: MessageDescriptor<ListPendingPaymentTasksRow> = {
-  name: 'ListPendingPaymentTasksRow',
+export let LIST_PENDING_PAYMENT_STRIPE_INVOICE_CREATING_TASKS_ROW: MessageDescriptor<ListPendingPaymentStripeInvoiceCreatingTasksRow> = {
+  name: 'ListPendingPaymentStripeInvoiceCreatingTasksRow',
   fields: [{
-    name: 'paymentTaskStatementId',
+    name: 'paymentStripeInvoiceCreatingTaskTaskId',
     index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentStripeInvoiceCreatingTaskStatementId',
+    index: 2,
     primitiveType: PrimitiveType.STRING,
   }],
 };
 
-export async function listPendingPaymentTasks(
+export async function listPendingPaymentStripeInvoiceCreatingTasks(
   runner: Database | Transaction,
   args: {
-    paymentTaskExecutionTimeMsLe?: number,
+    paymentStripeInvoiceCreatingTaskExecutionTimeMsLe?: number,
   }
-): Promise<Array<ListPendingPaymentTasksRow>> {
+): Promise<Array<ListPendingPaymentStripeInvoiceCreatingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PaymentTask.statementId FROM PaymentTask WHERE PaymentTask.executionTimeMs <= @paymentTaskExecutionTimeMsLe",
+    sql: "SELECT PaymentStripeInvoiceCreatingTask.taskId, PaymentStripeInvoiceCreatingTask.statementId FROM PaymentStripeInvoiceCreatingTask WHERE PaymentStripeInvoiceCreatingTask.executionTimeMs <= @paymentStripeInvoiceCreatingTaskExecutionTimeMsLe",
     params: {
-      paymentTaskExecutionTimeMsLe: args.paymentTaskExecutionTimeMsLe == null ? null : new Date(args.paymentTaskExecutionTimeMsLe).toISOString(),
+      paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: args.paymentStripeInvoiceCreatingTaskExecutionTimeMsLe == null ? null : new Date(args.paymentStripeInvoiceCreatingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      paymentTaskExecutionTimeMsLe: { type: "timestamp" },
+      paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingPaymentTasksRow>();
+  let resRows = new Array<ListPendingPaymentStripeInvoiceCreatingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      paymentTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentStripeInvoiceCreatingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentStripeInvoiceCreatingTaskStatementId: row.at(1).value == null ? undefined : row.at(1).value,
     });
   }
   return resRows;
 }
 
-export interface GetPaymentTaskMetadataRow {
-  paymentTaskRetryCount?: number,
-  paymentTaskExecutionTimeMs?: number,
+export interface GetPaymentStripeInvoiceCreatingTaskMetadataRow {
+  paymentStripeInvoiceCreatingTaskRetryCount?: number,
+  paymentStripeInvoiceCreatingTaskExecutionTimeMs?: number,
 }
 
-export let GET_PAYMENT_TASK_METADATA_ROW: MessageDescriptor<GetPaymentTaskMetadataRow> = {
-  name: 'GetPaymentTaskMetadataRow',
+export let GET_PAYMENT_STRIPE_INVOICE_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetPaymentStripeInvoiceCreatingTaskMetadataRow> = {
+  name: 'GetPaymentStripeInvoiceCreatingTaskMetadataRow',
   fields: [{
-    name: 'paymentTaskRetryCount',
+    name: 'paymentStripeInvoiceCreatingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'paymentTaskExecutionTimeMs',
+    name: 'paymentStripeInvoiceCreatingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getPaymentTaskMetadata(
+export async function getPaymentStripeInvoiceCreatingTaskMetadata(
   runner: Database | Transaction,
   args: {
-    paymentTaskStatementIdEq: string,
+    paymentStripeInvoiceCreatingTaskTaskIdEq: string,
   }
-): Promise<Array<GetPaymentTaskMetadataRow>> {
+): Promise<Array<GetPaymentStripeInvoiceCreatingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PaymentTask.retryCount, PaymentTask.executionTimeMs FROM PaymentTask WHERE (PaymentTask.statementId = @paymentTaskStatementIdEq)",
+    sql: "SELECT PaymentStripeInvoiceCreatingTask.retryCount, PaymentStripeInvoiceCreatingTask.executionTimeMs FROM PaymentStripeInvoiceCreatingTask WHERE (PaymentStripeInvoiceCreatingTask.taskId = @paymentStripeInvoiceCreatingTaskTaskIdEq)",
     params: {
-      paymentTaskStatementIdEq: args.paymentTaskStatementIdEq,
+      paymentStripeInvoiceCreatingTaskTaskIdEq: args.paymentStripeInvoiceCreatingTaskTaskIdEq,
     },
     types: {
-      paymentTaskStatementIdEq: { type: "string" },
+      paymentStripeInvoiceCreatingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetPaymentTaskMetadataRow>();
+  let resRows = new Array<GetPaymentStripeInvoiceCreatingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      paymentTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
-      paymentTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+      paymentStripeInvoiceCreatingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      paymentStripeInvoiceCreatingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updatePaymentTaskMetadataStatement(
+export function updatePaymentStripeInvoiceCreatingTaskMetadataStatement(
   args: {
-    paymentTaskStatementIdEq: string,
+    paymentStripeInvoiceCreatingTaskTaskIdEq: string,
     setRetryCount?: number,
     setExecutionTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE PaymentTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentTask.statementId = @paymentTaskStatementIdEq)",
+    sql: "UPDATE PaymentStripeInvoiceCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentStripeInvoiceCreatingTask.taskId = @paymentStripeInvoiceCreatingTaskTaskIdEq)",
     params: {
-      paymentTaskStatementIdEq: args.paymentTaskStatementIdEq,
+      paymentStripeInvoiceCreatingTaskTaskIdEq: args.paymentStripeInvoiceCreatingTaskTaskIdEq,
       setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
       setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      paymentTaskStatementIdEq: { type: "string" },
+      paymentStripeInvoiceCreatingTaskTaskIdEq: { type: "string" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function insertPaymentStripeInvoicePayingTaskStatement(
+  args: {
+    taskId: string,
+    statementId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT PaymentStripeInvoicePayingTask (taskId, statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      taskId: args.taskId,
+      statementId: args.statementId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      taskId: { type: "string" },
+      statementId: { type: "string" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deletePaymentStripeInvoicePayingTaskStatement(
+  args: {
+    paymentStripeInvoicePayingTaskTaskIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE PaymentStripeInvoicePayingTask WHERE (PaymentStripeInvoicePayingTask.taskId = @paymentStripeInvoicePayingTaskTaskIdEq)",
+    params: {
+      paymentStripeInvoicePayingTaskTaskIdEq: args.paymentStripeInvoicePayingTaskTaskIdEq,
+    },
+    types: {
+      paymentStripeInvoicePayingTaskTaskIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetPaymentStripeInvoicePayingTaskRow {
+  paymentStripeInvoicePayingTaskTaskId?: string,
+  paymentStripeInvoicePayingTaskStatementId?: string,
+  paymentStripeInvoicePayingTaskRetryCount?: number,
+  paymentStripeInvoicePayingTaskExecutionTimeMs?: number,
+  paymentStripeInvoicePayingTaskCreatedTimeMs?: number,
+}
+
+export let GET_PAYMENT_STRIPE_INVOICE_PAYING_TASK_ROW: MessageDescriptor<GetPaymentStripeInvoicePayingTaskRow> = {
+  name: 'GetPaymentStripeInvoicePayingTaskRow',
+  fields: [{
+    name: 'paymentStripeInvoicePayingTaskTaskId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentStripeInvoicePayingTaskStatementId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentStripeInvoicePayingTaskRetryCount',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentStripeInvoicePayingTaskExecutionTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentStripeInvoicePayingTaskCreatedTimeMs',
+    index: 5,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPaymentStripeInvoicePayingTask(
+  runner: Database | Transaction,
+  args: {
+    paymentStripeInvoicePayingTaskTaskIdEq: string,
+  }
+): Promise<Array<GetPaymentStripeInvoicePayingTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentStripeInvoicePayingTask.taskId, PaymentStripeInvoicePayingTask.statementId, PaymentStripeInvoicePayingTask.retryCount, PaymentStripeInvoicePayingTask.executionTimeMs, PaymentStripeInvoicePayingTask.createdTimeMs FROM PaymentStripeInvoicePayingTask WHERE (PaymentStripeInvoicePayingTask.taskId = @paymentStripeInvoicePayingTaskTaskIdEq)",
+    params: {
+      paymentStripeInvoicePayingTaskTaskIdEq: args.paymentStripeInvoicePayingTaskTaskIdEq,
+    },
+    types: {
+      paymentStripeInvoicePayingTaskTaskIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPaymentStripeInvoicePayingTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentStripeInvoicePayingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentStripeInvoicePayingTaskStatementId: row.at(1).value == null ? undefined : row.at(1).value,
+      paymentStripeInvoicePayingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      paymentStripeInvoicePayingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      paymentStripeInvoicePayingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingPaymentStripeInvoicePayingTasksRow {
+  paymentStripeInvoicePayingTaskTaskId?: string,
+  paymentStripeInvoicePayingTaskStatementId?: string,
+}
+
+export let LIST_PENDING_PAYMENT_STRIPE_INVOICE_PAYING_TASKS_ROW: MessageDescriptor<ListPendingPaymentStripeInvoicePayingTasksRow> = {
+  name: 'ListPendingPaymentStripeInvoicePayingTasksRow',
+  fields: [{
+    name: 'paymentStripeInvoicePayingTaskTaskId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'paymentStripeInvoicePayingTaskStatementId',
+    index: 2,
+    primitiveType: PrimitiveType.STRING,
+  }],
+};
+
+export async function listPendingPaymentStripeInvoicePayingTasks(
+  runner: Database | Transaction,
+  args: {
+    paymentStripeInvoicePayingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingPaymentStripeInvoicePayingTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentStripeInvoicePayingTask.taskId, PaymentStripeInvoicePayingTask.statementId FROM PaymentStripeInvoicePayingTask WHERE PaymentStripeInvoicePayingTask.executionTimeMs <= @paymentStripeInvoicePayingTaskExecutionTimeMsLe",
+    params: {
+      paymentStripeInvoicePayingTaskExecutionTimeMsLe: args.paymentStripeInvoicePayingTaskExecutionTimeMsLe == null ? null : new Date(args.paymentStripeInvoicePayingTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      paymentStripeInvoicePayingTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingPaymentStripeInvoicePayingTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentStripeInvoicePayingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      paymentStripeInvoicePayingTaskStatementId: row.at(1).value == null ? undefined : row.at(1).value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetPaymentStripeInvoicePayingTaskMetadataRow {
+  paymentStripeInvoicePayingTaskRetryCount?: number,
+  paymentStripeInvoicePayingTaskExecutionTimeMs?: number,
+}
+
+export let GET_PAYMENT_STRIPE_INVOICE_PAYING_TASK_METADATA_ROW: MessageDescriptor<GetPaymentStripeInvoicePayingTaskMetadataRow> = {
+  name: 'GetPaymentStripeInvoicePayingTaskMetadataRow',
+  fields: [{
+    name: 'paymentStripeInvoicePayingTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'paymentStripeInvoicePayingTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPaymentStripeInvoicePayingTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    paymentStripeInvoicePayingTaskTaskIdEq: string,
+  }
+): Promise<Array<GetPaymentStripeInvoicePayingTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PaymentStripeInvoicePayingTask.retryCount, PaymentStripeInvoicePayingTask.executionTimeMs FROM PaymentStripeInvoicePayingTask WHERE (PaymentStripeInvoicePayingTask.taskId = @paymentStripeInvoicePayingTaskTaskIdEq)",
+    params: {
+      paymentStripeInvoicePayingTaskTaskIdEq: args.paymentStripeInvoicePayingTaskTaskIdEq,
+    },
+    types: {
+      paymentStripeInvoicePayingTaskTaskIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPaymentStripeInvoicePayingTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      paymentStripeInvoicePayingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      paymentStripeInvoicePayingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updatePaymentStripeInvoicePayingTaskMetadataStatement(
+  args: {
+    paymentStripeInvoicePayingTaskTaskIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE PaymentStripeInvoicePayingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PaymentStripeInvoicePayingTask.taskId = @paymentStripeInvoicePayingTaskTaskIdEq)",
+    params: {
+      paymentStripeInvoicePayingTaskTaskIdEq: args.paymentStripeInvoicePayingTaskTaskIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      paymentStripeInvoicePayingTaskTaskIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }
@@ -2452,8 +2725,9 @@ export function updatePaymentProfileStateSyncingTaskMetadataStatement(
   };
 }
 
-export function insertPayoutTaskStatement(
+export function insertPayoutStripeTransferCreatingTaskStatement(
   args: {
+    taskId: string,
     statementId: string,
     retryCount?: number,
     executionTimeMs?: number,
@@ -2461,14 +2735,16 @@ export function insertPayoutTaskStatement(
   }
 ): Statement {
   return {
-    sql: "INSERT PayoutTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    sql: "INSERT PayoutStripeTransferCreatingTask (taskId, statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
+      taskId: args.taskId,
       statementId: args.statementId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
     },
     types: {
+      taskId: { type: "string" },
       statementId: { type: "string" },
       retryCount: { type: "float64" },
       executionTimeMs: { type: "timestamp" },
@@ -2477,173 +2753,185 @@ export function insertPayoutTaskStatement(
   };
 }
 
-export function deletePayoutTaskStatement(
+export function deletePayoutStripeTransferCreatingTaskStatement(
   args: {
-    payoutTaskStatementIdEq: string,
+    payoutStripeTransferCreatingTaskTaskIdEq: string,
   }
 ): Statement {
   return {
-    sql: "DELETE PayoutTask WHERE (PayoutTask.statementId = @payoutTaskStatementIdEq)",
+    sql: "DELETE PayoutStripeTransferCreatingTask WHERE (PayoutStripeTransferCreatingTask.taskId = @payoutStripeTransferCreatingTaskTaskIdEq)",
     params: {
-      payoutTaskStatementIdEq: args.payoutTaskStatementIdEq,
+      payoutStripeTransferCreatingTaskTaskIdEq: args.payoutStripeTransferCreatingTaskTaskIdEq,
     },
     types: {
-      payoutTaskStatementIdEq: { type: "string" },
+      payoutStripeTransferCreatingTaskTaskIdEq: { type: "string" },
     }
   };
 }
 
-export interface GetPayoutTaskRow {
-  payoutTaskStatementId?: string,
-  payoutTaskRetryCount?: number,
-  payoutTaskExecutionTimeMs?: number,
-  payoutTaskCreatedTimeMs?: number,
+export interface GetPayoutStripeTransferCreatingTaskRow {
+  payoutStripeTransferCreatingTaskTaskId?: string,
+  payoutStripeTransferCreatingTaskStatementId?: string,
+  payoutStripeTransferCreatingTaskRetryCount?: number,
+  payoutStripeTransferCreatingTaskExecutionTimeMs?: number,
+  payoutStripeTransferCreatingTaskCreatedTimeMs?: number,
 }
 
-export let GET_PAYOUT_TASK_ROW: MessageDescriptor<GetPayoutTaskRow> = {
-  name: 'GetPayoutTaskRow',
+export let GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_ROW: MessageDescriptor<GetPayoutStripeTransferCreatingTaskRow> = {
+  name: 'GetPayoutStripeTransferCreatingTaskRow',
   fields: [{
-    name: 'payoutTaskStatementId',
+    name: 'payoutStripeTransferCreatingTaskTaskId',
     index: 1,
     primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'payoutTaskRetryCount',
+    name: 'payoutStripeTransferCreatingTaskStatementId',
     index: 2,
-    primitiveType: PrimitiveType.NUMBER,
+    primitiveType: PrimitiveType.STRING,
   }, {
-    name: 'payoutTaskExecutionTimeMs',
+    name: 'payoutStripeTransferCreatingTaskRetryCount',
     index: 3,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'payoutTaskCreatedTimeMs',
+    name: 'payoutStripeTransferCreatingTaskExecutionTimeMs',
     index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutStripeTransferCreatingTaskCreatedTimeMs',
+    index: 5,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getPayoutTask(
+export async function getPayoutStripeTransferCreatingTask(
   runner: Database | Transaction,
   args: {
-    payoutTaskStatementIdEq: string,
+    payoutStripeTransferCreatingTaskTaskIdEq: string,
   }
-): Promise<Array<GetPayoutTaskRow>> {
+): Promise<Array<GetPayoutStripeTransferCreatingTaskRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PayoutTask.statementId, PayoutTask.retryCount, PayoutTask.executionTimeMs, PayoutTask.createdTimeMs FROM PayoutTask WHERE (PayoutTask.statementId = @payoutTaskStatementIdEq)",
+    sql: "SELECT PayoutStripeTransferCreatingTask.taskId, PayoutStripeTransferCreatingTask.statementId, PayoutStripeTransferCreatingTask.retryCount, PayoutStripeTransferCreatingTask.executionTimeMs, PayoutStripeTransferCreatingTask.createdTimeMs FROM PayoutStripeTransferCreatingTask WHERE (PayoutStripeTransferCreatingTask.taskId = @payoutStripeTransferCreatingTaskTaskIdEq)",
     params: {
-      payoutTaskStatementIdEq: args.payoutTaskStatementIdEq,
+      payoutStripeTransferCreatingTaskTaskIdEq: args.payoutStripeTransferCreatingTaskTaskIdEq,
     },
     types: {
-      payoutTaskStatementIdEq: { type: "string" },
+      payoutStripeTransferCreatingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetPayoutTaskRow>();
+  let resRows = new Array<GetPayoutStripeTransferCreatingTaskRow>();
   for (let row of rows) {
     resRows.push({
-      payoutTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
-      payoutTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
-      payoutTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
-      payoutTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      payoutStripeTransferCreatingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutStripeTransferCreatingTaskStatementId: row.at(1).value == null ? undefined : row.at(1).value,
+      payoutStripeTransferCreatingTaskRetryCount: row.at(2).value == null ? undefined : row.at(2).value.value,
+      payoutStripeTransferCreatingTaskExecutionTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+      payoutStripeTransferCreatingTaskCreatedTimeMs: row.at(4).value == null ? undefined : row.at(4).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export interface ListPendingPayoutTasksRow {
-  payoutTaskStatementId?: string,
+export interface ListPendingPayoutStripeTransferCreatingTasksRow {
+  payoutStripeTransferCreatingTaskTaskId?: string,
+  payoutStripeTransferCreatingTaskStatementId?: string,
 }
 
-export let LIST_PENDING_PAYOUT_TASKS_ROW: MessageDescriptor<ListPendingPayoutTasksRow> = {
-  name: 'ListPendingPayoutTasksRow',
+export let LIST_PENDING_PAYOUT_STRIPE_TRANSFER_CREATING_TASKS_ROW: MessageDescriptor<ListPendingPayoutStripeTransferCreatingTasksRow> = {
+  name: 'ListPendingPayoutStripeTransferCreatingTasksRow',
   fields: [{
-    name: 'payoutTaskStatementId',
+    name: 'payoutStripeTransferCreatingTaskTaskId',
     index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutStripeTransferCreatingTaskStatementId',
+    index: 2,
     primitiveType: PrimitiveType.STRING,
   }],
 };
 
-export async function listPendingPayoutTasks(
+export async function listPendingPayoutStripeTransferCreatingTasks(
   runner: Database | Transaction,
   args: {
-    payoutTaskExecutionTimeMsLe?: number,
+    payoutStripeTransferCreatingTaskExecutionTimeMsLe?: number,
   }
-): Promise<Array<ListPendingPayoutTasksRow>> {
+): Promise<Array<ListPendingPayoutStripeTransferCreatingTasksRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PayoutTask.statementId FROM PayoutTask WHERE PayoutTask.executionTimeMs <= @payoutTaskExecutionTimeMsLe",
+    sql: "SELECT PayoutStripeTransferCreatingTask.taskId, PayoutStripeTransferCreatingTask.statementId FROM PayoutStripeTransferCreatingTask WHERE PayoutStripeTransferCreatingTask.executionTimeMs <= @payoutStripeTransferCreatingTaskExecutionTimeMsLe",
     params: {
-      payoutTaskExecutionTimeMsLe: args.payoutTaskExecutionTimeMsLe == null ? null : new Date(args.payoutTaskExecutionTimeMsLe).toISOString(),
+      payoutStripeTransferCreatingTaskExecutionTimeMsLe: args.payoutStripeTransferCreatingTaskExecutionTimeMsLe == null ? null : new Date(args.payoutStripeTransferCreatingTaskExecutionTimeMsLe).toISOString(),
     },
     types: {
-      payoutTaskExecutionTimeMsLe: { type: "timestamp" },
+      payoutStripeTransferCreatingTaskExecutionTimeMsLe: { type: "timestamp" },
     }
   });
-  let resRows = new Array<ListPendingPayoutTasksRow>();
+  let resRows = new Array<ListPendingPayoutStripeTransferCreatingTasksRow>();
   for (let row of rows) {
     resRows.push({
-      payoutTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutStripeTransferCreatingTaskTaskId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutStripeTransferCreatingTaskStatementId: row.at(1).value == null ? undefined : row.at(1).value,
     });
   }
   return resRows;
 }
 
-export interface GetPayoutTaskMetadataRow {
-  payoutTaskRetryCount?: number,
-  payoutTaskExecutionTimeMs?: number,
+export interface GetPayoutStripeTransferCreatingTaskMetadataRow {
+  payoutStripeTransferCreatingTaskRetryCount?: number,
+  payoutStripeTransferCreatingTaskExecutionTimeMs?: number,
 }
 
-export let GET_PAYOUT_TASK_METADATA_ROW: MessageDescriptor<GetPayoutTaskMetadataRow> = {
-  name: 'GetPayoutTaskMetadataRow',
+export let GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_METADATA_ROW: MessageDescriptor<GetPayoutStripeTransferCreatingTaskMetadataRow> = {
+  name: 'GetPayoutStripeTransferCreatingTaskMetadataRow',
   fields: [{
-    name: 'payoutTaskRetryCount',
+    name: 'payoutStripeTransferCreatingTaskRetryCount',
     index: 1,
     primitiveType: PrimitiveType.NUMBER,
   }, {
-    name: 'payoutTaskExecutionTimeMs',
+    name: 'payoutStripeTransferCreatingTaskExecutionTimeMs',
     index: 2,
     primitiveType: PrimitiveType.NUMBER,
   }],
 };
 
-export async function getPayoutTaskMetadata(
+export async function getPayoutStripeTransferCreatingTaskMetadata(
   runner: Database | Transaction,
   args: {
-    payoutTaskStatementIdEq: string,
+    payoutStripeTransferCreatingTaskTaskIdEq: string,
   }
-): Promise<Array<GetPayoutTaskMetadataRow>> {
+): Promise<Array<GetPayoutStripeTransferCreatingTaskMetadataRow>> {
   let [rows] = await runner.run({
-    sql: "SELECT PayoutTask.retryCount, PayoutTask.executionTimeMs FROM PayoutTask WHERE (PayoutTask.statementId = @payoutTaskStatementIdEq)",
+    sql: "SELECT PayoutStripeTransferCreatingTask.retryCount, PayoutStripeTransferCreatingTask.executionTimeMs FROM PayoutStripeTransferCreatingTask WHERE (PayoutStripeTransferCreatingTask.taskId = @payoutStripeTransferCreatingTaskTaskIdEq)",
     params: {
-      payoutTaskStatementIdEq: args.payoutTaskStatementIdEq,
+      payoutStripeTransferCreatingTaskTaskIdEq: args.payoutStripeTransferCreatingTaskTaskIdEq,
     },
     types: {
-      payoutTaskStatementIdEq: { type: "string" },
+      payoutStripeTransferCreatingTaskTaskIdEq: { type: "string" },
     }
   });
-  let resRows = new Array<GetPayoutTaskMetadataRow>();
+  let resRows = new Array<GetPayoutStripeTransferCreatingTaskMetadataRow>();
   for (let row of rows) {
     resRows.push({
-      payoutTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
-      payoutTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+      payoutStripeTransferCreatingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      payoutStripeTransferCreatingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
     });
   }
   return resRows;
 }
 
-export function updatePayoutTaskMetadataStatement(
+export function updatePayoutStripeTransferCreatingTaskMetadataStatement(
   args: {
-    payoutTaskStatementIdEq: string,
+    payoutStripeTransferCreatingTaskTaskIdEq: string,
     setRetryCount?: number,
     setExecutionTimeMs?: number,
   }
 ): Statement {
   return {
-    sql: "UPDATE PayoutTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PayoutTask.statementId = @payoutTaskStatementIdEq)",
+    sql: "UPDATE PayoutStripeTransferCreatingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PayoutStripeTransferCreatingTask.taskId = @payoutStripeTransferCreatingTaskTaskIdEq)",
     params: {
-      payoutTaskStatementIdEq: args.payoutTaskStatementIdEq,
+      payoutStripeTransferCreatingTaskTaskIdEq: args.payoutStripeTransferCreatingTaskTaskIdEq,
       setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
       setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
     },
     types: {
-      payoutTaskStatementIdEq: { type: "string" },
+      payoutStripeTransferCreatingTaskTaskIdEq: { type: "string" },
       setRetryCount: { type: "float64" },
       setExecutionTimeMs: { type: "timestamp" },
     }

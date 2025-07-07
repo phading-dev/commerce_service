@@ -49,7 +49,7 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               accountId: "account1",
               statementId: "statement1",
-              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+              state: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
             }),
           ]);
           await transaction.commit();
@@ -99,7 +99,7 @@ TEST_RUNNER.run({
               {
                 paymentAccountId: "account1",
                 paymentStatementId: "statement1",
-                paymentState: PaymentState.FAILED,
+                paymentState: PaymentState.FAILED_WITH_INVOICE,
                 paymentUpdatedTimeMs: 1000,
               },
               GET_PAYMENT_ROW,
@@ -156,7 +156,7 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               accountId: "account1",
               statementId: "statement1",
-              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+              state: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
             }),
             insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
               statementId: "statement1",
@@ -209,7 +209,7 @@ TEST_RUNNER.run({
               {
                 paymentAccountId: "account1",
                 paymentStatementId: "statement1",
-                paymentState: PaymentState.FAILED,
+                paymentState: PaymentState.FAILED_WITH_INVOICE,
                 paymentUpdatedTimeMs: 1000,
               },
               GET_PAYMENT_ROW,

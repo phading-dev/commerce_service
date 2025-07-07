@@ -2,17 +2,17 @@ import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { InitCreditGrantingState } from "../../db/schema";
 import {
-  GET_INIT_PAYMENT_CREDIT_GRANTING_TASK_ROW,
+  GET_INIT_CREDIT_GRANTING_TASK_ROW,
   GET_PAYMENT_PROFILE_ROW,
-  deleteInitPaymentCreditGrantingTaskStatement,
+  deleteInitCreditGrantingTaskStatement,
   deletePaymentCardGrantedInitCreditStatement,
   deletePaymentProfileStatement,
-  getInitPaymentCreditGrantingTask,
+  getInitCreditGrantingTask,
   getPaymentCardGrantedInitCredit,
   getPaymentProfile,
   insertPaymentCardGrantedInitCreditStatement,
   insertPaymentProfileStatement,
-  listPendingInitPaymentCreditGrantingTasks,
+  listPendingInitCreditGrantingTasks,
 } from "../../db/sql";
 import { GrantInitPaymentCreditHandler } from "./grant_init_payment_credit_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -30,8 +30,8 @@ async function cleanupAll() {
       deletePaymentCardGrantedInitCreditStatement({
         paymentCardGrantedInitCreditFingerprintEq: "fingerprint1",
       }),
-      deleteInitPaymentCreditGrantingTaskStatement({
-        initPaymentCreditGrantingTaskAccountIdEq: "account1",
+      deleteInitCreditGrantingTaskStatement({
+        initCreditGrantingTaskTaskIdEq: "task1",
       }),
     ]);
     await transaction.commit();
@@ -98,6 +98,7 @@ TEST_RUNNER.run({
         let handler = new GrantInitPaymentCreditHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
+          () => "task1",
           () => 1000,
           "secret1",
         );
@@ -140,21 +141,22 @@ TEST_RUNNER.run({
           "paymentCardGrantedInitCredit",
         );
         assertThat(
-          await getInitPaymentCreditGrantingTask(SPANNER_DATABASE, {
-            initPaymentCreditGrantingTaskAccountIdEq: "account1",
+          await getInitCreditGrantingTask(SPANNER_DATABASE, {
+            initCreditGrantingTaskTaskIdEq: "task1",
           }),
           isArray([
             eqMessage(
               {
-                initPaymentCreditGrantingTaskAccountId: "account1",
-                initPaymentCreditGrantingTaskRetryCount: 0,
-                initPaymentCreditGrantingTaskExecutionTimeMs: 1000,
-                initPaymentCreditGrantingTaskCreatedTimeMs: 1000,
+                initCreditGrantingTaskTaskId: "task1",
+                initCreditGrantingTaskAccountId: "account1",
+                initCreditGrantingTaskRetryCount: 0,
+                initCreditGrantingTaskExecutionTimeMs: 1000,
+                initCreditGrantingTaskCreatedTimeMs: 1000,
               },
-              GET_INIT_PAYMENT_CREDIT_GRANTING_TASK_ROW,
+              GET_INIT_CREDIT_GRANTING_TASK_ROW,
             ),
           ]),
-          "initPaymentCreditGrantingTask",
+          "initCreditGrantingTask",
         );
       },
       tearDown: async () => {
@@ -213,6 +215,7 @@ TEST_RUNNER.run({
         let handler = new GrantInitPaymentCreditHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
+          () => "task1",
           () => 1000,
           "secret1",
         );
@@ -238,11 +241,11 @@ TEST_RUNNER.run({
           "paymentProfile",
         );
         assertThat(
-          await listPendingInitPaymentCreditGrantingTasks(SPANNER_DATABASE, {
-            initPaymentCreditGrantingTaskExecutionTimeMsLe: 1000000,
+          await listPendingInitCreditGrantingTasks(SPANNER_DATABASE, {
+            initCreditGrantingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
-          "initPaymentCreditGrantingTask",
+          "initCreditGrantingTask",
         );
       },
       tearDown: async () => {
@@ -298,6 +301,7 @@ TEST_RUNNER.run({
         let handler = new GrantInitPaymentCreditHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
+          () => "task1",
           () => 1000,
           "secret1",
         );
@@ -332,11 +336,11 @@ TEST_RUNNER.run({
           "paymentCardGrantedInitCredit",
         );
         assertThat(
-          await listPendingInitPaymentCreditGrantingTasks(SPANNER_DATABASE, {
-            initPaymentCreditGrantingTaskExecutionTimeMsLe: 1000000,
+          await listPendingInitCreditGrantingTasks(SPANNER_DATABASE, {
+            initCreditGrantingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
-          "paymentCreditGrantingTask",
+          "initCreditGrantingTask",
         );
       },
       tearDown: async () => {
@@ -379,6 +383,7 @@ TEST_RUNNER.run({
         let handler = new GrantInitPaymentCreditHandler(
           SPANNER_DATABASE,
           new Ref(stripeClientMock),
+          () => "task1",
           () => 1000,
           "secret1",
         );
@@ -404,11 +409,11 @@ TEST_RUNNER.run({
           "paymentProfile",
         );
         assertThat(
-          await listPendingInitPaymentCreditGrantingTasks(SPANNER_DATABASE, {
-            initPaymentCreditGrantingTaskExecutionTimeMsLe: 1000000,
+          await listPendingInitCreditGrantingTasks(SPANNER_DATABASE, {
+            initCreditGrantingTaskExecutionTimeMsLe: 1000000,
           }),
           isArray([]),
-          "initPaymentCreditGrantingTask",
+          "initCreditGrantingTask",
         );
       },
       tearDown: async () => {

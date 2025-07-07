@@ -32,7 +32,7 @@ TEST_RUNNER.run({
             insertPaymentStatement({
               accountId: "account1",
               statementId: "statement1",
-              state: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+              state: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
             }),
             insertPaymentProfileSuspendingDueToPastDueTaskStatement({
               statementId: "statement1",

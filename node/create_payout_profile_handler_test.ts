@@ -2,11 +2,11 @@ import "../local/env";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
   GET_PAYOUT_PROFILE_ROW,
-  GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW,
+  GET_STRIPE_CONNECTED_ACCOUNT_FOR_PAYOUT_CREATING_TASK_ROW,
   deletePayoutProfileStatement,
-  deleteStripeConnectedAccountCreatingTaskStatement,
+  deleteStripeConnectedAccountForPayoutCreatingTaskStatement,
   getPayoutProfile,
-  getStripeConnectedAccountCreatingTask,
+  getStripeConnectedAccountForPayoutCreatingTask,
 } from "../db/sql";
 import { CreatePayoutProfileHandler } from "./create_payout_profile_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -22,6 +22,7 @@ TEST_RUNNER.run({
         // Prepare
         let handler = new CreatePayoutProfileHandler(
           SPANNER_DATABASE,
+          () => "task1",
           () => 1000,
         );
 
@@ -45,18 +46,23 @@ TEST_RUNNER.run({
           "account",
         );
         assertThat(
-          await getStripeConnectedAccountCreatingTask(SPANNER_DATABASE, {
-            stripeConnectedAccountCreatingTaskAccountIdEq: "account1",
-          }),
+          await getStripeConnectedAccountForPayoutCreatingTask(
+            SPANNER_DATABASE,
+            {
+              stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: "task1",
+            },
+          ),
           isArray([
             eqMessage(
               {
-                stripeConnectedAccountCreatingTaskAccountId: "account1",
-                stripeConnectedAccountCreatingTaskRetryCount: 0,
-                stripeConnectedAccountCreatingTaskExecutionTimeMs: 1000,
-                stripeConnectedAccountCreatingTaskCreatedTimeMs: 1000,
+                stripeConnectedAccountForPayoutCreatingTaskTaskId: "task1",
+                stripeConnectedAccountForPayoutCreatingTaskAccountId:
+                  "account1",
+                stripeConnectedAccountForPayoutCreatingTaskRetryCount: 0,
+                stripeConnectedAccountForPayoutCreatingTaskExecutionTimeMs: 1000,
+                stripeConnectedAccountForPayoutCreatingTaskCreatedTimeMs: 1000,
               },
-              GET_STRIPE_CONNECTED_ACCOUNT_CREATING_TASK_ROW,
+              GET_STRIPE_CONNECTED_ACCOUNT_FOR_PAYOUT_CREATING_TASK_ROW,
             ),
           ]),
           "task",
@@ -73,8 +79,8 @@ TEST_RUNNER.run({
             deletePayoutProfileStatement({
               payoutProfileAccountIdEq: "account1",
             }),
-            deleteStripeConnectedAccountCreatingTaskStatement({
-              stripeConnectedAccountCreatingTaskAccountIdEq: "account1",
+            deleteStripeConnectedAccountForPayoutCreatingTaskStatement({
+              stripeConnectedAccountForPayoutCreatingTaskTaskIdEq: "task1",
             }),
           ]);
           await transaction.commit();

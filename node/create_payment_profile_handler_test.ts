@@ -3,11 +3,11 @@ import { SPANNER_DATABASE } from "../common/spanner_database";
 import { InitCreditGrantingState, PaymentProfileState } from "../db/schema";
 import {
   GET_PAYMENT_PROFILE_ROW,
-  GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_ROW,
+  GET_STRIPE_CUSTOMER_CREATING_TASK_ROW,
   deletePaymentProfileStatement,
-  deleteStripePaymentCustomerCreatingTaskStatement,
+  deleteStripeCustomerCreatingTaskStatement,
   getPaymentProfile,
-  getStripePaymentCustomerCreatingTask,
+  getStripeCustomerCreatingTask,
 } from "../db/sql";
 import { CreatePaymentProfileHandler } from "./create_payment_profile_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -23,6 +23,7 @@ TEST_RUNNER.run({
         // Prepare
         let handler = new CreatePaymentProfileHandler(
           SPANNER_DATABASE,
+          () => "task1",
           () => 1000,
         );
 
@@ -53,18 +54,19 @@ TEST_RUNNER.run({
           "account",
         );
         assertThat(
-          await getStripePaymentCustomerCreatingTask(SPANNER_DATABASE, {
-            stripePaymentCustomerCreatingTaskAccountIdEq: "account1",
+          await getStripeCustomerCreatingTask(SPANNER_DATABASE, {
+            stripeCustomerCreatingTaskTaskIdEq: "task1",
           }),
           isArray([
             eqMessage(
               {
-                stripePaymentCustomerCreatingTaskAccountId: "account1",
-                stripePaymentCustomerCreatingTaskRetryCount: 0,
-                stripePaymentCustomerCreatingTaskExecutionTimeMs: 1000,
-                stripePaymentCustomerCreatingTaskCreatedTimeMs: 1000,
+                stripeCustomerCreatingTaskTaskId: "task1",
+                stripeCustomerCreatingTaskAccountId: "account1",
+                stripeCustomerCreatingTaskRetryCount: 0,
+                stripeCustomerCreatingTaskExecutionTimeMs: 1000,
+                stripeCustomerCreatingTaskCreatedTimeMs: 1000,
               },
-              GET_STRIPE_PAYMENT_CUSTOMER_CREATING_TASK_ROW,
+              GET_STRIPE_CUSTOMER_CREATING_TASK_ROW,
             ),
           ]),
           "tasks",
@@ -81,8 +83,8 @@ TEST_RUNNER.run({
             deletePaymentProfileStatement({
               paymentProfileAccountIdEq: "account1",
             }),
-            deleteStripePaymentCustomerCreatingTaskStatement({
-              stripePaymentCustomerCreatingTaskAccountIdEq: "account1",
+            deleteStripeCustomerCreatingTaskStatement({
+              stripeCustomerCreatingTaskTaskIdEq: "task1",
             }),
           ]);
           await transaction.commit();

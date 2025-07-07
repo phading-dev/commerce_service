@@ -7,7 +7,7 @@ import { InitCreditGrantingState } from "../../db/schema";
 import {
   getPaymentCardGrantedInitCredit,
   getPaymentProfile,
-  insertInitPaymentCreditGrantingTaskStatement,
+  insertInitCreditGrantingTaskStatement,
   insertPaymentCardGrantedInitCreditStatement,
   updatePaymentProfileInitCreditGrantingStateStatement,
 } from "../../db/sql";
@@ -28,6 +28,7 @@ export class GrantInitPaymentCreditHandler extends GrantInitPaymentCreditHandler
     return new GrantInitPaymentCreditHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
+      () => crypto.randomUUID(),
       () => Date.now(),
       stripePaymentIntentFailedSecretKey,
     );
@@ -36,6 +37,7 @@ export class GrantInitPaymentCreditHandler extends GrantInitPaymentCreditHandler
   public constructor(
     private database: Database,
     private stripeClient: Ref<Stripe>,
+    private generateUuid: () => string,
     private getNow: () => number,
     private stripeSecretKey: string,
   ) {
@@ -110,7 +112,8 @@ export class GrantInitPaymentCreditHandler extends GrantInitPaymentCreditHandler
           paymentProfileAccountIdEq: accountId,
           setInitCreditGrantingState: InitCreditGrantingState.GRANTING,
         }),
-        insertInitPaymentCreditGrantingTaskStatement({
+        insertInitCreditGrantingTaskStatement({
+          taskId: this.generateUuid(),
           accountId,
           retryCount: 0,
           executionTimeMs: now,

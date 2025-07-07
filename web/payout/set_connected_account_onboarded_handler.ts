@@ -3,7 +3,7 @@ import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PayoutState, StripeConnectedAccountState } from "../../db/schema";
 import {
   getPayoutProfile,
-  insertPayoutTaskStatement,
+  insertPayoutStripeTransferCreatingTaskStatement,
   listPayoutsByState,
   updatePayoutProfileConnectedAccountStateStatement,
   updatePayoutStateStatement,
@@ -28,6 +28,7 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
     return new SetConnectedAccountOnboardedHandler(
       SPANNER_DATABASE,
       SERVICE_CLIENT,
+      () => crypto.randomUUID(),
       () => Date.now(),
     );
   }
@@ -35,6 +36,7 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
   public constructor(
     private database: Database,
     private serviceClient: NodeServiceClient,
+    private generateUuid: () => string,
     private getNow: () => number,
   ) {
     super();
@@ -95,7 +97,8 @@ export class SetConnectedAccountOnboardedHandler extends SetConnectedAccountOnbo
             setState: PayoutState.PROCESSING,
             setUpdatedTimeMs: now,
           }),
-          insertPayoutTaskStatement({
+          insertPayoutStripeTransferCreatingTaskStatement({
+            taskId: this.generateUuid(),
             statementId: payout.payoutStatementId,
             retryCount: 0,
             executionTimeMs: now,

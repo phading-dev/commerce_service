@@ -4,17 +4,18 @@ import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import { STRIPE_CLIENT } from "../common/stripe_client";
 import {
-  deleteStripePaymentCustomerCreatingTaskStatement,
+  deleteStripeCustomerCreatingTaskStatement,
   getPaymentProfile,
-  getStripePaymentCustomerCreatingTaskMetadata,
+  getStripeCustomerCreatingTaskMetadata,
   updatePaymentProfilePaymentCustomerStatement,
-  updateStripePaymentCustomerCreatingTaskMetadataStatement,
+  updateStripeCustomerCreatingTaskMetadataStatement,
 } from "../db/sql";
 import { Database } from "@google-cloud/spanner";
-import { ProcessStripePaymentCustomerCreatingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { Statement } from "@google-cloud/spanner/build/src/transaction";
+import { ProcessStripeCustomerCreatingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessStripePaymentCustomerCreatingTaskRequestBody,
-  ProcessStripePaymentCustomerCreatingTaskResponse,
+  ProcessStripeCustomerCreatingTaskRequestBody,
+  ProcessStripeCustomerCreatingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
 import {
@@ -25,9 +26,9 @@ import { NodeServiceClient } from "@selfage/node_service_client";
 import { Ref } from "@selfage/ref";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStripePaymentCustomerCreatingTaskHandlerInterface {
-  public static create(): ProcessStripePaymentCustomerCreatingTaskHandler {
-    return new ProcessStripePaymentCustomerCreatingTaskHandler(
+export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCustomerCreatingTaskHandlerInterface {
+  public static create(): ProcessStripeCustomerCreatingTaskHandler {
+    return new ProcessStripeCustomerCreatingTaskHandler(
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       STRIPE_CLIENT,
@@ -53,9 +54,9 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessStripePaymentCustomerCreatingTaskRequestBody,
-  ): Promise<ProcessStripePaymentCustomerCreatingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payment payment customer creating task for payment profile ${body.accountId}:`;
+    body: ProcessStripeCustomerCreatingTaskRequestBody,
+  ): Promise<ProcessStripeCustomerCreatingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Payment Stripe customer creating task ${body.taskid}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -66,25 +67,24 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessStripePaymentCustomerCreatingTaskRequestBody,
+    body: ProcessStripeCustomerCreatingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getStripePaymentCustomerCreatingTaskMetadata(
-        transaction,
-        { stripePaymentCustomerCreatingTaskAccountIdEq: body.accountId },
-      );
+      let rows = await getStripeCustomerCreatingTaskMetadata(transaction, {
+        stripeCustomerCreatingTaskTaskIdEq: body.taskid,
+      });
       if (rows.length === 0) {
         throw newBadRequestError(`Task is not found.`);
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updateStripePaymentCustomerCreatingTaskMetadataStatement({
-          stripePaymentCustomerCreatingTaskAccountIdEq: body.accountId,
-          setRetryCount: task.stripePaymentCustomerCreatingTaskRetryCount + 1,
+        updateStripeCustomerCreatingTaskMetadataStatement({
+          stripeCustomerCreatingTaskTaskIdEq: body.taskid,
+          setRetryCount: task.stripeCustomerCreatingTaskRetryCount + 1,
           setExecutionTimeMs:
             this.getNow() +
             this.taskHandler.getBackoffTime(
-              task.stripePaymentCustomerCreatingTaskRetryCount,
+              task.stripeCustomerCreatingTaskRetryCount,
             ),
         }),
       ]);
@@ -94,7 +94,7 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessStripePaymentCustomerCreatingTaskRequestBody,
+    body: ProcessStripeCustomerCreatingTaskRequestBody,
   ): Promise<void> {
     let contactResponse = await this.serviceClient.send(
       newGetAccountContactRequest({
@@ -114,7 +114,7 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
         },
       },
       {
-        idempotencyKey: `c${body.accountId}`,
+        idempotencyKey: `c${body.taskid}`,
       },
     );
     await this.database.runTransactionAsync(async (transaction) => {
@@ -127,28 +127,27 @@ export class ProcessStripePaymentCustomerCreatingTaskHandler extends ProcessStri
         );
       }
       let profile = profileRows[0];
-      if (profile.paymentProfileStripePaymentCustomerId) {
-        if (profile.paymentProfileStripePaymentCustomerId !== customer.id) {
-          throw newInternalServerErrorError(
-            `Payment profile ${body.accountId} already has a stripe customer id ${profile.paymentProfileStripePaymentCustomerId} which is different from the new one ${customer.id}.`,
-          );
-        } else {
-          throw newBadRequestError(
-            `Payment profile ${body.accountId} already has a stripe customer id ${profile.paymentProfileStripePaymentCustomerId}.`,
-          );
-        }
-      } else {
-        await transaction.batchUpdate([
+      let statements: Array<Statement> = [
+        deleteStripeCustomerCreatingTaskStatement({
+          stripeCustomerCreatingTaskTaskIdEq: body.taskid,
+        }),
+      ];
+      if (!profile.paymentProfileStripePaymentCustomerId) {
+        statements.push(
           updatePaymentProfilePaymentCustomerStatement({
             paymentProfileAccountIdEq: body.accountId,
             setStripePaymentCustomerId: customer.id,
           }),
-          deleteStripePaymentCustomerCreatingTaskStatement({
-            stripePaymentCustomerCreatingTaskAccountIdEq: body.accountId,
-          }),
-        ]);
-        await transaction.commit();
+        );
+      } else if (
+        profile.paymentProfileStripePaymentCustomerId !== customer.id
+      ) {
+        throw newInternalServerErrorError(
+          `Payment profile ${body.accountId} already has a stripe customer id ${profile.paymentProfileStripePaymentCustomerId} which is different from the new one ${customer.id}.`,
+        );
       }
+      await transaction.batchUpdate(statements);
+      await transaction.commit();
     });
   }
 }

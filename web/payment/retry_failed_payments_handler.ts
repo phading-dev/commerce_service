@@ -1,8 +1,10 @@
+import crypto = require("crypto");
 import { SERVICE_CLIENT } from "../../common/service_client";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
 import { PaymentState } from "../../db/schema";
 import {
-  insertPaymentTaskStatement,
+  insertPaymentStripeInvoiceCreatingTaskStatement,
+  insertPaymentStripeInvoicePayingTaskStatement,
   listPaymentsByState,
   updatePaymentStateStatement,
 } from "../../db/sql";
@@ -22,6 +24,7 @@ export class RetryFailedPaymentsHandler extends RetryFailedPaymentsHandlerInterf
     return new RetryFailedPaymentsHandler(
       SPANNER_DATABASE,
       SERVICE_CLIENT,
+      () => crypto.randomUUID(),
       () => Date.now(),
     );
   }
@@ -29,6 +32,7 @@ export class RetryFailedPaymentsHandler extends RetryFailedPaymentsHandlerInterf
   public constructor(
     private database: Database,
     private serviceClient: NodeServiceClient,
+    private generateUuid: () => string,
     private getNow: () => number,
   ) {
     super();
@@ -53,20 +57,43 @@ export class RetryFailedPaymentsHandler extends RetryFailedPaymentsHandlerInterf
       );
     }
     await this.database.runTransactionAsync(async (transaction) => {
-      let paymentRows = await listPaymentsByState(transaction, {
-        paymentAccountIdEq: accountId,
-        paymentStateEq: PaymentState.FAILED,
-      });
+      let [withoutInvoiceRows, withInvoiceRows] = await Promise.all([
+        listPaymentsByState(transaction, {
+          paymentAccountIdEq: accountId,
+          paymentStateEq: PaymentState.FAILED_WITHOUT_INVOICE,
+        }),
+        listPaymentsByState(transaction, {
+          paymentAccountIdEq: accountId,
+          paymentStateEq: PaymentState.FAILED_WITH_INVOICE,
+        }),
+      ]);
       let now = this.getNow();
       let statements = new Array<Statement>();
-      for (let payment of paymentRows) {
+      for (let payment of withoutInvoiceRows) {
         statements.push(
           updatePaymentStateStatement({
             paymentStatementIdEq: payment.paymentStatementId,
-            setState: PaymentState.PROCESSING,
+            setState: PaymentState.CREATING_STRIPE_INVOICE,
             setUpdatedTimeMs: now,
           }),
-          insertPaymentTaskStatement({
+          insertPaymentStripeInvoiceCreatingTaskStatement({
+            taskId: this.generateUuid(),
+            statementId: payment.paymentStatementId,
+            retryCount: 0,
+            executionTimeMs: now,
+            createdTimeMs: now,
+          }),
+        );
+      }
+      for (let payment of withInvoiceRows) {
+        statements.push(
+          updatePaymentStateStatement({
+            paymentStatementIdEq: payment.paymentStatementId,
+            setState: PaymentState.PAYING_INVOICE,
+            setUpdatedTimeMs: now,
+          }),
+          insertPaymentStripeInvoicePayingTaskStatement({
+            taskId: this.generateUuid(),
             statementId: payment.paymentStatementId,
             retryCount: 0,
             executionTimeMs: now,

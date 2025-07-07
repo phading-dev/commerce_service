@@ -7,26 +7,28 @@ import { ENV_VARS } from "./env_vars";
 import { CreatePaymentProfileHandler } from "./node/create_payment_profile_handler";
 import { CreatePayoutProfileHandler } from "./node/create_payout_profile_handler";
 import { GenerateTransactionStatementHandler } from "./node/generate_transaction_statement_handler";
-import { ListInitPaymentCreditGrantingTasksHandler } from "./node/list_init_payment_credit_granting_tasks_handler";
+import { ListInitCreditGrantingTasksHandler } from "./node/list_init_credit_granting_tasks_handler";
 import { ListPaymentMethodNeedsUpdateNotifyingTasksHandler } from "./node/list_payment_method_needs_update_notifying_tasks_handler";
 import { ListPaymentProfileStateSyncingTasksHandler } from "./node/list_payment_profile_state_syncing_tasks_handler";
 import { ListPaymentProfileSuspendingDueToPastDueTasksHandler } from "./node/list_payment_profile_suspending_due_to_past_due_tasks_handler";
 import { ListPaymentProfileSuspensionNotifyingTasksHandler } from "./node/list_payment_profile_suspension_notifying_tasks_handler";
-import { ListPaymentTasksHandler } from "./node/list_payment_tasks_handler";
-import { ListPayoutTasksHandler } from "./node/list_payout_tasks_handler";
-import { ListStripeConnectedAccountCreatingTasksHandler } from "./node/list_stripe_connected_account_creating_tasks_handler";
+import { ListPaymentStripeInvoiceCreatingTasksHandler } from "./node/list_payment_stripe_invoice_creating_tasks_handler";
+import { ListPaymentStripeInvoicePayingTasksHandler } from "./node/list_payment_stripe_invoice_paying_tasks_handler";
+import { ListPayoutStripeTransferCreatingTasksHandler } from "./node/list_payout_stripe_transfer_creating_tasks_handler";
+import { ListStripeConnectedAccountForPayoutCreatingTasksHandler } from "./node/list_stripe_connected_account_creating_for_payout_tasks_handler";
 import { ListStripeConnectedAccountNeedsSetupNotifyingTasksHandler } from "./node/list_stripe_connected_account_needs_setup_notifying_tasks_handler";
-import { ListStripePaymentCustomerCreatingTasksHandler } from "./node/list_stripe_payment_customer_creating_tasks_handler";
-import { ProcessInitPaymentCreditGrantingTaskHandler } from "./node/process_init_payment_credit_granting_task_handler";
+import { ListStripeCustomerCreatingTasksHandler } from "./node/list_stripe_customer_creating_tasks_handler";
+import { ProcessInitCreditGrantingTaskHandler } from "./node/process_init_credit_granting_task_handler";
 import { ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler } from "./node/process_payment_method_needs_update_notifying_task_handler";
 import { ProcessPaymentProfileStateSyncingTaskHandler } from "./node/process_payment_profile_state_syncing_task_handler";
 import { ProcessPaymentProfileSuspendingDueToPastDueTaskHandler } from "./node/process_payment_profile_suspending_due_to_past_due_task_handler";
 import { ProcessPaymentProfileSuspensionNotifyingTaskHandler } from "./node/process_payment_profile_suspension_notifying_task_handler";
-import { ProcessPaymentTaskHandler } from "./node/process_payment_task_handler";
-import { ProcessPayoutTaskHandler } from "./node/process_payout_task_handler";
-import { ProcessStripeConnectedAccountCreatingTaskHandler } from "./node/process_stripe_connected_account_creating_task_handler";
+import { ProcessPaymentStripeInvoiceCreatingTaskHandler } from "./node/process_payment_stripe_invoice_creating_task_handler";
+import { ProcessPaymentStripeInvoicePayingTaskHandler } from "./node/process_payment_stripe_invoice_paying_task_handler";
+import { ProcessPayoutStripeTransferCreatingTaskHandler } from "./node/process_payout_stripe_transfer_creating_task_handler";
+import { ProcessStripeConnectedAccountForPayoutCreatingTaskHandler } from "./node/process_stripe_connected_account_for_payout_creating_task_handler";
 import { ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler } from "./node/process_stripe_connected_account_needs_setup_notifying_task_handler";
-import { ProcessStripePaymentCustomerCreatingTaskHandler } from "./node/process_stripe_payment_customer_creating_task_handler";
+import { ProcessStripeCustomerCreatingTaskHandler } from "./node/process_stripe_customer_creating_task_handler";
 import { CreateStripeSessionToAddPaymentMethodHandler } from "./web/payment/create_stripe_session_to_add_payment_method_handler";
 import { GetPaymentProfileInfoHandler } from "./web/payment/get_payment_profile_info_handler";
 import { ListPaymentsHandler } from "./web/payment/list_payments_handler";
@@ -82,26 +84,28 @@ async function main() {
     .add(CreatePaymentProfileHandler.create())
     .add(CreatePayoutProfileHandler.create())
     .add(GenerateTransactionStatementHandler.create())
-    .add(ListInitPaymentCreditGrantingTasksHandler.create())
+    .add(ListInitCreditGrantingTasksHandler.create())
     .add(ListPaymentMethodNeedsUpdateNotifyingTasksHandler.create())
     .add(ListPaymentProfileStateSyncingTasksHandler.create())
     .add(ListPaymentProfileSuspendingDueToPastDueTasksHandler.create())
     .add(ListPaymentProfileSuspensionNotifyingTasksHandler.create())
-    .add(ListPaymentTasksHandler.create())
-    .add(ListPayoutTasksHandler.create())
-    .add(ListStripeConnectedAccountCreatingTasksHandler.create())
+    .add(ListPaymentStripeInvoiceCreatingTasksHandler.create())
+    .add(ListPaymentStripeInvoicePayingTasksHandler.create())
+    .add(ListPayoutStripeTransferCreatingTasksHandler.create())
+    .add(ListStripeConnectedAccountForPayoutCreatingTasksHandler.create())
     .add(ListStripeConnectedAccountNeedsSetupNotifyingTasksHandler.create())
-    .add(ListStripePaymentCustomerCreatingTasksHandler.create())
-    .add(ProcessInitPaymentCreditGrantingTaskHandler.create())
+    .add(ListStripeCustomerCreatingTasksHandler.create())
+    .add(ProcessInitCreditGrantingTaskHandler.create())
     .add(ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler.create())
     .add(ProcessPaymentProfileStateSyncingTaskHandler.create())
     .add(ProcessPaymentProfileSuspendingDueToPastDueTaskHandler.create())
     .add(ProcessPaymentProfileSuspensionNotifyingTaskHandler.create())
-    .add(ProcessPaymentTaskHandler.create())
-    .add(ProcessPayoutTaskHandler.create())
-    .add(ProcessStripeConnectedAccountCreatingTaskHandler.create())
+    .add(ProcessPaymentStripeInvoiceCreatingTaskHandler.create())
+    .add(ProcessPaymentStripeInvoicePayingTaskHandler.create())
+    .add(ProcessPayoutStripeTransferCreatingTaskHandler.create())
+    .add(ProcessStripeConnectedAccountForPayoutCreatingTaskHandler.create())
     .add(ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler.create())
-    .add(ProcessStripePaymentCustomerCreatingTaskHandler.create());
+    .add(ProcessStripeCustomerCreatingTaskHandler.create());
   service
     .addHandlerRegister(COMMERCE_WEB_SERVICE)
     .add(CreateStripeSessionToAddPaymentMethodHandler.create())

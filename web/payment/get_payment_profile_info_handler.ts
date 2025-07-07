@@ -63,24 +63,34 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
     }
     let [
       profileRows,
-      failedPaymentRows,
-      processingPaymentRows,
-      chargingPaymentRows,
+      failedWithoutInvoiceRows,
+      failedWithInvoiceRows,
+      waitingRows,
+      creatingRows,
+      payingRows,
     ] = await Promise.all([
       getPaymentProfile(this.database, {
         paymentProfileAccountIdEq: accountId,
       }),
       listPaymentsByState(this.database, {
         paymentAccountIdEq: accountId,
-        paymentStateEq: PaymentState.FAILED,
+        paymentStateEq: PaymentState.FAILED_WITHOUT_INVOICE,
       }),
       listPaymentsByState(this.database, {
         paymentAccountIdEq: accountId,
-        paymentStateEq: PaymentState.PROCESSING,
+        paymentStateEq: PaymentState.FAILED_WITH_INVOICE,
       }),
       listPaymentsByState(this.database, {
         paymentAccountIdEq: accountId,
-        paymentStateEq: PaymentState.CHARGING_VIA_STRIPE_INVOICE,
+        paymentStateEq: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
+      }),
+      listPaymentsByState(this.database, {
+        paymentAccountIdEq: accountId,
+        paymentStateEq: PaymentState.CREATING_STRIPE_INVOICE,
+      }),
+      listPaymentsByState(this.database, {
+        paymentAccountIdEq: accountId,
+        paymentStateEq: PaymentState.PAYING_INVOICE,
       }),
     ]);
     if (profileRows.length === 0) {
@@ -128,9 +138,11 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
           : undefined,
         state: this.getState(
           profile.paymentProfileStateInfo.state,
-          failedPaymentRows.length > 0,
-          processingPaymentRows.length > 0,
-          chargingPaymentRows.length > 0,
+          failedWithoutInvoiceRows.length > 0,
+          failedWithInvoiceRows.length > 0,
+          waitingRows.length > 0,
+          creatingRows.length > 0,
+          payingRows.length > 0,
         ),
         // Stripe stores credit as a negative amount. Return it as a positive amount.
         creditBalanceAmount:
@@ -148,15 +160,17 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
 
   private getState(
     state: PaymentProfileState,
-    hasFailedPayment: boolean,
-    hasProcessingPayment: boolean,
-    hasChargingPayment: boolean,
+    hasFailedWithoutInvoice: boolean,
+    hasFailedWithInvoice: boolean,
+    hasWaitingPayment: boolean,
+    hasCreatingPayment: boolean,
+    hasPayingPayment: boolean,
   ): PaymentProfileStateResponse {
     switch (state) {
       case PaymentProfileState.HEALTHY:
-        return hasFailedPayment
+        return hasFailedWithoutInvoice || hasFailedWithInvoice
           ? PaymentProfileStateResponse.WITH_FAILED_PAYMENTS
-          : hasProcessingPayment || hasChargingPayment
+          : hasWaitingPayment || hasCreatingPayment || hasPayingPayment
             ? PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS
             : PaymentProfileStateResponse.HEALTHY;
       case PaymentProfileState.SUSPENDED:

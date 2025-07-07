@@ -4,13 +4,13 @@ import { PayoutState, StripeConnectedAccountState } from "../../db/schema";
 import {
   GET_PAYOUT_PROFILE_ROW,
   GET_PAYOUT_ROW,
-  GET_PAYOUT_TASK_ROW,
+  GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_ROW,
   deletePayoutProfileStatement,
   deletePayoutStatement,
-  deletePayoutTaskStatement,
+  deletePayoutStripeTransferCreatingTaskStatement,
   getPayout,
   getPayoutProfile,
-  getPayoutTask,
+  getPayoutStripeTransferCreatingTask,
   insertPayoutProfileStatement,
   insertPayoutStatement,
 } from "../../db/sql";
@@ -33,10 +33,18 @@ async function cleanupAll() {
       deletePayoutStatement({ payoutStatementIdEq: "statement2" }),
       deletePayoutStatement({ payoutStatementIdEq: "statement3" }),
       deletePayoutStatement({ payoutStatementIdEq: "statement4" }),
-      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement1" }),
-      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement2" }),
-      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement3" }),
-      deletePayoutTaskStatement({ payoutTaskStatementIdEq: "statement4" }),
+      deletePayoutStripeTransferCreatingTaskStatement({
+        payoutStripeTransferCreatingTaskTaskIdEq: "uuid0",
+      }),
+      deletePayoutStripeTransferCreatingTaskStatement({
+        payoutStripeTransferCreatingTaskTaskIdEq: "uuid1",
+      }),
+      deletePayoutStripeTransferCreatingTaskStatement({
+        payoutStripeTransferCreatingTaskTaskIdEq: "uuid2",
+      }),
+      deletePayoutStripeTransferCreatingTaskStatement({
+        payoutStripeTransferCreatingTaskTaskIdEq: "uuid3",
+      }),
     ]);
     await transaction.commit();
   });
@@ -66,9 +74,11 @@ TEST_RUNNER.run({
             canEarn: true,
           },
         } as FetchSessionAndCheckCapabilityResponse;
+        let id = 0;
         let handler = new SetConnectedAccountOnboardedHandler(
           SPANNER_DATABASE,
           clientMock,
+          () => `uuid${id++}`,
           () => 1000,
         );
 
@@ -144,9 +154,11 @@ TEST_RUNNER.run({
             canEarn: true,
           },
         } as FetchSessionAndCheckCapabilityResponse;
+        let id = 0;
         let handler = new SetConnectedAccountOnboardedHandler(
           SPANNER_DATABASE,
           clientMock,
+          () => `uuid${id++}`,
           () => 1000,
         );
 
@@ -243,38 +255,40 @@ TEST_RUNNER.run({
           "Payout for statement4",
         );
         assertThat(
-          await getPayoutTask(SPANNER_DATABASE, {
-            payoutTaskStatementIdEq: "statement1",
+          await getPayoutStripeTransferCreatingTask(SPANNER_DATABASE, {
+            payoutStripeTransferCreatingTaskTaskIdEq: "uuid0",
           }),
           isArray([
             eqMessage(
               {
-                payoutTaskStatementId: "statement1",
-                payoutTaskRetryCount: 0,
-                payoutTaskExecutionTimeMs: 1000,
-                payoutTaskCreatedTimeMs: 1000,
+                payoutStripeTransferCreatingTaskTaskId: "uuid0",
+                payoutStripeTransferCreatingTaskStatementId: "statement1",
+                payoutStripeTransferCreatingTaskRetryCount: 0,
+                payoutStripeTransferCreatingTaskExecutionTimeMs: 1000,
+                payoutStripeTransferCreatingTaskCreatedTimeMs: 1000,
               },
-              GET_PAYOUT_TASK_ROW,
+              GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_ROW,
             ),
           ]),
-          "PayoutTask for statement1",
+          "PayoutStripeTransferCreatingTask for statement1",
         );
         assertThat(
-          await getPayoutTask(SPANNER_DATABASE, {
-            payoutTaskStatementIdEq: "statement4",
+          await getPayoutStripeTransferCreatingTask(SPANNER_DATABASE, {
+            payoutStripeTransferCreatingTaskTaskIdEq: "uuid1",
           }),
           isArray([
             eqMessage(
               {
-                payoutTaskStatementId: "statement4",
-                payoutTaskRetryCount: 0,
-                payoutTaskExecutionTimeMs: 1000,
-                payoutTaskCreatedTimeMs: 1000,
+                payoutStripeTransferCreatingTaskTaskId: "uuid1",
+                payoutStripeTransferCreatingTaskStatementId: "statement4",
+                payoutStripeTransferCreatingTaskRetryCount: 0,
+                payoutStripeTransferCreatingTaskExecutionTimeMs: 1000,
+                payoutStripeTransferCreatingTaskCreatedTimeMs: 1000,
               },
-              GET_PAYOUT_TASK_ROW,
+              GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_ROW,
             ),
           ]),
-          "PayoutTask for statement4",
+          "PayoutStripeTransferCreatingTask for statement4",
         );
       },
       tearDown: async () => {
@@ -295,6 +309,7 @@ TEST_RUNNER.run({
         let handler = new SetConnectedAccountOnboardedHandler(
           SPANNER_DATABASE,
           clientMock,
+          () => "uuid0",
           () => 1000,
         );
 
