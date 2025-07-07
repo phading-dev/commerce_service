@@ -268,6 +268,9 @@ export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPayme
         insertPaymentStripeInvoicePayingTaskStatement({
           taskId: crypto.randomUUID(),
           statementId,
+          retryCount: 0,
+          executionTimeMs: this.getNow(),
+          createdTimeMs: this.getNow(),
         }),
         deletePaymentStripeInvoiceCreatingTaskStatement({
           paymentStripeInvoiceCreatingTaskTaskIdEq: taskId,
