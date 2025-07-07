@@ -3130,6 +3130,38 @@ export function updatePayoutStateAndStripeTransferStatement(
   };
 }
 
+export function deletePaymentStripeInvoiceCreatingTaskByStatementStatement(
+  args: {
+    paymentStripeInvoiceCreatingTaskStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE PaymentStripeInvoiceCreatingTask WHERE PaymentStripeInvoiceCreatingTask.statementId = @paymentStripeInvoiceCreatingTaskStatementIdEq",
+    params: {
+      paymentStripeInvoiceCreatingTaskStatementIdEq: args.paymentStripeInvoiceCreatingTaskStatementIdEq,
+    },
+    types: {
+      paymentStripeInvoiceCreatingTaskStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export function deletePaymentStripeInvoicePayingTaskByStatementStatement(
+  args: {
+    paymentStripeInvoicePayingTaskStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE PaymentStripeInvoicePayingTask WHERE PaymentStripeInvoicePayingTask.statementId = @paymentStripeInvoicePayingTaskStatementIdEq",
+    params: {
+      paymentStripeInvoicePayingTaskStatementIdEq: args.paymentStripeInvoicePayingTaskStatementIdEq,
+    },
+    types: {
+      paymentStripeInvoicePayingTaskStatementIdEq: { type: "string" },
+    }
+  };
+}
+
 export interface GetPaymentProfileFromStatementRow {
   paymentProfileAccountId?: string,
   paymentProfileStripePaymentCustomerId?: string,

@@ -50,7 +50,7 @@ export class ProcessPaymentStripeInvoicePayingTaskHandler extends ProcessPayment
     loggingPrefix: string,
     body: ProcessPaymentStripeInvoicePayingTaskRequestBody,
   ): Promise<ProcessPaymentStripeInvoicePayingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payment task for statement ${body.taskId}:`;
+    loggingPrefix = `${loggingPrefix} Payment Stripe invoice paying task ${body.taskId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),

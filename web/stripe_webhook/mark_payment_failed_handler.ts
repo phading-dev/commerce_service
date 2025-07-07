@@ -9,6 +9,8 @@ import { STRIPE_CLIENT } from "../../common/stripe_client";
 import { PaymentState } from "../../db/schema";
 import {
   deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
+  deletePaymentStripeInvoiceCreatingTaskByStatementStatement,
+  deletePaymentStripeInvoicePayingTaskByStatementStatement,
   getPayment,
   getPaymentProfileSuspendingDueToPastDueTask,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
@@ -20,7 +22,6 @@ import { MarkPaymentFailedHandlerInterface } from "@phading/commerce_service_int
 import { Empty } from "@phading/commerce_service_interface/web/stripe_webhook/interface";
 import {
   newBadRequestError,
-  newConflictError,
   newInternalServerErrorError,
 } from "@selfage/http_error";
 import { Ref } from "@selfage/ref";
@@ -77,10 +78,11 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
         );
       }
       let payment = paymentRows[0];
-      if (payment.paymentState !== PaymentState.WAITING_FOR_INVOICE_PAYMENT) {
-        throw newConflictError(
-          `Payment ${statementId} is not in WAITING_FOR_INVOICE_PAYMENT state.`,
+      if (payment.paymentState === PaymentState.PAID) {
+        console.warn(
+          `${loggingPrefix} Payment ${statementId} is already in PAID state but received invoice.payment_failed event.`,
         );
+        return;
       }
       let now = this.getNow();
       await transaction.batchUpdate([
@@ -88,6 +90,12 @@ export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface 
           paymentStatementIdEq: statementId,
           setState: PaymentState.FAILED_WITH_INVOICE,
           setUpdatedTimeMs: now,
+        }),
+        deletePaymentStripeInvoiceCreatingTaskByStatementStatement({
+          paymentStripeInvoiceCreatingTaskStatementIdEq: statementId,
+        }),
+        deletePaymentStripeInvoicePayingTaskByStatementStatement({
+          paymentStripeInvoicePayingTaskStatementIdEq: statementId,
         }),
         deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
           paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: statementId,

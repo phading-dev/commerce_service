@@ -14,6 +14,10 @@ import {
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentStatement,
+  insertPaymentStripeInvoiceCreatingTaskStatement,
+  insertPaymentStripeInvoicePayingTaskStatement,
+  listPendingPaymentStripeInvoiceCreatingTasks,
+  listPendingPaymentStripeInvoicePayingTasks,
 } from "../../db/sql";
 import { MarkPaymentFailedHandler } from "./mark_payment_failed_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -158,6 +162,20 @@ TEST_RUNNER.run({
               statementId: "statement1",
               state: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
             }),
+            insertPaymentStripeInvoiceCreatingTaskStatement({
+              taskId: "task1",
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
+            insertPaymentStripeInvoicePayingTaskStatement({
+              taskId: "task2",
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
             insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
               statementId: "statement1",
               retryCount: 0,
@@ -218,6 +236,20 @@ TEST_RUNNER.run({
           "payment",
         );
         assertThat(
+          await listPendingPaymentStripeInvoiceCreatingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: 1000000,
+          }),
+          isArray([]),
+          "paymentStripeInvoiceCreatingTasks",
+        );
+        assertThat(
+          await listPendingPaymentStripeInvoicePayingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoicePayingTaskExecutionTimeMsLe: 1000000,
+          }),
+          isArray([]),
+          "paymentStripeInvoicePayingTasks",
+        );
+        assertThat(
           await getPaymentMethodNeedsUpdateNotifyingTask(SPANNER_DATABASE, {
             paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: "statement1",
           }),
@@ -251,6 +283,68 @@ TEST_RUNNER.run({
             ),
           ]),
           "accountSuspendingTasks",
+        );
+      },
+      tearDown: async () => {
+        await cleanupAll();
+      },
+    },
+    {
+      name: "NotMarkFailureIfAlreadyPaid",
+      execute: async () => {
+        // Prepare
+        await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
+          await transaction.batchUpdate([
+            insertPaymentStatement({
+              accountId: "account1",
+              statementId: "statement1",
+              state: PaymentState.PAID,
+            }),
+          ]);
+          await transaction.commit();
+        });
+        let stripeClientMock: any = {
+          webhooks: {
+            constructEvent: (payload: string, sig: string, secret: string) => {
+              return {
+                type: "invoice.payment_failed",
+                data: {
+                  object: {
+                    metadata: {
+                      statementId: "statement1",
+                    },
+                  },
+                },
+              };
+            },
+          },
+        };
+        let handler = new MarkPaymentFailedHandler(
+          SPANNER_DATABASE,
+          new Ref(stripeClientMock),
+          () => 1000,
+          "secret1",
+        );
+
+        // Execute
+        await handler.handle("", Readable.from("event_input"), "sig1");
+
+        // Verify
+        assertThat(
+          await getPayment(SPANNER_DATABASE, {
+            paymentStatementIdEq: "statement1",
+          }),
+          isArray([
+            eqMessage(
+              {
+                paymentAccountId: "account1",
+                paymentStatementId: "statement1",
+                paymentState: PaymentState.PAID,
+              },
+              GET_PAYMENT_ROW,
+            ),
+          ]),
+          "payment",
         );
       },
       tearDown: async () => {

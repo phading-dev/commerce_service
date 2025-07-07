@@ -330,6 +330,10 @@
       createdTimeColumn: createdTimeMs
       primaryKeys:
         - taskId
+      indexes:
+        - name: PaymentStripeInvoiceCreatingTaskByStatementId
+          columns:
+            - statementId
       executionTimeIndex: PaymentStripeInvoiceCreatingTaskByExecutionTime
       insert: InsertPaymentStripeInvoiceCreatingTask
       delete: DeletePaymentStripeInvoiceCreatingTask
@@ -349,6 +353,10 @@
       createdTimeColumn: createdTimeMs
       primaryKeys:
         - taskId
+      indexes:
+        - name: PaymentStripeInvoicePayingTaskByStatementId
+          columns:
+            - statementId
       executionTimeIndex: PaymentStripeInvoicePayingTaskByExecutionTime
       insert: InsertPaymentStripeInvoicePayingTask
       delete: DeletePaymentStripeInvoicePayingTask
@@ -449,6 +457,17 @@
       listPendingTasks: ListPendingPayoutStripeTransferCreatingTasks
       getMetadata: GetPayoutStripeTransferCreatingTaskMetadata
       updateMetadata: UpdatePayoutStripeTransferCreatingTaskMetadata
+  deletes:
+    - name: DeletePaymentStripeInvoiceCreatingTaskByStatement
+      table: PaymentStripeInvoiceCreatingTask
+      where:
+        op: =
+        lColumn: statementId
+    - name: DeletePaymentStripeInvoicePayingTaskByStatement
+      table: PaymentStripeInvoicePayingTask
+      where:
+        op: =
+        lColumn: statementId
   updates:
     - name: UpdatePaymentProfileState
       table: PaymentProfile

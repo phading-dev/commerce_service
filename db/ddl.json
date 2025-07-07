@@ -231,6 +231,9 @@
     }],
     "createTableDdl": "CREATE TABLE PaymentStripeInvoiceCreatingTask (taskId STRING(MAX) NOT NULL, statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
     "indexes": [{
+      "name": "PaymentStripeInvoiceCreatingTaskByStatementId",
+      "createIndexDdl": "CREATE INDEX PaymentStripeInvoiceCreatingTaskByStatementId ON PaymentStripeInvoiceCreatingTask(statementId)"
+    }, {
       "name": "PaymentStripeInvoiceCreatingTaskByExecutionTime",
       "createIndexDdl": "CREATE INDEX PaymentStripeInvoiceCreatingTaskByExecutionTime ON PaymentStripeInvoiceCreatingTask(executionTimeMs)"
     }]
@@ -254,6 +257,9 @@
     }],
     "createTableDdl": "CREATE TABLE PaymentStripeInvoicePayingTask (taskId STRING(MAX) NOT NULL, statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
     "indexes": [{
+      "name": "PaymentStripeInvoicePayingTaskByStatementId",
+      "createIndexDdl": "CREATE INDEX PaymentStripeInvoicePayingTaskByStatementId ON PaymentStripeInvoicePayingTask(statementId)"
+    }, {
       "name": "PaymentStripeInvoicePayingTaskByExecutionTime",
       "createIndexDdl": "CREATE INDEX PaymentStripeInvoicePayingTaskByExecutionTime ON PaymentStripeInvoicePayingTask(executionTimeMs)"
     }]

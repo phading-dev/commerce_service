@@ -53,7 +53,7 @@ export class ProcessInitCreditGrantingTaskHandler extends ProcessInitCreditGrant
     loggingPrefix: string,
     body: ProcessInitCreditGrantingTaskRequestBody,
   ): Promise<ProcessInitCreditGrantingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Init payment credit granting task ${body.taskId}:`;
+    loggingPrefix = `${loggingPrefix} Init credit granting task ${body.taskId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),

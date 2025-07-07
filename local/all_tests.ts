@@ -1,7 +1,7 @@
 import "../node/create_payment_profile_handler_test";
 import "../node/create_payout_profile_handler_test";
 import "../node/generate_transaction_statement_handler_test";
-import "../node/process_init_payment_credit_granting_task_handler_test";
+import "../node/process_init_credit_granting_task_handler_test";
 import "../node/process_payment_method_needs_update_notifying_task_handler_test";
 import "../node/process_payment_profile_state_syncing_task_handler_test";
 import "../node/process_payment_profile_suspending_due_to_past_due_task_handler_test";

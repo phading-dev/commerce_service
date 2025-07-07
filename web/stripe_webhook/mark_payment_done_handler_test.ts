@@ -10,8 +10,12 @@ import {
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentProfileSuspendingDueToPastDueTaskStatement,
   insertPaymentStatement,
+  insertPaymentStripeInvoiceCreatingTaskStatement,
+  insertPaymentStripeInvoicePayingTaskStatement,
   listPendingPaymentMethodNeedsUpdateNotifyingTasks,
   listPendingPaymentProfileSuspendingDueToPastDueTasks,
+  listPendingPaymentStripeInvoiceCreatingTasks,
+  listPendingPaymentStripeInvoicePayingTasks,
 } from "../../db/sql";
 import { MarkPaymentDoneHandler } from "./mark_payment_done_handler";
 import { eqMessage } from "@selfage/message/test_matcher";
@@ -34,17 +38,31 @@ TEST_RUNNER.run({
               statementId: "statement1",
               state: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
             }),
+            insertPaymentStripeInvoiceCreatingTaskStatement({
+              taskId: "task1",
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
+            insertPaymentStripeInvoicePayingTaskStatement({
+              taskId: "task2",
+              statementId: "statement1",
+              retryCount: 0,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
+            }),
             insertPaymentProfileSuspendingDueToPastDueTaskStatement({
               statementId: "statement1",
               retryCount: 0,
-              executionTimeMs: 1000,
-              createdTimeMs: 1000,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
             }),
             insertPaymentMethodNeedsUpdateNotifyingTaskStatement({
               statementId: "statement1",
               retryCount: 0,
-              executionTimeMs: 1000,
-              createdTimeMs: 1000,
+              executionTimeMs: 100,
+              createdTimeMs: 100,
             }),
           ]);
           await transaction.commit();
@@ -101,6 +119,20 @@ TEST_RUNNER.run({
             ),
           ]),
           "payment",
+        );
+        assertThat(
+          await listPendingPaymentStripeInvoiceCreatingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoiceCreatingTaskExecutionTimeMsLe: 1000000,
+          }),
+          isArray([]),
+          "paymentStripeInvoiceCreatingTasks",
+        );
+        assertThat(
+          await listPendingPaymentStripeInvoicePayingTasks(SPANNER_DATABASE, {
+            paymentStripeInvoicePayingTaskExecutionTimeMsLe: 1000000,
+          }),
+          isArray([]),
+          "paymentStripeInvoicePayingTasks",
         );
         assertThat(
           await listPendingPaymentProfileSuspendingDueToPastDueTasks(
