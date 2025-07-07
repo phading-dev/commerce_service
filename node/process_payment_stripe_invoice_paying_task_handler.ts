@@ -50,7 +50,7 @@ export class ProcessPaymentStripeInvoicePayingTaskHandler extends ProcessPayment
     loggingPrefix: string,
     body: ProcessPaymentStripeInvoicePayingTaskRequestBody,
   ): Promise<ProcessPaymentStripeInvoicePayingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payment Stripe invoice paying task ${body.taskId}:`;
+    loggingPrefix = `${loggingPrefix} Payment Stripe invoice paying task ${body.taskId} with payment ${body.statementId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -90,6 +90,7 @@ export class ProcessPaymentStripeInvoicePayingTaskHandler extends ProcessPayment
     loggingPrefix: string,
     body: ProcessPaymentStripeInvoicePayingTaskRequestBody,
   ): Promise<void> {
+    console.log(`${loggingPrefix} Processing task...`);
     let payment = await this.getValidPayment(this.database, body.statementId);
     if (!payment.paymentStripeInvoiceId) {
       throw newInternalServerErrorError(

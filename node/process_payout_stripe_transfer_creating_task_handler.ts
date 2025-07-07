@@ -54,7 +54,7 @@ export class ProcessPayoutStripeTransferCreatingTaskHandler extends ProcessPayou
     loggingPrefix: string,
     body: ProcessPayoutStripeTransferCreatingTaskRequestBody,
   ): Promise<ProcessPayoutStripeTransferCreatingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payout Stripe transfer creating task ${body.taskId}:`;
+    loggingPrefix = `${loggingPrefix} Payout Stripe transfer creating task ${body.taskId} with payout ${body.statementId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -97,6 +97,7 @@ export class ProcessPayoutStripeTransferCreatingTaskHandler extends ProcessPayou
     loggingPrefix: string,
     body: ProcessPayoutStripeTransferCreatingTaskRequestBody,
   ): Promise<void> {
+    console.log(`${loggingPrefix} Processing task...`);
     let [profileRows, statementRows] = await Promise.all([
       getPayoutProfileFromStatement(this.database, {
         transactionStatementStatementIdEq: body.statementId,

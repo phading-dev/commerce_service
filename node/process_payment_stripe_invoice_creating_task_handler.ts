@@ -18,6 +18,7 @@ import {
   getTransactionStatement,
   insertPaymentMethodNeedsUpdateNotifyingTaskStatement,
   insertPaymentProfileSuspendingDueToPastDueTaskStatement,
+  insertPaymentStripeInvoicePayingTaskStatement,
   updatePaymentStateAndStripeInvoiceStatement,
   updatePaymentStateStatement,
   updatePaymentStripeInvoiceCreatingTaskMetadataStatement,
@@ -63,7 +64,7 @@ export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPayme
     loggingPrefix: string,
     body: ProcessPaymentStripeInvoiceCreatingTaskRequestBody,
   ): Promise<ProcessPaymentStripeInvoiceCreatingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Payment Stripe invoice creating task ${body.taskId}:`;
+    loggingPrefix = `${loggingPrefix} Payment Stripe invoice creating task ${body.taskId} with payment ${body.statementId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -106,6 +107,7 @@ export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPayme
     loggingPrefix: string,
     body: ProcessPaymentStripeInvoiceCreatingTaskRequestBody,
   ): Promise<void> {
+    console.log(`${loggingPrefix} Processing task...`);
     let [profileRows, statementRows] = await Promise.all([
       getPaymentProfileFromStatement(this.database, {
         transactionStatementStatementIdEq: body.statementId,
@@ -187,7 +189,7 @@ export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPayme
     await this.stripeClient.val.invoices.finalizeInvoice(
       invoice.id,
       {
-        auto_advance: true,
+        // auto_advance: true,
       },
       {
         idempotencyKey: `fi${body.taskId}`,
@@ -258,9 +260,14 @@ export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPayme
       await transaction.batchUpdate([
         updatePaymentStateAndStripeInvoiceStatement({
           paymentStatementIdEq: statementId,
-          setState: PaymentState.WAITING_FOR_INVOICE_PAYMENT,
+          setState: PaymentState.PAYING_INVOICE,
           setStripeInvoiceId: invoiceId,
           setUpdatedTimeMs: this.getNow(),
+        }),
+        // TODO: Keep it or revert.
+        insertPaymentStripeInvoicePayingTaskStatement({
+          taskId: crypto.randomUUID(),
+          statementId,
         }),
         deletePaymentStripeInvoiceCreatingTaskStatement({
           paymentStripeInvoiceCreatingTaskTaskIdEq: taskId,
