@@ -141,11 +141,13 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
           creatingRows.length > 0,
           payingRows.length > 0,
         ),
-        creditBalanceAmount:
-          stripeCustomer.invoice_credit_balance[
+        // Stripe's credit balance stores credits as positive amounts,
+        balanceAmount:
+          -1 *
+          (stripeCustomer.invoice_credit_balance[
             ENV_VARS.defaultCurrency.toLowerCase()
-          ] ?? 0,
-        creditBalanceCurrency: ENV_VARS.defaultCurrency,
+          ] ?? 0),
+        balanceCurrency: ENV_VARS.defaultCurrency,
         canClaimInitCredit:
           profile.paymentProfileInitCreditGrantingState ===
           InitCreditGrantingState.NOT_GRANTED,

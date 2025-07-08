@@ -81,8 +81,8 @@ class HealthyButWithPaymentsTestCase {
         {
           paymentProfile: {
             state: this.expectedProfileState,
-            creditBalanceAmount: 0,
-            creditBalanceCurrency: "USD",
+            balanceAmount: 0,
+            balanceCurrency: "USD",
             canClaimInitCredit: false,
           },
         },
@@ -207,8 +207,8 @@ TEST_RUNNER.run({
                   },
                 },
                 state: PaymentProfileStateResponse.HEALTHY,
-                creditBalanceAmount: 2200,
-                creditBalanceCurrency: "USD",
+                balanceAmount: -2200,
+                balanceCurrency: "USD",
                 canClaimInitCredit: true,
               },
             },
@@ -303,8 +303,8 @@ TEST_RUNNER.run({
             {
               paymentProfile: {
                 state: PaymentProfileStateResponse.SUSPENDED,
-                creditBalanceAmount: 0,
-                creditBalanceCurrency: "USD",
+                balanceAmount: 0,
+                balanceCurrency: "USD",
                 canClaimInitCredit: false,
               },
             },
