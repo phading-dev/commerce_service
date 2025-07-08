@@ -1,6 +1,10 @@
 import "../../local/env";
 import { SPANNER_DATABASE } from "../../common/spanner_database";
-import { PaymentProfileState, PaymentState } from "../../db/schema";
+import {
+  InitCreditGrantingState,
+  PaymentProfileState,
+  PaymentState,
+} from "../../db/schema";
 import {
   deletePaymentProfileStatement,
   deletePaymentStatement,
@@ -34,6 +38,7 @@ class HealthyButWithPaymentsTestCase {
             state: PaymentProfileState.HEALTHY,
           },
           stripePaymentCustomerId: "stripeCustomer1",
+          initCreditGrantingState: InitCreditGrantingState.GRANTED,
         }),
         insertPaymentStatement({
           accountId: "account1",
@@ -78,6 +83,7 @@ class HealthyButWithPaymentsTestCase {
             state: this.expectedProfileState,
             creditBalanceAmount: 0,
             creditBalanceCurrency: "USD",
+            canClaimInitCredit: false,
           },
         },
         GET_PAYMENT_PROFILE_INFO_RESPONSE,
@@ -104,7 +110,7 @@ TEST_RUNNER.run({
   name: "GetPaymentProfileInfosHandlerTest",
   cases: [
     {
-      name: "WithPrimaryPaymentMethodAndHealthyAndNoFailedPaymentAndCreditBalance",
+      name: "WithPrimaryPaymentMethodAndHealthyAndNoFailedPaymentAndCreditBalanceAndCreditNotGranted",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -115,6 +121,7 @@ TEST_RUNNER.run({
                 state: PaymentProfileState.HEALTHY,
               },
               stripePaymentCustomerId: "stripeCustomer1",
+              initCreditGrantingState: InitCreditGrantingState.NOT_GRANTED,
             }),
           ]);
           await transaction.commit();
@@ -131,7 +138,7 @@ TEST_RUNNER.run({
                   default_payment_method: "paymentMethod1",
                 },
                 invoice_credit_balance: {
-                  usd: -2200,
+                  usd: 2200,
                 },
               };
             },
@@ -202,6 +209,7 @@ TEST_RUNNER.run({
                 state: PaymentProfileStateResponse.HEALTHY,
                 creditBalanceAmount: 2200,
                 creditBalanceCurrency: "USD",
+                canClaimInitCredit: true,
               },
             },
             GET_PAYMENT_PROFILE_INFO_RESPONSE,
@@ -246,7 +254,7 @@ TEST_RUNNER.run({
       PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS,
     ),
     {
-      name: "NoPaymentMethodAndSuspsended",
+      name: "NoPaymentMethodAndCreditGrantingAndSuspsended",
       execute: async () => {
         // Prepare
         await SPANNER_DATABASE.runTransactionAsync(async (transaction) => {
@@ -257,6 +265,7 @@ TEST_RUNNER.run({
                 state: PaymentProfileState.SUSPENDED,
               },
               stripePaymentCustomerId: "stripeCustomer1",
+              initCreditGrantingState: InitCreditGrantingState.GRANTING,
             }),
           ]);
           await transaction.commit();
@@ -296,6 +305,7 @@ TEST_RUNNER.run({
                 state: PaymentProfileStateResponse.SUSPENDED,
                 creditBalanceAmount: 0,
                 creditBalanceCurrency: "USD",
+                canClaimInitCredit: false,
               },
             },
             GET_PAYMENT_PROFILE_INFO_RESPONSE,

@@ -100,8 +100,8 @@ export class ProcessInitCreditGrantingTaskHandler extends ProcessInitCreditGrant
     await this.stripeClient.val.customers.createBalanceTransaction(
       profile.paymentProfileStripePaymentCustomerId,
       {
-        // Stripe stores credit as a negative amount.
-        amount: -1 * ENV_VARS.stripeInitCreditAmount,
+        // Pass in credit as a negative amount.
+        amount: -1 * ENV_VARS.initCreditAmount,
         currency: ENV_VARS.defaultCurrency.toLowerCase(),
         description: ProcessInitCreditGrantingTaskHandler.CREDIT_DESCRIPTION,
       },

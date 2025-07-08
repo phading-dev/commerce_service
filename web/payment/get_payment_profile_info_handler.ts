@@ -16,10 +16,7 @@ import {
   GetPaymentProfileInfoResponse,
 } from "@phading/commerce_service_interface/web/payment/interface";
 import { CARD_BRAND } from "@phading/commerce_service_interface/web/payment/payment_method_masked";
-import {
-  InitCreditGrantingState as InitCreditGrantingStateResponse,
-  PaymentProfileState as PaymentProfileStateResponse,
-} from "@phading/commerce_service_interface/web/payment/payment_profile";
+import { PaymentProfileState as PaymentProfileStateResponse } from "@phading/commerce_service_interface/web/payment/payment_profile";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newUnauthorizedError } from "@selfage/http_error";
 import { parseEnum } from "@selfage/message/parser";
@@ -144,16 +141,14 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
           creatingRows.length > 0,
           payingRows.length > 0,
         ),
-        // Stripe stores credit as a negative amount. Return it as a positive amount.
         creditBalanceAmount:
-          -1 *
-          (stripeCustomer.invoice_credit_balance[
+          stripeCustomer.invoice_credit_balance[
             ENV_VARS.defaultCurrency.toLowerCase()
-          ] ?? 0),
+          ] ?? 0,
         creditBalanceCurrency: ENV_VARS.defaultCurrency,
-        initCreditGrantingState: this.getInitCreditGrantingState(
-          profile.paymentProfileInitCreditGrantingState,
-        ),
+        canClaimInitCredit:
+          profile.paymentProfileInitCreditGrantingState ===
+          InitCreditGrantingState.NOT_GRANTED,
       },
     };
   }
@@ -175,19 +170,6 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
             : PaymentProfileStateResponse.HEALTHY;
       case PaymentProfileState.SUSPENDED:
         return PaymentProfileStateResponse.SUSPENDED;
-    }
-  }
-
-  private getInitCreditGrantingState(
-    state: InitCreditGrantingState,
-  ): InitCreditGrantingStateResponse {
-    switch (state) {
-      case InitCreditGrantingState.NOT_GRANTED:
-        return InitCreditGrantingStateResponse.NOT_GRANTED;
-      case InitCreditGrantingState.GRANTING:
-        return InitCreditGrantingStateResponse.GRANTING;
-      case InitCreditGrantingState.GRANTED:
-        return InitCreditGrantingStateResponse.GRANTED;
     }
   }
 }
