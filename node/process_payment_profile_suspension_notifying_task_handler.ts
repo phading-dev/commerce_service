@@ -1,4 +1,4 @@
-import { APP_NAME } from "../common/constants";
+import { PLATFORM_NAME } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
@@ -102,12 +102,12 @@ export class ProcessPaymentProfileSuspensionNotifyingTaskHandler extends Process
     );
     await this.sendgridClient.send({
       to: accountResponse.contactEmail,
-      from: ENV_VARS.contactEmail,
+      from: ENV_VARS.supportEmail,
       templateId: LOCALIZATION.accountSuspensionEmailTemplateId,
       dynamicTemplateData: {
         name: accountResponse.naturalName,
-        appName: APP_NAME,
-        accountSuspensionContactEmail: ENV_VARS.contactEmail,
+        appName: PLATFORM_NAME,
+        accountSuspensionContactEmail: ENV_VARS.supportEmail,
       },
     });
     await this.database.runTransactionAsync(async (transaction) => {

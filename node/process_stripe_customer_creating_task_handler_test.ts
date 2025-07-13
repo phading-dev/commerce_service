@@ -84,7 +84,7 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.processTask("", {
-          taskid: "task1",
+          taskId: "task1",
           accountId: "account1",
         });
 
@@ -172,7 +172,7 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.processTask("", {
-          taskid: "task1",
+          taskId: "task1",
           accountId: "account1",
         });
 
@@ -226,7 +226,7 @@ TEST_RUNNER.run({
         // Execute
         let error = await assertReject(
           handler.processTask("", {
-            taskid: "task1",
+            taskId: "task1",
             accountId: "account1",
           }),
         );
@@ -271,7 +271,7 @@ TEST_RUNNER.run({
 
         // Execute
         await handler.claimTask("", {
-          taskid: "task1",
+          taskId: "task1",
           accountId: "account1",
         });
 
