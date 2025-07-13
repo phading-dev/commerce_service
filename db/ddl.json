@@ -129,7 +129,7 @@
       "addColumnDdl": "ALTER TABLE StripeCustomerCreatingTask ADD COLUMN taskId STRING(MAX) NOT NULL"
     }, {
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE StripeCustomerCreatingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE StripeCustomerCreatingTask ADD COLUMN accountId STRING(MAX)"
     }, {
       "name": "retryCount",
       "addColumnDdl": "ALTER TABLE StripeCustomerCreatingTask ADD COLUMN retryCount FLOAT64"
@@ -140,7 +140,7 @@
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE StripeCustomerCreatingTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE StripeCustomerCreatingTask (taskId STRING(MAX) NOT NULL, accountId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
+    "createTableDdl": "CREATE TABLE StripeCustomerCreatingTask (taskId STRING(MAX) NOT NULL, accountId STRING(MAX), retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
     "indexes": [{
       "name": "StripeCustomerCreatingTaskByExecutionTime",
       "createIndexDdl": "CREATE INDEX StripeCustomerCreatingTaskByExecutionTime ON StripeCustomerCreatingTask(executionTimeMs)"
@@ -152,7 +152,7 @@
       "addColumnDdl": "ALTER TABLE InitCreditGrantingTask ADD COLUMN taskId STRING(MAX) NOT NULL"
     }, {
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE InitCreditGrantingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE InitCreditGrantingTask ADD COLUMN accountId STRING(MAX)"
     }, {
       "name": "retryCount",
       "addColumnDdl": "ALTER TABLE InitCreditGrantingTask ADD COLUMN retryCount FLOAT64"
@@ -163,7 +163,7 @@
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE InitCreditGrantingTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE InitCreditGrantingTask (taskId STRING(MAX) NOT NULL, accountId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
+    "createTableDdl": "CREATE TABLE InitCreditGrantingTask (taskId STRING(MAX) NOT NULL, accountId STRING(MAX), retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
     "indexes": [{
       "name": "InitCreditGrantingTaskByExecutionTime",
       "createIndexDdl": "CREATE INDEX InitCreditGrantingTaskByExecutionTime ON InitCreditGrantingTask(executionTimeMs)"
@@ -175,7 +175,7 @@
       "addColumnDdl": "ALTER TABLE StripeConnectedAccountForPayoutCreatingTask ADD COLUMN taskId STRING(MAX) NOT NULL"
     }, {
       "name": "accountId",
-      "addColumnDdl": "ALTER TABLE StripeConnectedAccountForPayoutCreatingTask ADD COLUMN accountId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE StripeConnectedAccountForPayoutCreatingTask ADD COLUMN accountId STRING(MAX)"
     }, {
       "name": "retryCount",
       "addColumnDdl": "ALTER TABLE StripeConnectedAccountForPayoutCreatingTask ADD COLUMN retryCount FLOAT64"
@@ -186,7 +186,7 @@
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE StripeConnectedAccountForPayoutCreatingTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE StripeConnectedAccountForPayoutCreatingTask (taskId STRING(MAX) NOT NULL, accountId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
+    "createTableDdl": "CREATE TABLE StripeConnectedAccountForPayoutCreatingTask (taskId STRING(MAX) NOT NULL, accountId STRING(MAX), retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
     "indexes": [{
       "name": "StripeConnectedAccountForPayoutCreatingTaskByExecutionTime",
       "createIndexDdl": "CREATE INDEX StripeConnectedAccountForPayoutCreatingTaskByExecutionTime ON StripeConnectedAccountForPayoutCreatingTask(executionTimeMs)"
@@ -218,7 +218,7 @@
       "addColumnDdl": "ALTER TABLE PaymentStripeInvoiceCreatingTask ADD COLUMN taskId STRING(MAX) NOT NULL"
     }, {
       "name": "statementId",
-      "addColumnDdl": "ALTER TABLE PaymentStripeInvoiceCreatingTask ADD COLUMN statementId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE PaymentStripeInvoiceCreatingTask ADD COLUMN statementId STRING(MAX)"
     }, {
       "name": "retryCount",
       "addColumnDdl": "ALTER TABLE PaymentStripeInvoiceCreatingTask ADD COLUMN retryCount FLOAT64"
@@ -229,7 +229,7 @@
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE PaymentStripeInvoiceCreatingTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE PaymentStripeInvoiceCreatingTask (taskId STRING(MAX) NOT NULL, statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
+    "createTableDdl": "CREATE TABLE PaymentStripeInvoiceCreatingTask (taskId STRING(MAX) NOT NULL, statementId STRING(MAX), retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
     "indexes": [{
       "name": "PaymentStripeInvoiceCreatingTaskByStatementId",
       "createIndexDdl": "CREATE INDEX PaymentStripeInvoiceCreatingTaskByStatementId ON PaymentStripeInvoiceCreatingTask(statementId)"
@@ -244,7 +244,7 @@
       "addColumnDdl": "ALTER TABLE PaymentStripeInvoicePayingTask ADD COLUMN taskId STRING(MAX) NOT NULL"
     }, {
       "name": "statementId",
-      "addColumnDdl": "ALTER TABLE PaymentStripeInvoicePayingTask ADD COLUMN statementId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE PaymentStripeInvoicePayingTask ADD COLUMN statementId STRING(MAX)"
     }, {
       "name": "retryCount",
       "addColumnDdl": "ALTER TABLE PaymentStripeInvoicePayingTask ADD COLUMN retryCount FLOAT64"
@@ -255,7 +255,7 @@
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE PaymentStripeInvoicePayingTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE PaymentStripeInvoicePayingTask (taskId STRING(MAX) NOT NULL, statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
+    "createTableDdl": "CREATE TABLE PaymentStripeInvoicePayingTask (taskId STRING(MAX) NOT NULL, statementId STRING(MAX), retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
     "indexes": [{
       "name": "PaymentStripeInvoicePayingTaskByStatementId",
       "createIndexDdl": "CREATE INDEX PaymentStripeInvoicePayingTaskByStatementId ON PaymentStripeInvoicePayingTask(statementId)"
@@ -356,7 +356,7 @@
       "addColumnDdl": "ALTER TABLE PayoutStripeTransferCreatingTask ADD COLUMN taskId STRING(MAX) NOT NULL"
     }, {
       "name": "statementId",
-      "addColumnDdl": "ALTER TABLE PayoutStripeTransferCreatingTask ADD COLUMN statementId STRING(MAX) NOT NULL"
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferCreatingTask ADD COLUMN statementId STRING(MAX)"
     }, {
       "name": "retryCount",
       "addColumnDdl": "ALTER TABLE PayoutStripeTransferCreatingTask ADD COLUMN retryCount FLOAT64"
@@ -367,7 +367,7 @@
       "name": "createdTimeMs",
       "addColumnDdl": "ALTER TABLE PayoutStripeTransferCreatingTask ADD COLUMN createdTimeMs TIMESTAMP"
     }],
-    "createTableDdl": "CREATE TABLE PayoutStripeTransferCreatingTask (taskId STRING(MAX) NOT NULL, statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
+    "createTableDdl": "CREATE TABLE PayoutStripeTransferCreatingTask (taskId STRING(MAX) NOT NULL, statementId STRING(MAX), retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (taskId ASC)",
     "indexes": [{
       "name": "PayoutStripeTransferCreatingTaskByExecutionTime",
       "createIndexDdl": "CREATE INDEX PayoutStripeTransferCreatingTaskByExecutionTime ON PayoutStripeTransferCreatingTask(executionTimeMs)"

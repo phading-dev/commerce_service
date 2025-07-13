@@ -7,6 +7,9 @@ export default class EN {
   get total() {
     return "Total";
   }
+  get invoiceForMonth() {
+    return "For the month of ";
+  }
   get updatePaymentMethodEmailTemplateId() {
     return ENV_VARS.updatePaymentMethodEnEmailTemplateId;
   }

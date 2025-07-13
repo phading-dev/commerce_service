@@ -19,6 +19,7 @@ import { buildUrl } from "@phading/web_interface/url_builder";
 import { newBadRequestError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
+import { PLATFORM_NAME } from "../common/constants";
 
 export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandlerInterface {
   public static create(): ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler {
@@ -104,10 +105,11 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
     );
     await this.sendgridClient.send({
       to: contactResponse.contactEmail,
-      from: ENV_VARS.contactEmail,
+      from: ENV_VARS.supportEmail,
       templateId: LOCALIZATION.setupStripeConnectedAccountEmailTemplateId,
       dynamicTemplateData: {
         name: contactResponse.naturalName,
+        platformName: PLATFORM_NAME,
         completeSetupUrl: buildUrl(this.externalOrigin, {
           main: {
             chooseAccount: {

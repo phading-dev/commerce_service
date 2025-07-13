@@ -173,7 +173,7 @@ TEST_RUNNER.run({
         );
         assertThat(
           createInvoiceParamsCaptured.description,
-          eq("2021-01"),
+          eq("For the month of 2021-01"),
           "createInvoiceParams.description",
         );
         assertThat(

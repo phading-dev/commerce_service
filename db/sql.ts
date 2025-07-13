@@ -619,7 +619,7 @@ export async function getPayout(
 export function insertStripeCustomerCreatingTaskStatement(
   args: {
     taskId: string,
-    accountId: string,
+    accountId?: string,
     retryCount?: number,
     executionTimeMs?: number,
     createdTimeMs?: number,
@@ -629,7 +629,7 @@ export function insertStripeCustomerCreatingTaskStatement(
     sql: "INSERT StripeCustomerCreatingTask (taskId, accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       taskId: args.taskId,
-      accountId: args.accountId,
+      accountId: args.accountId == null ? null : args.accountId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
@@ -832,7 +832,7 @@ export function updateStripeCustomerCreatingTaskMetadataStatement(
 export function insertInitCreditGrantingTaskStatement(
   args: {
     taskId: string,
-    accountId: string,
+    accountId?: string,
     retryCount?: number,
     executionTimeMs?: number,
     createdTimeMs?: number,
@@ -842,7 +842,7 @@ export function insertInitCreditGrantingTaskStatement(
     sql: "INSERT InitCreditGrantingTask (taskId, accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       taskId: args.taskId,
-      accountId: args.accountId,
+      accountId: args.accountId == null ? null : args.accountId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
@@ -1045,7 +1045,7 @@ export function updateInitCreditGrantingTaskMetadataStatement(
 export function insertStripeConnectedAccountForPayoutCreatingTaskStatement(
   args: {
     taskId: string,
-    accountId: string,
+    accountId?: string,
     retryCount?: number,
     executionTimeMs?: number,
     createdTimeMs?: number,
@@ -1055,7 +1055,7 @@ export function insertStripeConnectedAccountForPayoutCreatingTaskStatement(
     sql: "INSERT StripeConnectedAccountForPayoutCreatingTask (taskId, accountId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @accountId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       taskId: args.taskId,
-      accountId: args.accountId,
+      accountId: args.accountId == null ? null : args.accountId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
@@ -1456,7 +1456,7 @@ export function updateStripeConnectedAccountNeedsSetupNotifyingTaskMetadataState
 export function insertPaymentStripeInvoiceCreatingTaskStatement(
   args: {
     taskId: string,
-    statementId: string,
+    statementId?: string,
     retryCount?: number,
     executionTimeMs?: number,
     createdTimeMs?: number,
@@ -1466,7 +1466,7 @@ export function insertPaymentStripeInvoiceCreatingTaskStatement(
     sql: "INSERT PaymentStripeInvoiceCreatingTask (taskId, statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       taskId: args.taskId,
-      statementId: args.statementId,
+      statementId: args.statementId == null ? null : args.statementId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
@@ -1669,7 +1669,7 @@ export function updatePaymentStripeInvoiceCreatingTaskMetadataStatement(
 export function insertPaymentStripeInvoicePayingTaskStatement(
   args: {
     taskId: string,
-    statementId: string,
+    statementId?: string,
     retryCount?: number,
     executionTimeMs?: number,
     createdTimeMs?: number,
@@ -1679,7 +1679,7 @@ export function insertPaymentStripeInvoicePayingTaskStatement(
     sql: "INSERT PaymentStripeInvoicePayingTask (taskId, statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       taskId: args.taskId,
-      statementId: args.statementId,
+      statementId: args.statementId == null ? null : args.statementId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
@@ -2728,7 +2728,7 @@ export function updatePaymentProfileStateSyncingTaskMetadataStatement(
 export function insertPayoutStripeTransferCreatingTaskStatement(
   args: {
     taskId: string,
-    statementId: string,
+    statementId?: string,
     retryCount?: number,
     executionTimeMs?: number,
     createdTimeMs?: number,
@@ -2738,7 +2738,7 @@ export function insertPayoutStripeTransferCreatingTaskStatement(
     sql: "INSERT PayoutStripeTransferCreatingTask (taskId, statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@taskId, @statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
     params: {
       taskId: args.taskId,
-      statementId: args.statementId,
+      statementId: args.statementId == null ? null : args.statementId,
       retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
       executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
       createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
@@ -3132,13 +3132,13 @@ export function updatePayoutStateAndStripeTransferStatement(
 
 export function deletePaymentStripeInvoiceCreatingTaskByStatementStatement(
   args: {
-    paymentStripeInvoiceCreatingTaskStatementIdEq: string,
+    paymentStripeInvoiceCreatingTaskStatementIdEq?: string,
   }
 ): Statement {
   return {
     sql: "DELETE PaymentStripeInvoiceCreatingTask WHERE PaymentStripeInvoiceCreatingTask.statementId = @paymentStripeInvoiceCreatingTaskStatementIdEq",
     params: {
-      paymentStripeInvoiceCreatingTaskStatementIdEq: args.paymentStripeInvoiceCreatingTaskStatementIdEq,
+      paymentStripeInvoiceCreatingTaskStatementIdEq: args.paymentStripeInvoiceCreatingTaskStatementIdEq == null ? null : args.paymentStripeInvoiceCreatingTaskStatementIdEq,
     },
     types: {
       paymentStripeInvoiceCreatingTaskStatementIdEq: { type: "string" },
@@ -3148,13 +3148,13 @@ export function deletePaymentStripeInvoiceCreatingTaskByStatementStatement(
 
 export function deletePaymentStripeInvoicePayingTaskByStatementStatement(
   args: {
-    paymentStripeInvoicePayingTaskStatementIdEq: string,
+    paymentStripeInvoicePayingTaskStatementIdEq?: string,
   }
 ): Statement {
   return {
     sql: "DELETE PaymentStripeInvoicePayingTask WHERE PaymentStripeInvoicePayingTask.statementId = @paymentStripeInvoicePayingTaskStatementIdEq",
     params: {
-      paymentStripeInvoicePayingTaskStatementIdEq: args.paymentStripeInvoicePayingTaskStatementIdEq,
+      paymentStripeInvoicePayingTaskStatementIdEq: args.paymentStripeInvoicePayingTaskStatementIdEq == null ? null : args.paymentStripeInvoicePayingTaskStatementIdEq,
     },
     types: {
       paymentStripeInvoicePayingTaskStatementIdEq: { type: "string" },

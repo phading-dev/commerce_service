@@ -1,4 +1,4 @@
-import { GRACE_PERIOD_DAYS } from "../common/constants";
+import { GRACE_PERIOD_DAYS, PLATFORM_NAME } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
@@ -116,12 +116,13 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
     );
     await this.sendgridClient.send({
       to: contactEmail,
-      from: ENV_VARS.contactEmail,
+      from: ENV_VARS.supportEmail,
       templateId: LOCALIZATION.updatePaymentMethodEmailTemplateId,
       dynamicTemplateData: {
         month: transactionStatement.transactionStatementMonth,
         name: naturalName,
-        gradePeriodDays: GRACE_PERIOD_DAYS,
+        gracePeriodDays: `${GRACE_PERIOD_DAYS}`,
+        platformName: PLATFORM_NAME,
         updatePaymentMethodUrl: buildUrl(this.externalOrigin, {
           main: {
             chooseAccount: {
@@ -129,6 +130,16 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
             },
             account: {
               payment: {},
+            },
+          },
+        }),
+        statementPageUrl: buildUrl(this.externalOrigin, {
+          main: {
+            chooseAccount: {
+              accountId: transactionStatement.transactionStatementAccountId,
+            },
+            account: {
+              statements: {},
             },
           },
         }),

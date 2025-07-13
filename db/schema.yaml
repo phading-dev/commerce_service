@@ -251,6 +251,7 @@
           type: string
         - name: accountId
           type: string
+          nullable: true
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
@@ -270,6 +271,7 @@
           type: string
         - name: accountId
           type: string
+          nullable: true
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
@@ -289,6 +291,7 @@
           type: string
         - name: accountId
           type: string
+          nullable: true
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
@@ -325,6 +328,7 @@
           type: string
         - name: statementId
           type: string
+          nullable: true
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
@@ -348,6 +352,7 @@
           type: string
         - name: statementId
           type: string
+          nullable: true
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs
@@ -445,6 +450,7 @@
           type: string
         - name: statementId
           type: string
+          nullable: true
       retryCountColumn: retryCount
       executionTimeColumn: executionTimeMs
       createdTimeColumn: createdTimeMs

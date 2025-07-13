@@ -97,6 +97,13 @@ TEST_RUNNER.run({
           "emailParamsCaptured.dynamicTemplateData.updatePaymentMethodUrl",
         );
         assertThat(
+          emailParamsCaptured.dynamicTemplateData.statementPageUrl,
+          eq(
+            "https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%7B%221%22%3A%22account1%22%7D%2C%222%22%3A%7B%224%22%3A%7B%7D%7D%7D%7D",
+          ),
+          "emailParamsCaptured.dynamicTemplateData.statementPageUrl",
+        );
+        assertThat(
           clientMock.request.descriptor,
           eq(GET_ACCOUNT_CONTACT),
           "RC",

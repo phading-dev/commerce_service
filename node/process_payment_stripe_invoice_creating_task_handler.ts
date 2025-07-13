@@ -159,7 +159,7 @@ export class ProcessPaymentStripeInvoiceCreatingTaskHandler extends ProcessPayme
         automatic_tax: {
           enabled: true,
         },
-        description: transactionStatement.transactionStatementMonth,
+        description: `${LOCALIZATION.invoiceForMonth}${transactionStatement.transactionStatementMonth}`,
         metadata: {
           [PAYMENT_METADATA_STATEMENT_ID_KEY]: body.statementId,
         },
