@@ -83,7 +83,7 @@ TEST_RUNNER.run({
         assertThat(
           paramsCaptured.return_url,
           eq(
-            "https://test.com/?e=%7B%223%22%3A%7B%221%22%3A%22account1%22%7D%7D",
+            "https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%7B%221%22%3A%22account1%22%7D%2C%222%22%3A%7B%223%22%3A%7B%7D%7D%7D%7D",
           ),
           "paramsCaptured.return_url",
         );

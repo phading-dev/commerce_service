@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import {
+  CONNECTED_ACCOUNT_METADATA_ACCOUNT_ID_KEY,
   MERCHANT_CATEGORY_CODE,
   PRODUCT_DESCRIPTION,
 } from "../common/constants";
@@ -132,6 +133,9 @@ export class ProcessStripeConnectedAccountForPayoutCreatingTaskHandler extends P
           losses: {
             payments: "application",
           },
+        },
+        metadata: {
+          [CONNECTED_ACCOUNT_METADATA_ACCOUNT_ID_KEY]: body.accountId,
         },
       },
       {

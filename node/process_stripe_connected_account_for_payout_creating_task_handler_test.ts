@@ -104,6 +104,11 @@ TEST_RUNNER.run({
           "createAccountParams.email",
         );
         assertThat(
+          createAccountParamsCapture.metadata.accountId,
+          eq("account1"),
+          "createAccountParams.metadata.accountId",
+        );
+        assertThat(
           optionsCapture.idempotencyKey,
           eq("catask1"),
           "options.idempotencyKey",

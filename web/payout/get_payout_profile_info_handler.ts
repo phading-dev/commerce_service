@@ -80,8 +80,13 @@ export class GetPayoutProfileInfoHandler extends GetPayoutProfileInfoHandlerInte
       let onboardingLink = await this.stripeClient.val.accountLinks.create({
         account: profile.payoutProfileStripeConnectedAccountId,
         return_url: buildUrl(this.externalOrigin, {
-          setConnectedAccountOnboarded: {
-            accountId,
+          main: {
+            chooseAccount: {
+              accountId,
+            },
+            account: {
+              payout: {},
+            },
           },
         }),
         refresh_url: buildUrl(this.externalOrigin, {
