@@ -4,12 +4,18 @@ import { PayoutState } from "../db/schema";
 import {
   GET_PAYOUT_ROW,
   GET_PAYOUT_STRIPE_TRANSFER_CREATING_TASK_METADATA_ROW,
+  GET_PAYOUT_STRIPE_TRANSFER_DISABLED_NOTIFYING_TASK_ROW,
+  GET_PAYOUT_STRIPE_TRANSFER_SUCCESS_NOTIFYING_TASK_ROW,
   deletePayoutProfileStatement,
   deletePayoutStatement,
   deletePayoutStripeTransferCreatingTaskStatement,
+  deletePayoutStripeTransferDisabledNotifyingTaskStatement,
+  deletePayoutStripeTransferSuccessNotifyingTaskStatement,
   deleteTransactionStatementStatement,
   getPayout,
   getPayoutStripeTransferCreatingTaskMetadata,
+  getPayoutStripeTransferDisabledNotifyingTask,
+  getPayoutStripeTransferSuccessNotifyingTask,
   insertPayoutProfileStatement,
   insertPayoutStatement,
   insertPayoutStripeTransferCreatingTaskStatement,
@@ -69,6 +75,12 @@ async function cleanupAll(): Promise<void> {
       deletePayoutStatement({ payoutStatementIdEq: "statement1" }),
       deletePayoutStripeTransferCreatingTaskStatement({
         payoutStripeTransferCreatingTaskTaskIdEq: "task1",
+      }),
+      deletePayoutStripeTransferDisabledNotifyingTaskStatement({
+        payoutStripeTransferDisabledNotifyingTaskStatementIdEq: "statement1",
+      }),
+      deletePayoutStripeTransferSuccessNotifyingTaskStatement({
+        payoutStripeTransferSuccessNotifyingTaskStatementIdEq: "statement1",
       }),
     ]);
     await transaction.commit();
@@ -164,6 +176,24 @@ TEST_RUNNER.run({
           isArray([]),
           "payoutTasks",
         );
+        assertThat(
+          await getPayoutStripeTransferSuccessNotifyingTask(SPANNER_DATABASE, {
+            payoutStripeTransferSuccessNotifyingTaskStatementIdEq: "statement1",
+          }),
+          isArray([
+            eqMessage(
+              {
+                payoutStripeTransferSuccessNotifyingTaskStatementId:
+                  "statement1",
+                payoutStripeTransferSuccessNotifyingTaskRetryCount: 0,
+                payoutStripeTransferSuccessNotifyingTaskExecutionTimeMs: 1000,
+                payoutStripeTransferSuccessNotifyingTaskCreatedTimeMs: 1000,
+              },
+              GET_PAYOUT_STRIPE_TRANSFER_SUCCESS_NOTIFYING_TASK_ROW,
+            ),
+          ]),
+          "payoutSuccessNotifyingTask",
+        );
       },
       tearDown: async () => {
         await cleanupAll();
@@ -217,6 +247,25 @@ TEST_RUNNER.run({
           }),
           isArray([]),
           "payoutTasks",
+        );
+        assertThat(
+          await getPayoutStripeTransferDisabledNotifyingTask(SPANNER_DATABASE, {
+            payoutStripeTransferDisabledNotifyingTaskStatementIdEq:
+              "statement1",
+          }),
+          isArray([
+            eqMessage(
+              {
+                payoutStripeTransferDisabledNotifyingTaskStatementId:
+                  "statement1",
+                payoutStripeTransferDisabledNotifyingTaskRetryCount: 0,
+                payoutStripeTransferDisabledNotifyingTaskExecutionTimeMs: 1000,
+                payoutStripeTransferDisabledNotifyingTaskCreatedTimeMs: 1000,
+              },
+              GET_PAYOUT_STRIPE_TRANSFER_DISABLED_NOTIFYING_TASK_ROW,
+            ),
+          ]),
+          "payoutDisabledNotifyingTask",
         );
       },
       tearDown: async () => {

@@ -2938,6 +2938,402 @@ export function updatePayoutStripeTransferCreatingTaskMetadataStatement(
   };
 }
 
+export function insertPayoutStripeTransferSuccessNotifyingTaskStatement(
+  args: {
+    statementId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT PayoutStripeTransferSuccessNotifyingTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      statementId: args.statementId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      statementId: { type: "string" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deletePayoutStripeTransferSuccessNotifyingTaskStatement(
+  args: {
+    payoutStripeTransferSuccessNotifyingTaskStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE PayoutStripeTransferSuccessNotifyingTask WHERE (PayoutStripeTransferSuccessNotifyingTask.statementId = @payoutStripeTransferSuccessNotifyingTaskStatementIdEq)",
+    params: {
+      payoutStripeTransferSuccessNotifyingTaskStatementIdEq: args.payoutStripeTransferSuccessNotifyingTaskStatementIdEq,
+    },
+    types: {
+      payoutStripeTransferSuccessNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetPayoutStripeTransferSuccessNotifyingTaskRow {
+  payoutStripeTransferSuccessNotifyingTaskStatementId?: string,
+  payoutStripeTransferSuccessNotifyingTaskRetryCount?: number,
+  payoutStripeTransferSuccessNotifyingTaskExecutionTimeMs?: number,
+  payoutStripeTransferSuccessNotifyingTaskCreatedTimeMs?: number,
+}
+
+export let GET_PAYOUT_STRIPE_TRANSFER_SUCCESS_NOTIFYING_TASK_ROW: MessageDescriptor<GetPayoutStripeTransferSuccessNotifyingTaskRow> = {
+  name: 'GetPayoutStripeTransferSuccessNotifyingTaskRow',
+  fields: [{
+    name: 'payoutStripeTransferSuccessNotifyingTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutStripeTransferSuccessNotifyingTaskRetryCount',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutStripeTransferSuccessNotifyingTaskExecutionTimeMs',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutStripeTransferSuccessNotifyingTaskCreatedTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPayoutStripeTransferSuccessNotifyingTask(
+  runner: Database | Transaction,
+  args: {
+    payoutStripeTransferSuccessNotifyingTaskStatementIdEq: string,
+  }
+): Promise<Array<GetPayoutStripeTransferSuccessNotifyingTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PayoutStripeTransferSuccessNotifyingTask.statementId, PayoutStripeTransferSuccessNotifyingTask.retryCount, PayoutStripeTransferSuccessNotifyingTask.executionTimeMs, PayoutStripeTransferSuccessNotifyingTask.createdTimeMs FROM PayoutStripeTransferSuccessNotifyingTask WHERE (PayoutStripeTransferSuccessNotifyingTask.statementId = @payoutStripeTransferSuccessNotifyingTaskStatementIdEq)",
+    params: {
+      payoutStripeTransferSuccessNotifyingTaskStatementIdEq: args.payoutStripeTransferSuccessNotifyingTaskStatementIdEq,
+    },
+    types: {
+      payoutStripeTransferSuccessNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPayoutStripeTransferSuccessNotifyingTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      payoutStripeTransferSuccessNotifyingTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutStripeTransferSuccessNotifyingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      payoutStripeTransferSuccessNotifyingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      payoutStripeTransferSuccessNotifyingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingPayoutStripeTransferSuccessNotifyingTasksRow {
+  payoutStripeTransferSuccessNotifyingTaskStatementId?: string,
+}
+
+export let LIST_PENDING_PAYOUT_STRIPE_TRANSFER_SUCCESS_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingPayoutStripeTransferSuccessNotifyingTasksRow> = {
+  name: 'ListPendingPayoutStripeTransferSuccessNotifyingTasksRow',
+  fields: [{
+    name: 'payoutStripeTransferSuccessNotifyingTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }],
+};
+
+export async function listPendingPayoutStripeTransferSuccessNotifyingTasks(
+  runner: Database | Transaction,
+  args: {
+    payoutStripeTransferSuccessNotifyingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingPayoutStripeTransferSuccessNotifyingTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PayoutStripeTransferSuccessNotifyingTask.statementId FROM PayoutStripeTransferSuccessNotifyingTask WHERE PayoutStripeTransferSuccessNotifyingTask.executionTimeMs <= @payoutStripeTransferSuccessNotifyingTaskExecutionTimeMsLe",
+    params: {
+      payoutStripeTransferSuccessNotifyingTaskExecutionTimeMsLe: args.payoutStripeTransferSuccessNotifyingTaskExecutionTimeMsLe == null ? null : new Date(args.payoutStripeTransferSuccessNotifyingTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      payoutStripeTransferSuccessNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingPayoutStripeTransferSuccessNotifyingTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      payoutStripeTransferSuccessNotifyingTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetPayoutStripeTransferSuccessNotifyingTaskMetadataRow {
+  payoutStripeTransferSuccessNotifyingTaskRetryCount?: number,
+  payoutStripeTransferSuccessNotifyingTaskExecutionTimeMs?: number,
+}
+
+export let GET_PAYOUT_STRIPE_TRANSFER_SUCCESS_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetPayoutStripeTransferSuccessNotifyingTaskMetadataRow> = {
+  name: 'GetPayoutStripeTransferSuccessNotifyingTaskMetadataRow',
+  fields: [{
+    name: 'payoutStripeTransferSuccessNotifyingTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutStripeTransferSuccessNotifyingTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPayoutStripeTransferSuccessNotifyingTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    payoutStripeTransferSuccessNotifyingTaskStatementIdEq: string,
+  }
+): Promise<Array<GetPayoutStripeTransferSuccessNotifyingTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PayoutStripeTransferSuccessNotifyingTask.retryCount, PayoutStripeTransferSuccessNotifyingTask.executionTimeMs FROM PayoutStripeTransferSuccessNotifyingTask WHERE (PayoutStripeTransferSuccessNotifyingTask.statementId = @payoutStripeTransferSuccessNotifyingTaskStatementIdEq)",
+    params: {
+      payoutStripeTransferSuccessNotifyingTaskStatementIdEq: args.payoutStripeTransferSuccessNotifyingTaskStatementIdEq,
+    },
+    types: {
+      payoutStripeTransferSuccessNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPayoutStripeTransferSuccessNotifyingTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      payoutStripeTransferSuccessNotifyingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      payoutStripeTransferSuccessNotifyingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updatePayoutStripeTransferSuccessNotifyingTaskMetadataStatement(
+  args: {
+    payoutStripeTransferSuccessNotifyingTaskStatementIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE PayoutStripeTransferSuccessNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PayoutStripeTransferSuccessNotifyingTask.statementId = @payoutStripeTransferSuccessNotifyingTaskStatementIdEq)",
+    params: {
+      payoutStripeTransferSuccessNotifyingTaskStatementIdEq: args.payoutStripeTransferSuccessNotifyingTaskStatementIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      payoutStripeTransferSuccessNotifyingTaskStatementIdEq: { type: "string" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function insertPayoutStripeTransferDisabledNotifyingTaskStatement(
+  args: {
+    statementId: string,
+    retryCount?: number,
+    executionTimeMs?: number,
+    createdTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "INSERT PayoutStripeTransferDisabledNotifyingTask (statementId, retryCount, executionTimeMs, createdTimeMs) VALUES (@statementId, @retryCount, @executionTimeMs, @createdTimeMs)",
+    params: {
+      statementId: args.statementId,
+      retryCount: args.retryCount == null ? null : Spanner.float(args.retryCount),
+      executionTimeMs: args.executionTimeMs == null ? null : new Date(args.executionTimeMs).toISOString(),
+      createdTimeMs: args.createdTimeMs == null ? null : new Date(args.createdTimeMs).toISOString(),
+    },
+    types: {
+      statementId: { type: "string" },
+      retryCount: { type: "float64" },
+      executionTimeMs: { type: "timestamp" },
+      createdTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
+export function deletePayoutStripeTransferDisabledNotifyingTaskStatement(
+  args: {
+    payoutStripeTransferDisabledNotifyingTaskStatementIdEq: string,
+  }
+): Statement {
+  return {
+    sql: "DELETE PayoutStripeTransferDisabledNotifyingTask WHERE (PayoutStripeTransferDisabledNotifyingTask.statementId = @payoutStripeTransferDisabledNotifyingTaskStatementIdEq)",
+    params: {
+      payoutStripeTransferDisabledNotifyingTaskStatementIdEq: args.payoutStripeTransferDisabledNotifyingTaskStatementIdEq,
+    },
+    types: {
+      payoutStripeTransferDisabledNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  };
+}
+
+export interface GetPayoutStripeTransferDisabledNotifyingTaskRow {
+  payoutStripeTransferDisabledNotifyingTaskStatementId?: string,
+  payoutStripeTransferDisabledNotifyingTaskRetryCount?: number,
+  payoutStripeTransferDisabledNotifyingTaskExecutionTimeMs?: number,
+  payoutStripeTransferDisabledNotifyingTaskCreatedTimeMs?: number,
+}
+
+export let GET_PAYOUT_STRIPE_TRANSFER_DISABLED_NOTIFYING_TASK_ROW: MessageDescriptor<GetPayoutStripeTransferDisabledNotifyingTaskRow> = {
+  name: 'GetPayoutStripeTransferDisabledNotifyingTaskRow',
+  fields: [{
+    name: 'payoutStripeTransferDisabledNotifyingTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }, {
+    name: 'payoutStripeTransferDisabledNotifyingTaskRetryCount',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutStripeTransferDisabledNotifyingTaskExecutionTimeMs',
+    index: 3,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutStripeTransferDisabledNotifyingTaskCreatedTimeMs',
+    index: 4,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPayoutStripeTransferDisabledNotifyingTask(
+  runner: Database | Transaction,
+  args: {
+    payoutStripeTransferDisabledNotifyingTaskStatementIdEq: string,
+  }
+): Promise<Array<GetPayoutStripeTransferDisabledNotifyingTaskRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PayoutStripeTransferDisabledNotifyingTask.statementId, PayoutStripeTransferDisabledNotifyingTask.retryCount, PayoutStripeTransferDisabledNotifyingTask.executionTimeMs, PayoutStripeTransferDisabledNotifyingTask.createdTimeMs FROM PayoutStripeTransferDisabledNotifyingTask WHERE (PayoutStripeTransferDisabledNotifyingTask.statementId = @payoutStripeTransferDisabledNotifyingTaskStatementIdEq)",
+    params: {
+      payoutStripeTransferDisabledNotifyingTaskStatementIdEq: args.payoutStripeTransferDisabledNotifyingTaskStatementIdEq,
+    },
+    types: {
+      payoutStripeTransferDisabledNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPayoutStripeTransferDisabledNotifyingTaskRow>();
+  for (let row of rows) {
+    resRows.push({
+      payoutStripeTransferDisabledNotifyingTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+      payoutStripeTransferDisabledNotifyingTaskRetryCount: row.at(1).value == null ? undefined : row.at(1).value.value,
+      payoutStripeTransferDisabledNotifyingTaskExecutionTimeMs: row.at(2).value == null ? undefined : row.at(2).value.valueOf(),
+      payoutStripeTransferDisabledNotifyingTaskCreatedTimeMs: row.at(3).value == null ? undefined : row.at(3).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export interface ListPendingPayoutStripeTransferDisabledNotifyingTasksRow {
+  payoutStripeTransferDisabledNotifyingTaskStatementId?: string,
+}
+
+export let LIST_PENDING_PAYOUT_STRIPE_TRANSFER_DISABLED_NOTIFYING_TASKS_ROW: MessageDescriptor<ListPendingPayoutStripeTransferDisabledNotifyingTasksRow> = {
+  name: 'ListPendingPayoutStripeTransferDisabledNotifyingTasksRow',
+  fields: [{
+    name: 'payoutStripeTransferDisabledNotifyingTaskStatementId',
+    index: 1,
+    primitiveType: PrimitiveType.STRING,
+  }],
+};
+
+export async function listPendingPayoutStripeTransferDisabledNotifyingTasks(
+  runner: Database | Transaction,
+  args: {
+    payoutStripeTransferDisabledNotifyingTaskExecutionTimeMsLe?: number,
+  }
+): Promise<Array<ListPendingPayoutStripeTransferDisabledNotifyingTasksRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PayoutStripeTransferDisabledNotifyingTask.statementId FROM PayoutStripeTransferDisabledNotifyingTask WHERE PayoutStripeTransferDisabledNotifyingTask.executionTimeMs <= @payoutStripeTransferDisabledNotifyingTaskExecutionTimeMsLe",
+    params: {
+      payoutStripeTransferDisabledNotifyingTaskExecutionTimeMsLe: args.payoutStripeTransferDisabledNotifyingTaskExecutionTimeMsLe == null ? null : new Date(args.payoutStripeTransferDisabledNotifyingTaskExecutionTimeMsLe).toISOString(),
+    },
+    types: {
+      payoutStripeTransferDisabledNotifyingTaskExecutionTimeMsLe: { type: "timestamp" },
+    }
+  });
+  let resRows = new Array<ListPendingPayoutStripeTransferDisabledNotifyingTasksRow>();
+  for (let row of rows) {
+    resRows.push({
+      payoutStripeTransferDisabledNotifyingTaskStatementId: row.at(0).value == null ? undefined : row.at(0).value,
+    });
+  }
+  return resRows;
+}
+
+export interface GetPayoutStripeTransferDisabledNotifyingTaskMetadataRow {
+  payoutStripeTransferDisabledNotifyingTaskRetryCount?: number,
+  payoutStripeTransferDisabledNotifyingTaskExecutionTimeMs?: number,
+}
+
+export let GET_PAYOUT_STRIPE_TRANSFER_DISABLED_NOTIFYING_TASK_METADATA_ROW: MessageDescriptor<GetPayoutStripeTransferDisabledNotifyingTaskMetadataRow> = {
+  name: 'GetPayoutStripeTransferDisabledNotifyingTaskMetadataRow',
+  fields: [{
+    name: 'payoutStripeTransferDisabledNotifyingTaskRetryCount',
+    index: 1,
+    primitiveType: PrimitiveType.NUMBER,
+  }, {
+    name: 'payoutStripeTransferDisabledNotifyingTaskExecutionTimeMs',
+    index: 2,
+    primitiveType: PrimitiveType.NUMBER,
+  }],
+};
+
+export async function getPayoutStripeTransferDisabledNotifyingTaskMetadata(
+  runner: Database | Transaction,
+  args: {
+    payoutStripeTransferDisabledNotifyingTaskStatementIdEq: string,
+  }
+): Promise<Array<GetPayoutStripeTransferDisabledNotifyingTaskMetadataRow>> {
+  let [rows] = await runner.run({
+    sql: "SELECT PayoutStripeTransferDisabledNotifyingTask.retryCount, PayoutStripeTransferDisabledNotifyingTask.executionTimeMs FROM PayoutStripeTransferDisabledNotifyingTask WHERE (PayoutStripeTransferDisabledNotifyingTask.statementId = @payoutStripeTransferDisabledNotifyingTaskStatementIdEq)",
+    params: {
+      payoutStripeTransferDisabledNotifyingTaskStatementIdEq: args.payoutStripeTransferDisabledNotifyingTaskStatementIdEq,
+    },
+    types: {
+      payoutStripeTransferDisabledNotifyingTaskStatementIdEq: { type: "string" },
+    }
+  });
+  let resRows = new Array<GetPayoutStripeTransferDisabledNotifyingTaskMetadataRow>();
+  for (let row of rows) {
+    resRows.push({
+      payoutStripeTransferDisabledNotifyingTaskRetryCount: row.at(0).value == null ? undefined : row.at(0).value.value,
+      payoutStripeTransferDisabledNotifyingTaskExecutionTimeMs: row.at(1).value == null ? undefined : row.at(1).value.valueOf(),
+    });
+  }
+  return resRows;
+}
+
+export function updatePayoutStripeTransferDisabledNotifyingTaskMetadataStatement(
+  args: {
+    payoutStripeTransferDisabledNotifyingTaskStatementIdEq: string,
+    setRetryCount?: number,
+    setExecutionTimeMs?: number,
+  }
+): Statement {
+  return {
+    sql: "UPDATE PayoutStripeTransferDisabledNotifyingTask SET retryCount = @setRetryCount, executionTimeMs = @setExecutionTimeMs WHERE (PayoutStripeTransferDisabledNotifyingTask.statementId = @payoutStripeTransferDisabledNotifyingTaskStatementIdEq)",
+    params: {
+      payoutStripeTransferDisabledNotifyingTaskStatementIdEq: args.payoutStripeTransferDisabledNotifyingTaskStatementIdEq,
+      setRetryCount: args.setRetryCount == null ? null : Spanner.float(args.setRetryCount),
+      setExecutionTimeMs: args.setExecutionTimeMs == null ? null : new Date(args.setExecutionTimeMs).toISOString(),
+    },
+    types: {
+      payoutStripeTransferDisabledNotifyingTaskStatementIdEq: { type: "string" },
+      setRetryCount: { type: "float64" },
+      setExecutionTimeMs: { type: "timestamp" },
+    }
+  };
+}
+
 export function updatePaymentProfileStateStatement(
   args: {
     paymentProfileAccountIdEq: string,

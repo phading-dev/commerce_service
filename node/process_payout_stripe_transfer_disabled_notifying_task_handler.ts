@@ -1,21 +1,22 @@
-import { GRACE_PERIOD_DAYS, PLATFORM_NAME } from "../common/constants";
+import { PLATFORM_NAME } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
 import { SPANNER_DATABASE } from "../common/spanner_database";
 import {
-  deletePaymentMethodNeedsUpdateNotifyingTaskStatement,
-  getPaymentMethodNeedsUpdateNotifyingTaskMetadata,
+  deletePayoutStripeTransferDisabledNotifyingTaskStatement,
+  getPayoutStripeTransferDisabledNotifyingTaskMetadata,
   getTransactionStatement,
-  updatePaymentMethodNeedsUpdateNotifyingTaskMetadataStatement,
+  updatePayoutStripeTransferDisabledNotifyingTaskMetadataStatement,
 } from "../db/sql";
 import { ENV_VARS } from "../env_vars";
 import { Database } from "@google-cloud/spanner";
-import { ProcessPaymentMethodNeedsUpdateNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
+import { ProcessPayoutStripeTransferDisabledNotifyingTaskHandlerInterface } from "@phading/commerce_service_interface/node/handler";
 import {
-  ProcessPaymentMethodNeedsUpdateNotifyingTaskRequestBody,
-  ProcessPaymentMethodNeedsUpdateNotifyingTaskResponse,
+  ProcessPayoutStripeTransferDisabledNotifyingTaskRequestBody,
+  ProcessPayoutStripeTransferDisabledNotifyingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
+import { getDollarAmount } from "@phading/price_config/amount_conversion";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
 import { buildUrl } from "@phading/web_interface/url_builder";
 import {
@@ -25,9 +26,9 @@ import {
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
 
-export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends ProcessPaymentMethodNeedsUpdateNotifyingTaskHandlerInterface {
-  public static create(): ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler {
-    return new ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler(
+export class ProcessPayoutStripeTransferDisabledNotifyingTaskHandler extends ProcessPayoutStripeTransferDisabledNotifyingTaskHandlerInterface {
+  public static create(): ProcessPayoutStripeTransferDisabledNotifyingTaskHandler {
+    return new ProcessPayoutStripeTransferDisabledNotifyingTaskHandler(
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       SENDGRID_CLIENT,
@@ -54,9 +55,9 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
 
   public async handle(
     loggingPrefix: string,
-    body: ProcessPaymentMethodNeedsUpdateNotifyingTaskRequestBody,
-  ): Promise<ProcessPaymentMethodNeedsUpdateNotifyingTaskResponse> {
-    loggingPrefix = `${loggingPrefix} Update payment method notifying task for statement ${body.statementId}:`;
+    body: ProcessPayoutStripeTransferDisabledNotifyingTaskRequestBody,
+  ): Promise<ProcessPayoutStripeTransferDisabledNotifyingTaskResponse> {
+    loggingPrefix = `${loggingPrefix} Payout stripe transfer disabled notifying task for statement ${body.statementId}:`;
     await this.taskHandler.wrap(
       loggingPrefix,
       () => this.claimTask(loggingPrefix, body),
@@ -67,13 +68,14 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
 
   public async claimTask(
     loggingPrefix: string,
-    body: ProcessPaymentMethodNeedsUpdateNotifyingTaskRequestBody,
+    body: ProcessPayoutStripeTransferDisabledNotifyingTaskRequestBody,
   ): Promise<void> {
     await this.database.runTransactionAsync(async (transaction) => {
-      let rows = await getPaymentMethodNeedsUpdateNotifyingTaskMetadata(
+      let rows = await getPayoutStripeTransferDisabledNotifyingTaskMetadata(
         transaction,
         {
-          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: body.statementId,
+          payoutStripeTransferDisabledNotifyingTaskStatementIdEq:
+            body.statementId,
         },
       );
       if (rows.length === 0) {
@@ -81,14 +83,15 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
       }
       let task = rows[0];
       await transaction.batchUpdate([
-        updatePaymentMethodNeedsUpdateNotifyingTaskMetadataStatement({
-          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: body.statementId,
+        updatePayoutStripeTransferDisabledNotifyingTaskMetadataStatement({
+          payoutStripeTransferDisabledNotifyingTaskStatementIdEq:
+            body.statementId,
           setRetryCount:
-            task.paymentMethodNeedsUpdateNotifyingTaskRetryCount + 1,
+            task.payoutStripeTransferDisabledNotifyingTaskRetryCount + 1,
           setExecutionTimeMs:
             this.getNow() +
             this.taskHandler.getBackoffTime(
-              task.paymentMethodNeedsUpdateNotifyingTaskRetryCount,
+              task.payoutStripeTransferDisabledNotifyingTaskRetryCount,
             ),
         }),
       ]);
@@ -98,7 +101,7 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
 
   public async processTask(
     loggingPrefix: string,
-    body: ProcessPaymentMethodNeedsUpdateNotifyingTaskRequestBody,
+    body: ProcessPayoutStripeTransferDisabledNotifyingTaskRequestBody,
   ): Promise<void> {
     let statementRows = await getTransactionStatement(this.database, {
       transactionStatementStatementIdEq: body.statementId,
@@ -109,37 +112,36 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
       );
     }
     let transactionStatement = statementRows[0];
-    let { naturalName, contactEmail } = await this.serviceClient.send(
+    let accountResponse = await this.serviceClient.send(
       newGetAccountContactRequest({
         accountId: transactionStatement.transactionStatementAccountId,
       }),
     );
+    let money = new Intl.NumberFormat(LOCALIZATION.locale, {
+      style: "currency",
+      currency: transactionStatement.transactionStatementStatement.currency,
+    }).format(
+      getDollarAmount(
+        transactionStatement.transactionStatementStatement.totalAmount,
+        transactionStatement.transactionStatementStatement.currency,
+      ),
+    );
     await this.sendgridClient.send({
-      to: contactEmail,
+      to: accountResponse.contactEmail,
       from: ENV_VARS.supportEmail,
-      templateId: LOCALIZATION.updatePaymentMethodEmailTemplateId,
+      templateId: LOCALIZATION.payoutDisabledEmailTemplateId,
       dynamicTemplateData: {
-        name: naturalName,
+        name: accountResponse.naturalName,
         platformName: PLATFORM_NAME,
         month: transactionStatement.transactionStatementMonth,
-        gracePeriodDays: `${GRACE_PERIOD_DAYS}`,
-        updatePaymentMethodUrl: buildUrl(this.externalOrigin, {
+        money,
+        setupPayoutUrl: buildUrl(this.externalOrigin, {
           main: {
             chooseAccount: {
               accountId: transactionStatement.transactionStatementAccountId,
             },
             account: {
-              payment: {},
-            },
-          },
-        }),
-        statementPageUrl: buildUrl(this.externalOrigin, {
-          main: {
-            chooseAccount: {
-              accountId: transactionStatement.transactionStatementAccountId,
-            },
-            account: {
-              statements: {},
+              payout: {},
             },
           },
         }),
@@ -147,8 +149,9 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
     });
     await this.database.runTransactionAsync(async (transaction) => {
       await transaction.batchUpdate([
-        deletePaymentMethodNeedsUpdateNotifyingTaskStatement({
-          paymentMethodNeedsUpdateNotifyingTaskStatementIdEq: body.statementId,
+        deletePayoutStripeTransferDisabledNotifyingTaskStatement({
+          payoutStripeTransferDisabledNotifyingTaskStatementIdEq:
+            body.statementId,
         }),
       ]);
       await transaction.commit();

@@ -14,7 +14,7 @@ import {
 import { GetPaymentProfileInfoHandler } from "./get_payment_profile_info_handler";
 import { GET_PAYMENT_PROFILE_INFO_RESPONSE } from "@phading/commerce_service_interface/web/payment/interface";
 import { CardBrand } from "@phading/commerce_service_interface/web/payment/payment_method_masked";
-import { PaymentProfileState as PaymentProfileStateResponse } from "@phading/commerce_service_interface/web/payment/payment_profile";
+import { PaymentProfileState as PaymentProfileStateResponse, PaymentsOverallState } from "@phading/commerce_service_interface/web/payment/payment_profile";
 import { FetchSessionAndCheckCapabilityResponse } from "@phading/user_session_service_interface/node/interface";
 import { eqMessage } from "@selfage/message/test_matcher";
 import { NodeServiceClientMock } from "@selfage/node_service_client/client_mock";
@@ -27,6 +27,7 @@ class HealthyButWithPaymentsTestCase {
     public name: string,
     public paymentState: PaymentState,
     public expectedProfileState: PaymentProfileStateResponse,
+    public expectedPaymentsOverallState: PaymentsOverallState,
   ) {}
   public async execute() {
     // Prepare
@@ -80,7 +81,8 @@ class HealthyButWithPaymentsTestCase {
       eqMessage(
         {
           paymentProfile: {
-            state: this.expectedProfileState,
+            profileState: this.expectedProfileState,
+            paymentsOverallState: this.expectedPaymentsOverallState,
             balanceAmount: 0,
             balanceCurrency: "USD",
             canClaimInitCredit: false,
@@ -107,7 +109,7 @@ class HealthyButWithPaymentsTestCase {
 }
 
 TEST_RUNNER.run({
-  name: "GetPaymentProfileInfosHandlerTest",
+  name: "GetPaymentProfileInfoHandlerTest",
   cases: [
     {
       name: "WithPrimaryPaymentMethodAndHealthyAndNoFailedPaymentAndCreditBalanceAndCreditNotGranted",
@@ -206,7 +208,8 @@ TEST_RUNNER.run({
                     expYear: 2023,
                   },
                 },
-                state: PaymentProfileStateResponse.HEALTHY,
+                profileState: PaymentProfileStateResponse.HEALTHY,
+                paymentsOverallState: PaymentsOverallState.ALL_PAID,
                 balanceAmount: -2200,
                 balanceCurrency: "USD",
                 canClaimInitCredit: true,
@@ -231,27 +234,32 @@ TEST_RUNNER.run({
     new HealthyButWithPaymentsTestCase(
       "FailedWithoutInvoiceAndHealthyButWithFailedPayments",
       PaymentState.FAILED_WITHOUT_INVOICE,
-      PaymentProfileStateResponse.WITH_FAILED_PAYMENTS,
+      PaymentProfileStateResponse.HEALTHY,
+      PaymentsOverallState.WITH_FAILED_PAYMENTS,
     ),
     new HealthyButWithPaymentsTestCase(
       "FailedWithInvoiceAndHealthyButWithFailedPayments",
       PaymentState.FAILED_WITH_INVOICE,
-      PaymentProfileStateResponse.WITH_FAILED_PAYMENTS,
+      PaymentProfileStateResponse.HEALTHY,
+      PaymentsOverallState.WITH_FAILED_PAYMENTS,
     ),
     new HealthyButWithPaymentsTestCase(
       "CreatingStripeInvoiceAndHealthyButWithProcessingPayments",
       PaymentState.CREATING_STRIPE_INVOICE,
-      PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS,
+      PaymentProfileStateResponse.HEALTHY,
+      PaymentsOverallState.WITH_PROCESSING_PAYMENTS,
     ),
     new HealthyButWithPaymentsTestCase(
       "PayingInvoiceAndHealthyButWithChargingViaStripeInvoice",
       PaymentState.PAYING_INVOICE,
-      PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS,
+      PaymentProfileStateResponse.HEALTHY,
+      PaymentsOverallState.WITH_PROCESSING_PAYMENTS,
     ),
     new HealthyButWithPaymentsTestCase(
       "WaitingForInvoiceAndHealthyButWithProcessingPayments",
       PaymentState.WAITING_FOR_INVOICE_PAYMENT,
-      PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS,
+      PaymentProfileStateResponse.HEALTHY,
+      PaymentsOverallState.WITH_PROCESSING_PAYMENTS,
     ),
     {
       name: "NoPaymentMethodAndCreditGrantingAndSuspsended",
@@ -302,7 +310,8 @@ TEST_RUNNER.run({
           eqMessage(
             {
               paymentProfile: {
-                state: PaymentProfileStateResponse.SUSPENDED,
+                profileState: PaymentProfileStateResponse.SUSPENDED,
+                paymentsOverallState: PaymentsOverallState.ALL_PAID,
                 balanceAmount: 0,
                 balanceCurrency: "USD",
                 canClaimInitCredit: false,

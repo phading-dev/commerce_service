@@ -16,6 +16,7 @@ import {
   ProcessPaymentProfileSuspensionNotifyingTaskResponse,
 } from "@phading/commerce_service_interface/node/interface";
 import { newGetAccountContactRequest } from "@phading/user_service_interface/node/client";
+import { buildUrl } from "@phading/web_interface/url_builder";
 import { newBadRequestError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
@@ -26,6 +27,7 @@ export class ProcessPaymentProfileSuspensionNotifyingTaskHandler extends Process
       SPANNER_DATABASE,
       SERVICE_CLIENT,
       SENDGRID_CLIENT,
+      ENV_VARS.externalOrigin,
       () => Date.now(),
     );
   }
@@ -40,6 +42,7 @@ export class ProcessPaymentProfileSuspensionNotifyingTaskHandler extends Process
     private database: Database,
     private serviceClient: NodeServiceClient,
     private sendgridClient: any,
+    private externalOrigin: string,
     private getNow: () => number,
   ) {
     super();
@@ -103,11 +106,20 @@ export class ProcessPaymentProfileSuspensionNotifyingTaskHandler extends Process
     await this.sendgridClient.send({
       to: accountResponse.contactEmail,
       from: ENV_VARS.supportEmail,
-      templateId: LOCALIZATION.accountSuspensionEmailTemplateId,
+      templateId: LOCALIZATION.profileSuspensionEmailTemplateId,
       dynamicTemplateData: {
         name: accountResponse.naturalName,
-        appName: PLATFORM_NAME,
-        accountSuspensionContactEmail: ENV_VARS.supportEmail,
+        platformName: PLATFORM_NAME,
+        paymentPageUrl: buildUrl(this.externalOrigin, {
+          main: {
+            chooseAccount: {
+              accountId: body.accountId,
+            },
+            account: {
+              payment: {},
+            },
+          },
+        }),
       },
     });
     await this.database.runTransactionAsync(async (transaction) => {

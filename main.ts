@@ -15,6 +15,8 @@ import { ListPaymentProfileSuspensionNotifyingTasksHandler } from "./node/list_p
 import { ListPaymentStripeInvoiceCreatingTasksHandler } from "./node/list_payment_stripe_invoice_creating_tasks_handler";
 import { ListPaymentStripeInvoicePayingTasksHandler } from "./node/list_payment_stripe_invoice_paying_tasks_handler";
 import { ListPayoutStripeTransferCreatingTasksHandler } from "./node/list_payout_stripe_transfer_creating_tasks_handler";
+import { ListPayoutStripeTransferDisabledNotifyingTasksHandler } from "./node/list_payout_stripe_transfer_disabled_notifying_tasks_handler";
+import { ListPayoutStripeTransferSuccessNotifyingTasksHandler } from "./node/list_payout_stripe_transfer_success_notifying_tasks_handler";
 import { ListStripeConnectedAccountForPayoutCreatingTasksHandler } from "./node/list_stripe_connected_account_creating_for_payout_tasks_handler";
 import { ListStripeConnectedAccountNeedsSetupNotifyingTasksHandler } from "./node/list_stripe_connected_account_needs_setup_notifying_tasks_handler";
 import { ListStripeCustomerCreatingTasksHandler } from "./node/list_stripe_customer_creating_tasks_handler";
@@ -26,12 +28,15 @@ import { ProcessPaymentProfileSuspensionNotifyingTaskHandler } from "./node/proc
 import { ProcessPaymentStripeInvoiceCreatingTaskHandler } from "./node/process_payment_stripe_invoice_creating_task_handler";
 import { ProcessPaymentStripeInvoicePayingTaskHandler } from "./node/process_payment_stripe_invoice_paying_task_handler";
 import { ProcessPayoutStripeTransferCreatingTaskHandler } from "./node/process_payout_stripe_transfer_creating_task_handler";
+import { ProcessPayoutStripeTransferDisabledNotifyingTaskHandler } from "./node/process_payout_stripe_transfer_disabled_notifying_task_handler";
+import { ProcessPayoutStripeTransferSuccessNotifyingTaskHandler } from "./node/process_payout_stripe_transfer_success_notifying_task_handler";
 import { ProcessStripeConnectedAccountForPayoutCreatingTaskHandler } from "./node/process_stripe_connected_account_for_payout_creating_task_handler";
 import { ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler } from "./node/process_stripe_connected_account_needs_setup_notifying_task_handler";
 import { ProcessStripeCustomerCreatingTaskHandler } from "./node/process_stripe_customer_creating_task_handler";
 import { CreateStripeSessionToAddPaymentMethodHandler } from "./web/payment/create_stripe_session_to_add_payment_method_handler";
 import { GetPaymentProfileInfoHandler } from "./web/payment/get_payment_profile_info_handler";
 import { ListPaymentsHandler } from "./web/payment/list_payments_handler";
+import { ReactivatePaymentProfileHandler } from "./web/payment/reactivate_payment_profile_handler";
 import { ReplacePrimaryPaymentMethodHandler } from "./web/payment/replace_primary_payment_method_handler";
 import { RetryFailedPaymentsHandler } from "./web/payment/retry_failed_payments_handler";
 import { GetPayoutProfileInfoHandler } from "./web/payout/get_payout_profile_info_handler";
@@ -92,6 +97,8 @@ async function main() {
     .add(ListPaymentStripeInvoiceCreatingTasksHandler.create())
     .add(ListPaymentStripeInvoicePayingTasksHandler.create())
     .add(ListPayoutStripeTransferCreatingTasksHandler.create())
+    .add(ListPayoutStripeTransferDisabledNotifyingTasksHandler.create())
+    .add(ListPayoutStripeTransferSuccessNotifyingTasksHandler.create())
     .add(ListStripeConnectedAccountForPayoutCreatingTasksHandler.create())
     .add(ListStripeConnectedAccountNeedsSetupNotifyingTasksHandler.create())
     .add(ListStripeCustomerCreatingTasksHandler.create())
@@ -103,6 +110,8 @@ async function main() {
     .add(ProcessPaymentStripeInvoiceCreatingTaskHandler.create())
     .add(ProcessPaymentStripeInvoicePayingTaskHandler.create())
     .add(ProcessPayoutStripeTransferCreatingTaskHandler.create())
+    .add(ProcessPayoutStripeTransferDisabledNotifyingTaskHandler.create())
+    .add(ProcessPayoutStripeTransferSuccessNotifyingTaskHandler.create())
     .add(ProcessStripeConnectedAccountForPayoutCreatingTaskHandler.create())
     .add(ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler.create())
     .add(ProcessStripeCustomerCreatingTaskHandler.create());
@@ -111,6 +120,7 @@ async function main() {
     .add(CreateStripeSessionToAddPaymentMethodHandler.create())
     .add(GetPaymentProfileInfoHandler.create())
     .add(ListPaymentsHandler.create())
+    .add(ReactivatePaymentProfileHandler.create())
     .add(ReplacePrimaryPaymentMethodHandler.create())
     .add(RetryFailedPaymentsHandler.create())
     .add(GetPayoutProfileInfoHandler.create())

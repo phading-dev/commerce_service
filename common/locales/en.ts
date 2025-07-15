@@ -10,13 +10,19 @@ export default class EN {
   get invoiceForMonth() {
     return "For the month of ";
   }
+  get setupStripeConnectedAccountEmailTemplateId() {
+    return ENV_VARS.setupStripeConnectedAccountEnEmailTemplateId;
+  }
   get updatePaymentMethodEmailTemplateId() {
     return ENV_VARS.updatePaymentMethodEnEmailTemplateId;
   }
-  get accountSuspensionEmailTemplateId() {
-    return ENV_VARS.accountSuspensionEnEmailTemplateId;
+  get profileSuspensionEmailTemplateId() {
+    return ENV_VARS.profileSuspensionEnEmailTemplateId;
   }
-  get setupStripeConnectedAccountEmailTemplateId() {
-    return ENV_VARS.setupStripeConnectedAccountEnEmailTemplateId;
+  get payoutDisabledEmailTemplateId() {
+    return ENV_VARS.payoutDisabledEnEmailTemplateId;
+  }
+  get payoutSuccessEmailTemplateId() {
+    return ENV_VARS.payoutSuccessEnEmailTemplateId;
   }
 }

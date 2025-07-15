@@ -5,10 +5,14 @@ import { PayoutState } from "../db/schema";
 import {
   GetPayoutRow,
   deletePayoutStripeTransferCreatingTaskStatement,
+  deletePayoutStripeTransferDisabledNotifyingTaskStatement,
+  deletePayoutStripeTransferSuccessNotifyingTaskStatement,
   getPayout,
   getPayoutProfileFromStatement,
   getPayoutStripeTransferCreatingTaskMetadata,
   getTransactionStatement,
+  insertPayoutStripeTransferDisabledNotifyingTaskStatement,
+  insertPayoutStripeTransferSuccessNotifyingTaskStatement,
   updatePayoutStateAndStripeTransferStatement,
   updatePayoutStateStatement,
   updatePayoutStripeTransferCreatingTaskMetadataStatement,
@@ -163,14 +167,24 @@ export class ProcessPayoutStripeTransferCreatingTaskHandler extends ProcessPayou
   ) {
     await this.database.runTransactionAsync(async (transaction) => {
       await this.getvalidPayout(transaction, statementId);
+      let now = this.getNow();
       await transaction.batchUpdate([
         updatePayoutStateStatement({
           payoutStatementIdEq: statementId,
           setState: PayoutState.DISABLED,
-          setUpdatedTimeMs: this.getNow(),
+          setUpdatedTimeMs: now,
         }),
         deletePayoutStripeTransferCreatingTaskStatement({
           payoutStripeTransferCreatingTaskTaskIdEq: taskId,
+        }),
+        deletePayoutStripeTransferDisabledNotifyingTaskStatement({
+          payoutStripeTransferDisabledNotifyingTaskStatementIdEq: statementId,
+        }),
+        insertPayoutStripeTransferDisabledNotifyingTaskStatement({
+          statementId,
+          retryCount: 0,
+          executionTimeMs: now,
+          createdTimeMs: now,
         }),
       ]);
       await transaction.commit();
@@ -185,15 +199,25 @@ export class ProcessPayoutStripeTransferCreatingTaskHandler extends ProcessPayou
   ) {
     await this.database.runTransactionAsync(async (transaction) => {
       await this.getvalidPayout(transaction, statementId);
+      let now = this.getNow();
       await transaction.batchUpdate([
         updatePayoutStateAndStripeTransferStatement({
           payoutStatementIdEq: statementId,
           setState: PayoutState.PAID,
           setStripeTransferId: transferId,
-          setUpdatedTimeMs: this.getNow(),
+          setUpdatedTimeMs: now,
         }),
         deletePayoutStripeTransferCreatingTaskStatement({
           payoutStripeTransferCreatingTaskTaskIdEq: taskId,
+        }),
+        deletePayoutStripeTransferSuccessNotifyingTaskStatement({
+          payoutStripeTransferSuccessNotifyingTaskStatementIdEq: statementId,
+        }),
+        insertPayoutStripeTransferSuccessNotifyingTaskStatement({
+          statementId,
+          retryCount: 0,
+          executionTimeMs: now,
+          createdTimeMs: now,
         }),
       ]);
       await transaction.commit();

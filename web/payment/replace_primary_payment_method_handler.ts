@@ -12,6 +12,7 @@ import {
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import {
   newInternalServerErrorError,
+  newNotFoundError,
   newUnauthorizedError,
 } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
@@ -61,7 +62,7 @@ export class ReplacePrimaryPaymentMethodHandler extends ReplacePrimaryPaymentMet
       paymentProfileAccountIdEq: accountId,
     });
     if (profileRows.length === 0) {
-      throw newInternalServerErrorError(
+      throw newNotFoundError(
         `Payment account ${accountId} is not found.`,
       );
     }

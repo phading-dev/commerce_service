@@ -372,5 +372,45 @@
       "name": "PayoutStripeTransferCreatingTaskByExecutionTime",
       "createIndexDdl": "CREATE INDEX PayoutStripeTransferCreatingTaskByExecutionTime ON PayoutStripeTransferCreatingTask(executionTimeMs)"
     }]
+  }, {
+    "name": "PayoutStripeTransferSuccessNotifyingTask",
+    "columns": [{
+      "name": "statementId",
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferSuccessNotifyingTask ADD COLUMN statementId STRING(MAX) NOT NULL"
+    }, {
+      "name": "retryCount",
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferSuccessNotifyingTask ADD COLUMN retryCount FLOAT64"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferSuccessNotifyingTask ADD COLUMN executionTimeMs TIMESTAMP"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferSuccessNotifyingTask ADD COLUMN createdTimeMs TIMESTAMP"
+    }],
+    "createTableDdl": "CREATE TABLE PayoutStripeTransferSuccessNotifyingTask (statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (statementId ASC)",
+    "indexes": [{
+      "name": "PayoutStripeTransferSuccessNotifyingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX PayoutStripeTransferSuccessNotifyingTaskByExecutionTime ON PayoutStripeTransferSuccessNotifyingTask(executionTimeMs)"
+    }]
+  }, {
+    "name": "PayoutStripeTransferDisabledNotifyingTask",
+    "columns": [{
+      "name": "statementId",
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferDisabledNotifyingTask ADD COLUMN statementId STRING(MAX) NOT NULL"
+    }, {
+      "name": "retryCount",
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferDisabledNotifyingTask ADD COLUMN retryCount FLOAT64"
+    }, {
+      "name": "executionTimeMs",
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferDisabledNotifyingTask ADD COLUMN executionTimeMs TIMESTAMP"
+    }, {
+      "name": "createdTimeMs",
+      "addColumnDdl": "ALTER TABLE PayoutStripeTransferDisabledNotifyingTask ADD COLUMN createdTimeMs TIMESTAMP"
+    }],
+    "createTableDdl": "CREATE TABLE PayoutStripeTransferDisabledNotifyingTask (statementId STRING(MAX) NOT NULL, retryCount FLOAT64, executionTimeMs TIMESTAMP, createdTimeMs TIMESTAMP) PRIMARY KEY (statementId ASC)",
+    "indexes": [{
+      "name": "PayoutStripeTransferDisabledNotifyingTaskByExecutionTime",
+      "createIndexDdl": "CREATE INDEX PayoutStripeTransferDisabledNotifyingTaskByExecutionTime ON PayoutStripeTransferDisabledNotifyingTask(executionTimeMs)"
+    }]
   }]
 }

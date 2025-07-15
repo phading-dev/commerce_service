@@ -463,6 +463,40 @@
       listPendingTasks: ListPendingPayoutStripeTransferCreatingTasks
       getMetadata: GetPayoutStripeTransferCreatingTaskMetadata
       updateMetadata: UpdatePayoutStripeTransferCreatingTaskMetadata
+    - kind: TaskTable
+      name: PayoutStripeTransferSuccessNotifyingTask
+      columns:
+        - name: statementId
+          type: string
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - statementId
+      executionTimeIndex: PayoutStripeTransferSuccessNotifyingTaskByExecutionTime
+      insert: InsertPayoutStripeTransferSuccessNotifyingTask
+      delete: DeletePayoutStripeTransferSuccessNotifyingTask
+      get: GetPayoutStripeTransferSuccessNotifyingTask
+      listPendingTasks: ListPendingPayoutStripeTransferSuccessNotifyingTasks
+      getMetadata: GetPayoutStripeTransferSuccessNotifyingTaskMetadata
+      updateMetadata: UpdatePayoutStripeTransferSuccessNotifyingTaskMetadata
+    - kind: TaskTable
+      name: PayoutStripeTransferDisabledNotifyingTask
+      columns:
+        - name: statementId
+          type: string
+      retryCountColumn: retryCount
+      executionTimeColumn: executionTimeMs
+      createdTimeColumn: createdTimeMs
+      primaryKeys:
+        - statementId
+      executionTimeIndex: PayoutStripeTransferDisabledNotifyingTaskByExecutionTime
+      insert: InsertPayoutStripeTransferDisabledNotifyingTask
+      delete: DeletePayoutStripeTransferDisabledNotifyingTask
+      get: GetPayoutStripeTransferDisabledNotifyingTask
+      listPendingTasks: ListPendingPayoutStripeTransferDisabledNotifyingTasks
+      getMetadata: GetPayoutStripeTransferDisabledNotifyingTaskMetadata
+      updateMetadata: UpdatePayoutStripeTransferDisabledNotifyingTaskMetadata
   deletes:
     - name: DeletePaymentStripeInvoiceCreatingTaskByStatement
       table: PaymentStripeInvoiceCreatingTask

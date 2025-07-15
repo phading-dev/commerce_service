@@ -16,7 +16,10 @@ import {
   GetPaymentProfileInfoResponse,
 } from "@phading/commerce_service_interface/web/payment/interface";
 import { CARD_BRAND } from "@phading/commerce_service_interface/web/payment/payment_method_masked";
-import { PaymentProfileState as PaymentProfileStateResponse } from "@phading/commerce_service_interface/web/payment/payment_profile";
+import {
+  PaymentProfileState as PaymentProfileStateResponse,
+  PaymentsOverallState,
+} from "@phading/commerce_service_interface/web/payment/payment_profile";
 import { newFetchSessionAndCheckCapabilityRequest } from "@phading/user_session_service_interface/node/client";
 import { newUnauthorizedError } from "@selfage/http_error";
 import { parseEnum } from "@selfage/message/parser";
@@ -133,8 +136,10 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
               },
             }
           : undefined,
-        state: this.getState(
+        profileState: this.getProfileState(
           profile.paymentProfileStateInfo.state,
+        ),
+        paymentsOverallState: this.getPaymentsOverallState(
           failedWithoutInvoiceRows.length > 0,
           failedWithInvoiceRows.length > 0,
           waitingRows.length > 0,
@@ -155,23 +160,30 @@ export class GetPaymentProfileInfoHandler extends GetPaymentProfileInfoHandlerIn
     };
   }
 
-  private getState(
+  private getProfileState(
     state: PaymentProfileState,
+  ): PaymentProfileStateResponse {
+    switch (state) {
+      case PaymentProfileState.HEALTHY:
+        return PaymentProfileStateResponse.HEALTHY;
+      case PaymentProfileState.SUSPENDED:
+        return PaymentProfileStateResponse.SUSPENDED;
+    }
+  }
+
+  private getPaymentsOverallState(
     hasFailedWithoutInvoice: boolean,
     hasFailedWithInvoice: boolean,
     hasWaitingPayment: boolean,
     hasCreatingPayment: boolean,
     hasPayingPayment: boolean,
-  ): PaymentProfileStateResponse {
-    switch (state) {
-      case PaymentProfileState.HEALTHY:
-        return hasFailedWithoutInvoice || hasFailedWithInvoice
-          ? PaymentProfileStateResponse.WITH_FAILED_PAYMENTS
-          : hasWaitingPayment || hasCreatingPayment || hasPayingPayment
-            ? PaymentProfileStateResponse.WITH_PROCESSING_PAYMENTS
-            : PaymentProfileStateResponse.HEALTHY;
-      case PaymentProfileState.SUSPENDED:
-        return PaymentProfileStateResponse.SUSPENDED;
+  ): PaymentsOverallState {
+    if (hasFailedWithoutInvoice || hasFailedWithInvoice) {
+      return PaymentsOverallState.WITH_FAILED_PAYMENTS;
+    } else if (hasWaitingPayment || hasCreatingPayment || hasPayingPayment) {
+      return PaymentsOverallState.WITH_PROCESSING_PAYMENTS;
+    } else {
+      return PaymentsOverallState.ALL_PAID;
     }
   }
 }

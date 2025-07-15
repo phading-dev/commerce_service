@@ -54,6 +54,7 @@ TEST_RUNNER.run({
           SPANNER_DATABASE,
           clientMock,
           sendgridClientMock,
+          "https://test.com",
           () => 1000,
         );
 
@@ -73,6 +74,11 @@ TEST_RUNNER.run({
           sendEmailParamsCaptured.dynamicTemplateData.name,
           eq("First Second"),
           "sendEmailParams.dynamicTemplateData.name",
+        );
+        assertThat(
+          sendEmailParamsCaptured.dynamicTemplateData.paymentPageUrl,
+          eq("https://test.com/?e=%7B%221%22%3A%7B%221%22%3A%7B%221%22%3A%22account1%22%7D%2C%222%22%3A%7B%222%22%3A%7B%7D%7D%7D%7D"),
+          "sendEmailParams.dynamicTemplateData.paymentPageUrl",
         );
         assertThat(
           await listPendingPaymentProfileSuspensionNotifyingTasks(
@@ -125,6 +131,7 @@ TEST_RUNNER.run({
           SPANNER_DATABASE,
           clientMock,
           sendgridClientMock,
+          "https://example.com",
           () => 1000,
         );
 
@@ -169,6 +176,7 @@ TEST_RUNNER.run({
         });
         let handler = new ProcessPaymentProfileSuspensionNotifyingTaskHandler(
           SPANNER_DATABASE,
+          undefined,
           undefined,
           undefined,
           () => 1000,
