@@ -10,7 +10,6 @@ ENV_VARS.stripeMarkPaymentFailedSecretKeyFile =
   "stripe_mark_payment_failed_secret_key";
 ENV_VARS.stripeMarkPayoutEnabledSecretKeyFile =
   "stripe_mark_payout_enabled_secret_key";
-ENV_VARS.sendgridApiKeyFile = "send_grid_api_key";
 ENV_VARS.releaseServiceName = "commerce-service";
 ENV_VARS.port = 8080;
 ENV_VARS.builderAccount = "commerce-service-builder";

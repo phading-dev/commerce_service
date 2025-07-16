@@ -8,7 +8,6 @@ export interface EnvVars extends ClusterEnvVars {
   stripeMarkPaymentDoneSecretKeyFile?: string;
   stripeMarkPaymentFailedSecretKeyFile?: string;
   stripeMarkPayoutEnabledSecretKeyFile?: string;
-  sendgridApiKeyFile?: string;
   setupStripeConnectedAccountEnEmailTemplateId?: string;
   updatePaymentMethodEnEmailTemplateId?: string;
   profileSuspensionEnEmailTemplateId?: string;
