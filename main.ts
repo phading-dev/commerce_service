@@ -41,7 +41,6 @@ import { ReplacePrimaryPaymentMethodHandler } from "./web/payment/replace_primar
 import { RetryFailedPaymentsHandler } from "./web/payment/retry_failed_payments_handler";
 import { GetPayoutProfileInfoHandler } from "./web/payout/get_payout_profile_info_handler";
 import { ListPayoutsHandler } from "./web/payout/list_payouts_handler";
-import { SetConnectedAccountOnboardedHandler } from "./web/payout/set_connected_account_onboarded_handler";
 import { ListTransactionStatementsHandler } from "./web/statements/list_transaction_statements_handler";
 import { GrantInitPaymentCreditHandler } from "./web/stripe_webhook/grant_init_payment_credit_handler";
 import { MarkPaymentDoneHandler } from "./web/stripe_webhook/mark_payment_done_handler";
@@ -132,7 +131,6 @@ async function main() {
     .add(RetryFailedPaymentsHandler.create())
     .add(GetPayoutProfileInfoHandler.create())
     .add(ListPayoutsHandler.create())
-    .add(SetConnectedAccountOnboardedHandler.create())
     .add(ListTransactionStatementsHandler.create())
     .add(GrantInitPaymentCreditHandler.create(stripeGrantInitPaymentCreditSecretKey))
     .add(MarkPaymentDoneHandler.create(stripeMarkPaymentDoneSecretKey))

@@ -105,7 +105,10 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
     );
     await this.sendgridClient.send({
       to: contactResponse.contactEmail,
-      from: ENV_VARS.supportEmail,
+      from: {
+        email: ENV_VARS.supportEmail,
+        name: "Secount support",
+      },
       templateId: LOCALIZATION.setupStripeConnectedAccountEmailTemplateId,
       dynamicTemplateData: {
         name: contactResponse.naturalName,
