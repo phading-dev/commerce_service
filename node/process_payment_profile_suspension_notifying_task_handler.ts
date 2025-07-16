@@ -1,4 +1,4 @@
-import { PLATFORM_NAME } from "../common/constants";
+import { PLATFORM_NAME, SUPPORT_EMAIL_NAME } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
@@ -105,7 +105,10 @@ export class ProcessPaymentProfileSuspensionNotifyingTaskHandler extends Process
     );
     await this.sendgridClient.send({
       to: accountResponse.contactEmail,
-      from: ENV_VARS.supportEmail,
+      from: {
+        email: ENV_VARS.supportEmail,
+        name: SUPPORT_EMAIL_NAME,
+      },
       templateId: LOCALIZATION.profileSuspensionEmailTemplateId,
       dynamicTemplateData: {
         name: accountResponse.naturalName,

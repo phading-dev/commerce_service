@@ -1,4 +1,8 @@
-import { GRACE_PERIOD_DAYS, PLATFORM_NAME } from "../common/constants";
+import {
+  GRACE_PERIOD_DAYS,
+  PLATFORM_NAME,
+  SUPPORT_EMAIL_NAME,
+} from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
@@ -116,7 +120,10 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
     );
     await this.sendgridClient.send({
       to: contactEmail,
-      from: ENV_VARS.supportEmail,
+      from: {
+        email: ENV_VARS.supportEmail,
+        name: SUPPORT_EMAIL_NAME,
+      },
       templateId: LOCALIZATION.updatePaymentMethodEmailTemplateId,
       dynamicTemplateData: {
         name: naturalName,

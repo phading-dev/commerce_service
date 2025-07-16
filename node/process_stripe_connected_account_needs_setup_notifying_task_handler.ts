@@ -1,3 +1,4 @@
+import { PLATFORM_NAME, SUPPORT_EMAIL_NAME } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
@@ -19,7 +20,6 @@ import { buildUrl } from "@phading/web_interface/url_builder";
 import { newBadRequestError } from "@selfage/http_error";
 import { NodeServiceClient } from "@selfage/node_service_client";
 import { ProcessTaskHandlerWrapper } from "@selfage/service_handler/process_task_handler_wrapper";
-import { PLATFORM_NAME } from "../common/constants";
 
 export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandlerInterface {
   public static create(): ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler {
@@ -107,7 +107,7 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
       to: contactResponse.contactEmail,
       from: {
         email: ENV_VARS.supportEmail,
-        name: "Secount support",
+        name: SUPPORT_EMAIL_NAME,
       },
       templateId: LOCALIZATION.setupStripeConnectedAccountEmailTemplateId,
       dynamicTemplateData: {
