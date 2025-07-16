@@ -46,6 +46,7 @@ import { ListTransactionStatementsHandler } from "./web/statements/list_transact
 import { GrantInitPaymentCreditHandler } from "./web/stripe_webhook/grant_init_payment_credit_handler";
 import { MarkPaymentDoneHandler } from "./web/stripe_webhook/mark_payment_done_handler";
 import { MarkPaymentFailedHandler } from "./web/stripe_webhook/mark_payment_failed_handler";
+import { MarkPayoutEnabledHandler } from "./web/stripe_webhook/mark_payout_enabled_handler";
 import {
   COMMERCE_NODE_SERVICE,
   COMMERCE_WEB_SERVICE,
@@ -54,23 +55,29 @@ import { ServiceHandler } from "@selfage/service_handler/service_handler";
 
 async function main() {
   let [
-    stripeCustomerUpdatedSecretKey,
-    stripePaymentIntentSuccessSecretKey,
-    stripePaymentIntentFailedSecretKey,
+    stripeGrantInitPaymentCreditSecretKey,
+    stripeMarkPaymentDoneSecretKey,
+    stripeMarkPaymentFailedSecretKey,
+    stripeMarkPayoutEnabledSecretKey,
   ] = await Promise.all([
     getStream(
       STORAGE_CLIENT.bucket(ENV_VARS.gcsSecretBucketName)
-        .file(ENV_VARS.stripeCustomerUpdatedSecretKeyFile)
+        .file(ENV_VARS.stripeGrantInitPaymentCreditSecretKeyFile)
         .createReadStream(),
     ),
     getStream(
       STORAGE_CLIENT.bucket(ENV_VARS.gcsSecretBucketName)
-        .file(ENV_VARS.stripePaymentIntentSuccessSecretKeyFile)
+        .file(ENV_VARS.stripeMarkPaymentDoneSecretKeyFile)
         .createReadStream(),
     ),
     getStream(
       STORAGE_CLIENT.bucket(ENV_VARS.gcsSecretBucketName)
-        .file(ENV_VARS.stripePaymentIntentFailedSecretKeyFile)
+        .file(ENV_VARS.stripeMarkPaymentFailedSecretKeyFile)
+        .createReadStream(),
+    ),
+    getStream(
+      STORAGE_CLIENT.bucket(ENV_VARS.gcsSecretBucketName)
+        .file(ENV_VARS.stripeMarkPayoutEnabledSecretKeyFile)
         .createReadStream(),
     ),
     initStripeClient(),
@@ -127,9 +134,10 @@ async function main() {
     .add(ListPayoutsHandler.create())
     .add(SetConnectedAccountOnboardedHandler.create())
     .add(ListTransactionStatementsHandler.create())
-    .add(GrantInitPaymentCreditHandler.create(stripeCustomerUpdatedSecretKey))
-    .add(MarkPaymentDoneHandler.create(stripePaymentIntentSuccessSecretKey))
-    .add(MarkPaymentFailedHandler.create(stripePaymentIntentFailedSecretKey));
+    .add(GrantInitPaymentCreditHandler.create(stripeGrantInitPaymentCreditSecretKey))
+    .add(MarkPaymentDoneHandler.create(stripeMarkPaymentDoneSecretKey))
+    .add(MarkPaymentFailedHandler.create(stripeMarkPaymentFailedSecretKey))
+    .add(MarkPayoutEnabledHandler.create(stripeMarkPayoutEnabledSecretKey));
   await service.start(ENV_VARS.port);
 }
 

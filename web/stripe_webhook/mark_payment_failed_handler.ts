@@ -29,13 +29,13 @@ import { Readable } from "stream";
 
 export class MarkPaymentFailedHandler extends MarkPaymentFailedHandlerInterface {
   public static create(
-    stripePaymentIntentFailedSecretKey: string,
+    stripeMarkPaymentFailedSecretKey: string,
   ): MarkPaymentFailedHandler {
     return new MarkPaymentFailedHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       () => Date.now(),
-      stripePaymentIntentFailedSecretKey,
+      stripeMarkPaymentFailedSecretKey,
     );
   }
 

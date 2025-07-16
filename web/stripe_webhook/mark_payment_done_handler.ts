@@ -20,13 +20,13 @@ import { Readable } from "stream";
 
 export class MarkPaymentDoneHandler extends MarkPaymentDoneHandlerInterface {
   public static create(
-    stripePaymentIntentSuccessSecretKey: string,
+    stripeMarkPaymentDoneSecretKey: string,
   ): MarkPaymentDoneHandler {
     return new MarkPaymentDoneHandler(
       SPANNER_DATABASE,
       STRIPE_CLIENT,
       () => Date.now(),
-      stripePaymentIntentSuccessSecretKey,
+      stripeMarkPaymentDoneSecretKey,
     );
   }
 
