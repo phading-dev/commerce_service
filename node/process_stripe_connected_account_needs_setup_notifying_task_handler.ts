@@ -1,4 +1,3 @@
-import { PLATFORM_NAME, SUPPORT_EMAIL_NAME } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
@@ -107,12 +106,12 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
       to: contactResponse.contactEmail,
       from: {
         email: ENV_VARS.supportEmail,
-        name: SUPPORT_EMAIL_NAME,
+        name: ENV_VARS.supportEmailName,
       },
       templateId: LOCALIZATION.setupStripeConnectedAccountEmailTemplateId,
       dynamicTemplateData: {
-        name: contactResponse.naturalName,
-        platformName: PLATFORM_NAME,
+        name: contactResponse.name,
+        platformName: ENV_VARS.platformName,
         completeSetupUrl: buildUrl(this.externalOrigin, {
           main: {
             chooseAccount: {
@@ -123,6 +122,8 @@ export class ProcessStripeConnectedAccountNeedsSetupNotifyingTaskHandler extends
             },
           },
         }),
+        yearAndCompany: ENV_VARS.emailFooterYearAndCompany,
+        companyAddress: ENV_VARS.emailFooterCompanyAddress,
       },
     });
     await this.database.runTransactionAsync(async (transaction) => {

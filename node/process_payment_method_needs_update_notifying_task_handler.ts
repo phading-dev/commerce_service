@@ -1,8 +1,4 @@
-import {
-  GRACE_PERIOD_DAYS,
-  PLATFORM_NAME,
-  SUPPORT_EMAIL_NAME,
-} from "../common/constants";
+import { GRACE_PERIOD_DAYS } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
@@ -113,7 +109,7 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
       );
     }
     let transactionStatement = statementRows[0];
-    let { naturalName, contactEmail } = await this.serviceClient.send(
+    let { name, contactEmail } = await this.serviceClient.send(
       newGetAccountContactRequest({
         accountId: transactionStatement.transactionStatementAccountId,
       }),
@@ -122,12 +118,12 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
       to: contactEmail,
       from: {
         email: ENV_VARS.supportEmail,
-        name: SUPPORT_EMAIL_NAME,
+        name: ENV_VARS.supportEmailName,
       },
       templateId: LOCALIZATION.updatePaymentMethodEmailTemplateId,
       dynamicTemplateData: {
-        name: naturalName,
-        platformName: PLATFORM_NAME,
+        name: name,
+        platformName: ENV_VARS.platformName,
         month: transactionStatement.transactionStatementMonth,
         gracePeriodDays: `${GRACE_PERIOD_DAYS}`,
         updatePaymentMethodUrl: buildUrl(this.externalOrigin, {
@@ -150,6 +146,8 @@ export class ProcessPaymentMethodNeedsUpdateNotifyingTaskHandler extends Process
             },
           },
         }),
+        yearAndCompany: ENV_VARS.emailFooterYearAndCompany,
+        companyAddress: ENV_VARS.emailFooterCompanyAddress,
       },
     });
     await this.database.runTransactionAsync(async (transaction) => {

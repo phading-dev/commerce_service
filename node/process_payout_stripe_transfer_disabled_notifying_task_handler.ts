@@ -1,4 +1,3 @@
-import { PLATFORM_NAME, SUPPORT_EMAIL_NAME } from "../common/constants";
 import { LOCALIZATION } from "../common/localization";
 import { SENDGRID_CLIENT } from "../common/sendgrid_client";
 import { SERVICE_CLIENT } from "../common/service_client";
@@ -130,12 +129,12 @@ export class ProcessPayoutStripeTransferDisabledNotifyingTaskHandler extends Pro
       to: accountResponse.contactEmail,
       from: {
         email: ENV_VARS.supportEmail,
-        name: SUPPORT_EMAIL_NAME,
+        name: ENV_VARS.supportEmailName,
       },
       templateId: LOCALIZATION.payoutDisabledEmailTemplateId,
       dynamicTemplateData: {
-        name: accountResponse.naturalName,
-        platformName: PLATFORM_NAME,
+        name: accountResponse.name,
+        platformName: ENV_VARS.platformName,
         month: transactionStatement.transactionStatementMonth,
         money,
         setupPayoutUrl: buildUrl(this.externalOrigin, {
@@ -148,6 +147,8 @@ export class ProcessPayoutStripeTransferDisabledNotifyingTaskHandler extends Pro
             },
           },
         }),
+        yearAndCompany: ENV_VARS.emailFooterYearAndCompany,
+        companyAddress: ENV_VARS.emailFooterCompanyAddress,
       },
     });
     await this.database.runTransactionAsync(async (transaction) => {

@@ -104,7 +104,7 @@ export class ProcessStripeCustomerCreatingTaskHandler extends ProcessStripeCusto
     let customer = await this.stripeClient.val.customers.create(
       {
         email: contactResponse.contactEmail,
-        name: contactResponse.naturalName,
+        name: contactResponse.name,
         test_clock: this.testClockId,
         tax: {
           validate_location: "deferred",
