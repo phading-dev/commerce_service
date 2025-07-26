@@ -32,11 +32,11 @@
   "dependencies": {
     "@google-cloud/spanner": "^7.21.0",
     "@google-cloud/storage": "^7.16.0",
-    "@phading/cluster": "^1.0.13",
+    "@phading/cluster": "^1.0.14",
     "@phading/commerce_service_interface": "^1.3.16",
     "@phading/constants": "^0.3.14",
     "@phading/price_config": "^0.7.5",
-    "@phading/user_service_interface": "^1.2.15",
+    "@phading/user_service_interface": "^1.2.16",
     "@phading/user_session_service_interface": "^1.1.1",
     "@phading/web_interface": "^1.1.5",
     "@selfage/env_var_getter": "^1.0.2",
