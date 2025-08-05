@@ -151,7 +151,7 @@ spec:
     config:
       type: HTTP
       httpHealthCheck:
-        port: ${K8S_SERVICE_PORT}
+        port: ${ENV_VARS.port}
         requestPath: /healthz
   targetRef:
     group: ""

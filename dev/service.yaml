@@ -73,7 +73,7 @@ spec:
     config:
       type: HTTP
       httpHealthCheck:
-        port: 80
+        port: 8080
         requestPath: /healthz
   targetRef:
     group: ""
